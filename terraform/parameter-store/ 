@@ -1,0 +1,864 @@
+{
+  "version": 4,
+  "terraform_version": "1.14.3",
+  "serial": 1,
+  "lineage": "def0d764-10bf-abb2-5f19-91fd622008ba",
+  "outputs": {
+    "kms_key_arn": {
+      "value": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+      "type": "string"
+    },
+    "parameter_store_prefix": {
+      "value": "/doktori/dev",
+      "type": "string"
+    },
+    "read_policy_arn": {
+      "value": "arn:aws:iam::246477585940:policy/doktori-dev-parameter-store-read",
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "aws_iam_policy",
+      "name": "parameter_store_read",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:iam::246477585940:policy/doktori-dev-parameter-store-read",
+            "attachment_count": 0,
+            "description": "Policy to read Parameter Store secrets",
+            "id": "arn:aws:iam::246477585940:policy/doktori-dev-parameter-store-read",
+            "name": "doktori-dev-parameter-store-read",
+            "name_prefix": "",
+            "path": "/",
+            "policy": "{\"Statement\":[{\"Action\":[\"ssm:GetParameter\",\"ssm:GetParameters\",\"ssm:GetParametersByPath\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:ssm:ap-northeast-2:*:parameter/doktori/dev/*\"},{\"Action\":[\"kms:Decrypt\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc\"}],\"Version\":\"2012-10-17\"}",
+            "policy_id": "ANPATSYZVPYKLTJC673LR",
+            "tags": {},
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Project": "doktori"
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_kms_alias",
+      "name": "parameter_store",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:kms:ap-northeast-2:246477585940:alias/doktori-dev-parameter-store",
+            "id": "alias/doktori-dev-parameter-store",
+            "name": "alias/doktori-dev-parameter-store",
+            "name_prefix": "",
+            "target_key_arn": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "target_key_id": "9c99924f-8f9a-48d3-bbf8-f252d95f61fc"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_kms_key",
+      "name": "parameter_store",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "bypass_policy_lockout_safety_check": false,
+            "custom_key_store_id": "",
+            "customer_master_key_spec": "SYMMETRIC_DEFAULT",
+            "deletion_window_in_days": 7,
+            "description": "KMS key for Parameter Store secrets",
+            "enable_key_rotation": true,
+            "id": "9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "is_enabled": true,
+            "key_id": "9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "key_usage": "ENCRYPT_DECRYPT",
+            "multi_region": false,
+            "policy": "{\"Id\":\"key-default-1\",\"Statement\":[{\"Action\":\"kms:*\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::246477585940:root\"},\"Resource\":\"*\",\"Sid\":\"Enable IAM User Permissions\"}],\"Version\":\"2012-10-17\"}",
+            "rotation_period_in_days": 365,
+            "tags": {
+              "Name": "doktori-dev-parameter-store-key"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-parameter-store-key",
+              "Project": "doktori"
+            },
+            "timeouts": null,
+            "xks_key_id": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDB9fQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "aws_s3_bucket_name",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/AWS_S3_BUCKET_NAME",
+            "data_type": "text",
+            "description": "AWS S3 bucket name",
+            "has_value_wo": null,
+            "id": "/doktori/dev/AWS_S3_BUCKET_NAME",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/AWS_S3_BUCKET_NAME",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-aws-s3-bucket-name"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-aws-s3-bucket-name",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "doktori-dev-images",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "aws_s3_enabled",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/AWS_S3_ENABLED",
+            "data_type": "text",
+            "description": "AWS S3 enabled flag",
+            "has_value_wo": null,
+            "id": "/doktori/dev/AWS_S3_ENABLED",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/AWS_S3_ENABLED",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-aws-s3-enabled"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-aws-s3-enabled",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "true",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "aws_s3_endpoint",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/AWS_S3_ENDPOINT",
+            "data_type": "text",
+            "description": "AWS S3 endpoint URL",
+            "has_value_wo": null,
+            "id": "/doktori/dev/AWS_S3_ENDPOINT",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/AWS_S3_ENDPOINT",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-aws-s3-endpoint"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-aws-s3-endpoint",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "https://s3.ap-northeast-2.amazonaws.com",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "aws_s3_region",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/AWS_REGION",
+            "data_type": "text",
+            "description": "AWS region for S3",
+            "has_value_wo": null,
+            "id": "/doktori/dev/AWS_REGION",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/AWS_REGION",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-aws-region"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-aws-region",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "ap-northeast-2",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "db_password",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/DB_PASSWORD",
+            "data_type": "text",
+            "description": "Database password",
+            "has_value_wo": null,
+            "id": "/doktori/dev/DB_PASSWORD",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/DB_PASSWORD",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-db-password"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-db-password",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "zsed1235",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "db_url",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/DB_URL",
+            "data_type": "text",
+            "description": "Database connection URL",
+            "has_value_wo": null,
+            "id": "/doktori/dev/DB_URL",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/DB_URL",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-db-url"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-db-url",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "jdbc:mysql://localhost:3306/doktoridb?serverTimezone=Asia/Seoul\u0026useSSL=false",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "db_username",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/DB_USERNAME",
+            "data_type": "text",
+            "description": "Database username",
+            "has_value_wo": null,
+            "id": "/doktori/dev/DB_USERNAME",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/DB_USERNAME",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-db-username"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-db-username",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "root",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "jwt_secret",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/JWT_SECRET",
+            "data_type": "text",
+            "description": "JWT signing secret",
+            "has_value_wo": null,
+            "id": "/doktori/dev/JWT_SECRET",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/JWT_SECRET",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-jwt-secret"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-jwt-secret",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "R4xZTbNTRBrfBULweNEesNNyz1st8RHvT07ct64iS02",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "kakao_client_id",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/KAKAO_CLIENT_ID",
+            "data_type": "text",
+            "description": "Kakao OAuth client ID",
+            "has_value_wo": null,
+            "id": "/doktori/dev/KAKAO_CLIENT_ID",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/KAKAO_CLIENT_ID",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-kakao-client-id"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-kakao-client-id",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "d5a5d8a5ef66dcd5c1a8cbe3261b1d43",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "kakao_client_secret",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/KAKAO_CLIENT_SECRET",
+            "data_type": "text",
+            "description": "Kakao OAuth client secret",
+            "has_value_wo": null,
+            "id": "/doktori/dev/KAKAO_CLIENT_SECRET",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/KAKAO_CLIENT_SECRET",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-kakao-client-secret"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-kakao-client-secret",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "o70nW1utkgc5z0Pyw4XN0e3dMLdl6b4m",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "kakao_frontend_redirect",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/KAKAO_FRONTEND_REDIRECT",
+            "data_type": "text",
+            "description": "Kakao OAuth frontend redirect URL",
+            "has_value_wo": null,
+            "id": "/doktori/dev/KAKAO_FRONTEND_REDIRECT",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/KAKAO_FRONTEND_REDIRECT",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-kakao-frontend-redirect"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-kakao-frontend-redirect",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "https://dev.doktori.kr/oauth/callback",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "kakao_redirect_uri",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/KAKAO_REDIRECT_URI",
+            "data_type": "text",
+            "description": "Kakao OAuth redirect URI",
+            "has_value_wo": null,
+            "id": "/doktori/dev/KAKAO_REDIRECT_URI",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/KAKAO_REDIRECT_URI",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-kakao-redirect-uri"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-kakao-redirect-uri",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "https://dev.doktori.kr/api/oauth/kakao/callback",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "spring_profiles_active",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "allowed_pattern": "",
+            "arn": "arn:aws:ssm:ap-northeast-2:246477585940:parameter/doktori/dev/SPRING_PROFILES_ACTIVE",
+            "data_type": "text",
+            "description": "Spring active profile",
+            "has_value_wo": null,
+            "id": "/doktori/dev/SPRING_PROFILES_ACTIVE",
+            "insecure_value": null,
+            "key_id": "arn:aws:kms:ap-northeast-2:246477585940:key/9c99924f-8f9a-48d3-bbf8-f252d95f61fc",
+            "name": "/doktori/dev/SPRING_PROFILES_ACTIVE",
+            "overwrite": null,
+            "tags": {
+              "Name": "doktori-dev-spring-profiles-active"
+            },
+            "tags_all": {
+              "Environment": "dev",
+              "ManagedBy": "Terraform",
+              "Name": "doktori-dev-spring-profiles-active",
+              "Project": "doktori"
+            },
+            "tier": "Standard",
+            "type": "SecureString",
+            "value": "dev",
+            "value_wo": null,
+            "value_wo_version": null,
+            "version": 1
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "value"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "value_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_kms_key.parameter_store"
+          ]
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}
