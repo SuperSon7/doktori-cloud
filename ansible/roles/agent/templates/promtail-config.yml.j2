@@ -1,0 +1,20 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+clients:
+  # 43.200.183.8은 모니터링 서버(Loki)의 IP입니다.
+  - url: http://43.200.183.8:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: spring-boot-app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          # 인벤토리에서 설정한 env 변수(prod/dev)가 여기에 들어갑니다.
+          env: "{{ env }}"
+          instance: "{{ inventory_hostname }}"
+          job: spring-boot-app
+          # Spring Boot 로그 파일이 생성되는 실제 경로를 적어주세요.
+          __path__: /home/ubuntu/app/backend/*.log

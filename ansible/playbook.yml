@@ -1,0 +1,9 @@
+- hosts: monitoring_server
+  become: yes
+  roles:
+    - monitoring
+
+- hosts: targets
+  become: yes
+  roles:
+    - agent

@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'node_metrics'
+    static_configs:
+      - targets: ['doktori.kr:9100']
+        labels:
+          env: 'prod'  # 운영 서버 라벨
+      - targets: ['dev.doktori.kr:9100']
+        labels:
+          env: 'dev'   # 개발 서버 라벨
+
+  - job_name: 'spring-boot-app'
+    metrics_path: '/api/actuator/prometheus'
+    static_configs:
+      - targets: ['doktori.kr:8080', 'doktori.kr:8081']
+        labels:
+          env: 'prod'
+      - targets: ['dev.doktori.kr:8080', 'dev.doktori.kr:8081']
+        labels:
+          env: 'dev'

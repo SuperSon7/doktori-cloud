@@ -1,0 +1,85 @@
+---
+# Node Exporter 설치 (Binary)
+- name: Download Node Exporter
+  unarchive:
+    src: https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+    dest: /tmp
+    remote_src: yes
+
+- name: Move Node Exporter binary
+  copy:
+    src: /tmp/node_exporter-1.6.1.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    mode: '0755'
+    remote_src: yes
+
+- name: Create Systemd service for Node Exporter
+  copy:
+    dest: /etc/systemd/system/node_exporter.service
+    content: |
+      [Unit]
+      Description=Node Exporter
+      [Service]
+      ExecStart=/usr/local/bin/node_exporter
+      Restart=always
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start Node Exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+
+- name: Install unzip for Promtail
+  apt:
+    name: unzip
+    state: present
+
+- name: Download Promtail
+  unarchive:
+    src: https://github.com/grafana/loki/releases/download/v2.9.4/promtail-linux-amd64.zip
+    dest: /tmp
+    remote_src: yes
+
+- name: Move Promtail binary
+  copy:
+    src: /tmp/promtail-linux-amd64
+    dest: /usr/local/bin/promtail
+    mode: '0755'
+    remote_src: yes
+
+- name: Create Promtail config directory
+  file:
+    path: /etc/promtail
+    state: directory
+
+- name: Deploy Promtail config
+  template:
+    src: promtail-config.yml.j2
+    dest: /etc/promtail/promtail-config.yml
+
+- name: Create Systemd service for Promtail
+  copy:
+    dest: /etc/systemd/system/promtail.service
+    content: |
+      [Unit]
+      Description=Promtail for Loki logs
+      After=network.target
+
+      [Service]
+      Type=simple
+      # Promtail이 로그 파일에 접근할 수 있도록 필요시 User=ubuntu 추가 가능
+      ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/promtail-config.yml
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start Promtail
+  systemd:
+    name: promtail
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
