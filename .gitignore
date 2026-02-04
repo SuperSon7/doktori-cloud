@@ -79,3 +79,5 @@ logs/
 scripts/
 .github/workflows/
 .github/dependabot.yml
+
+*.sh
