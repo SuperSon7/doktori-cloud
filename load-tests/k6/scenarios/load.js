@@ -8,6 +8,7 @@
  * - 15%: 모임 검색
  * - 10%: 도서 검색
  */
+import http from 'k6/http';
 import { group, sleep } from 'k6';
 import { config, thresholds, loadStages } from '../config.js';
 import {
@@ -129,21 +130,63 @@ function bookSearchFlow(hasAuth) {
   });
 }
 
+// 이미지 업로드 (인증 필요)
+function imageUploadFlow(hasAuth) {
+  if (!hasAuth) {
+    guestFlow();
+    return;
+  }
+
+  group('이미지 업로드', function () {
+    const directories = ['PROFILE', 'MEETING'];
+    const contentTypes = ['image/jpeg', 'image/png'];
+
+    const directory = randomItem(directories);
+    const contentType = randomItem(contentTypes);
+    const fileSize = randomInt(100, 500) * 1024;  // 100KB ~ 500KB
+    const extension = contentType.split('/')[1];
+    const fileName = `test_${Date.now()}_${__VU}.${extension}`;
+
+    // Presigned URL 발급
+    const res = apiPost('/uploads/presigned-url', {
+      directory: directory,
+      fileName: fileName,
+      contentType: contentType,
+      fileSize: fileSize,
+    }, true);
+
+    if (res.status === 200) {
+      const data = extractData(res);
+      if (data && data.presignedUrl) {
+        // S3 업로드 (더미 데이터)
+        const dummyData = new ArrayBuffer(fileSize);
+        http.put(data.presignedUrl, dummyData, {
+          headers: { 'Content-Type': contentType },
+          tags: { name: 's3_upload' },
+        });
+      }
+    }
+  });
+}
+
 export default function (data) {
   const scenario = randomInt(1, 100);
 
-  if (scenario <= 40) {
-    // 40%: 비회원 탐색
+  if (scenario <= 35) {
+    // 35%: 비회원 탐색
     guestFlow();
-  } else if (scenario <= 75) {
-    // 35%: 로그인 사용자
+  } else if (scenario <= 65) {
+    // 30%: 로그인 사용자
     userFlow(data.hasAuth);
-  } else if (scenario <= 90) {
+  } else if (scenario <= 80) {
     // 15%: 모임 검색
     searchFlow();
-  } else {
+  } else if (scenario <= 90) {
     // 10%: 도서 검색
     bookSearchFlow(data.hasAuth);
+  } else {
+    // 10%: 이미지 업로드
+    imageUploadFlow(data.hasAuth);
   }
 
   sleep(1);
