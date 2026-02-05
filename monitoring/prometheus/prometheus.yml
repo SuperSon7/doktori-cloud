@@ -1,0 +1,106 @@
+global:
+  # Prometheus가 모든 타겟을 얼마나 자주 스크랩할지 설정
+  # 즉, 메트릭 수집 주기 (여기서는 15초마다 수집)
+  scrape_interval: 15s
+
+  # Alert rule을 얼마나 자주 평가할지 설정
+  # 알람 조건 만족 여부를 15초마다 확인
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        # Alertmanager 컨테이너 주소
+        # docker-compose 네트워크 내부 이름으로 접근
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+
+  ############################################################
+  # 1. Prometheus 자체 상태 모니터링
+  ############################################################
+  - job_name: "prometheus"
+    static_configs:
+      # Prometheus 컨테이너 자신의 메트릭 수집
+      - targets: ["prometheus:9090"]
+
+
+  ############################################################
+  # 2. Node Exporter (서버 리소스 모니터링)
+  # CPU, 메모리, 디스크, 네트워크 상태 수집
+  ############################################################
+  - job_name: "node_exporter"
+    static_configs:
+      - targets:
+          # 운영 서버 Node Exporter
+          - "52.79.205.195:9100"
+
+          # 개발 서버 Node Exporter
+          - "3.37.180.158:9100"
+
+
+  ############################################################
+  # 3. 운영 Spring Boot 메트릭 수집
+  # actuator/prometheus endpoint 사용
+  ############################################################
+  - job_name: "spring-boot-prod"
+    scheme: https
+
+    # Spring Boot Actuator Prometheus endpoint
+    metrics_path: /api/actuator/prometheus
+
+    static_configs:
+      - targets: ["doktori.kr"]
+
+
+  ############################################################
+  # 4. 개발 서버 Spring Boot 메트릭 수집
+  ############################################################
+  - job_name: "spring-boot-dev"
+    scheme: https
+    metrics_path: /api/actuator/prometheus
+
+    static_configs:
+      - targets: ["dev.doktori.kr"]
+
+
+  ############################################################
+  # 5. MySQL Exporter
+  # MySQL 상태 및 쿼리 메트릭 수집
+  ############################################################
+  - job_name: "mysql-prod"
+    static_configs:
+      - targets: ["3.37.180.158:9104"]
+
+
+  ############################################################
+  # 6. Blackbox Exporter 기반 HTTP 상태 체크
+  # 외부 사용자 관점에서 서비스 접근 가능 여부 확인
+  ############################################################
+  - job_name: "nginx-probe"
+
+    # blackbox exporter의 probe 엔드포인트 사용
+    metrics_path: /probe
+
+    # http_2xx 응답 여부 검사 모듈 사용
+    params:
+      module: [http_2xx]
+
+    static_configs:
+      - targets:
+          # 실제 외부 사용자 접근 URL
+          - https://doktori.kr
+
+    relabel_configs:
+
+      # 실제 검사 대상 URL을 __param_target에 저장
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      # 실제 요청은 blackbox exporter 컨테이너로 전달
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+      # 모니터링 화면에 실제 대상 주소 표시
+      - source_labels: [__param_target]
+        target_label: instance
