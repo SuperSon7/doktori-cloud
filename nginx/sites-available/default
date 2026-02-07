@@ -1,0 +1,211 @@
+server {
+    server_name doktori.kr www.doktori.kr;
+
+    if ($bad_bot) {
+        return 403;
+    }
+
+    # ========================================
+    # 보안 설정
+    # ========================================
+
+    # 숨김 파일 차단
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # 설정 파일 차단
+    location ~* \.(env|git|svn|htaccess|htpasswd|ini|log|sql|bak|old|backup|swp|yml|yaml|toml|conf|config)$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # 민감 디렉토리 차단
+    location ~ ^/(config|configs|secrets|backup|backups|logs|log|tmp|temp|database|db|sql|uploads|upload|private|old|new|src|dist|build|node_modules|\.next)/ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Source Map 파일 차단
+    location ~* \.map$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # ========================================
+    # 모니터링
+    # ========================================
+
+    # Actuator (localhost만)
+    location /api/actuator {
+        access_log off;
+	allow 127.0.0.1;
+        allow 3.36.172.142;
+        deny all;
+
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    # ========================================
+    # API 문서 (Basic Auth)
+    # ========================================
+
+    # Spring Swagger UI
+    location /api/swagger-ui {
+        auth_basic "Development Swagger";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Spring API Docs
+    location /api/v1/api-docs {
+        auth_basic "Development API Docs";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # FastAPI Swagger UI
+    location /ai/docs {
+        auth_basic "AI Service Swagger";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8001/docs;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # FastAPI ReDoc
+    location /ai/redoc {
+        auth_basic "AI Service ReDoc";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8001/redoc;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # FastAPI OpenAPI JSON (/ai/openapi.json)
+    location /ai/openapi.json {
+        auth_basic "AI Service OpenAPI";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8001/openapi.json;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # FastAPI OpenAPI JSON (/openapi.json - Swagger UI가 요청)
+    location = /openapi.json {
+        auth_basic "AI Service OpenAPI";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://127.0.0.1:8001/openapi.json;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # ========================================
+    # 정적 리소스 최적화 (Step 1)
+    # ========================================
+
+    # 브라우저 캐싱 - 이미지/폰트/미디어
+    location ~* \.(jpg|jpeg|png|gif|ico|webp|woff|woff2|ttf|otf|eot)$ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+        access_log off;
+    }
+
+    # 브라우저 캐싱 - JS/CSS 번들
+    location ~* \.(js|css)$ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        expires 7d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # ========================================
+    # 애플리케이션
+    # ========================================
+
+    # Backend API
+    location /api/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # AI Service
+    location /ai/ {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    # Frontend
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+
+    # Health check
+    location /nginx-health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    location /nginx_status {
+        stub_status on;
+        access_log off;
+        allow 127.0.0.1;  # localhost만 허용
+        deny all;
+    }
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/doktori.kr/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/doktori.kr/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+# HTTP → HTTPS 리다이렉트
+server {
+    listen 80;
+    server_name dev.doktori.kr;
+    return 301 https://$host$request_uri;
+}
