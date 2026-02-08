@@ -23,6 +23,13 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Terraform plan output
+*.plan
+plan.out
+
+# Terraform backend configs (encrypt with SOPS before committing)
+**/envs/
+
 # CLI configuration files
 .terraformrc
 terraform.rc
@@ -81,3 +88,8 @@ scripts/
 .github/dependabot.yml
 
 *.sh
+
+# =============================================================================
+# Load Test Results
+# =============================================================================
+load-tests/**/*.html
