@@ -159,3 +159,19 @@ resource "aws_instance" "app" {
     ignore_changes = [ami]
   }
 }
+
+# -----------------------------------------------------------------------------
+# Elastic IP for App Instance
+# -----------------------------------------------------------------------------
+resource "aws_eip" "app" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-${local.environment}-app-eip"
+  }
+}
+
+resource "aws_eip_association" "app" {
+  allocation_id = aws_eip.app.id
+  instance_id   = aws_instance.app.id
+}

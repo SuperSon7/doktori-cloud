@@ -75,10 +75,10 @@ variable "allowed_admin_cidrs" {
   default     = ["211.244.225.166/32", "211.244.225.211/32"]
 }
 
-variable "monitoring_server_ip" {
-  description = "Monitoring server IP for node exporter access"
-  type        = string
-  default     = "43.201.9.63/32"
+variable "monitoring_server_ips" {
+  description = "Monitoring server IPs for metric scraping access"
+  type        = list(string)
+  default     = ["3.36.172.142/32", "3.37.104.151/32"]
 }
 
 # -----------------------------------------------------------------------------

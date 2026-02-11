@@ -33,6 +33,15 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # WireGuard VPN
+  ingress {
+    description = "WireGuard VPN"
+    from_port   = 51820
+    to_port     = 51820
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # AI Service
   ingress {
     description = "AI Service"
@@ -48,6 +57,24 @@ resource "aws_security_group" "app" {
     to_port     = 8001
     protocol    = "tcp"
     cidr_blocks = ["211.244.225.166/32"]
+  }
+
+  # Spring Boot Blue (monitoring access)
+  ingress {
+    description = "Spring Boot (Blue)"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = var.monitoring_server_ips
+  }
+
+  # Spring Boot Green (monitoring access)
+  ingress {
+    description = "Spring Boot (Green)"
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = var.monitoring_server_ips
   }
 
   # Grafana (Monitoring)
@@ -86,13 +113,31 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["211.244.225.166/32"]
   }
 
-  # Node Exporter (Monitoring server access)
+  # Node Exporter
   ingress {
     description = "Node Exporter port"
     from_port   = 9100
     to_port     = 9100
     protocol    = "tcp"
-    cidr_blocks = [var.monitoring_server_ip]
+    cidr_blocks = var.monitoring_server_ips
+  }
+
+  # MySQL Exporter
+  ingress {
+    description = "MySQL Exporter"
+    from_port   = 9104
+    to_port     = 9104
+    protocol    = "tcp"
+    cidr_blocks = concat(["211.244.225.166/32"], var.monitoring_server_ips)
+  }
+
+  # Nginx Exporter
+  ingress {
+    description = "Nginx Exporter"
+    from_port   = 9113
+    to_port     = 9113
+    protocol    = "tcp"
+    cidr_blocks = var.monitoring_server_ips
   }
 
   # Outbound - Allow all
