@@ -149,3 +149,170 @@ resource "aws_iam_user_policy" "s3_developer" {
 resource "aws_iam_access_key" "s3_developer" {
   user = aws_iam_user.s3_developer.name
 }
+
+# -----------------------------------------------------------------------------
+# S3 Bucket for DB Backup (dev)
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket" "dev_db_backup" {
+  bucket = "${var.project_name}-dev-db-backup"
+
+  tags = {
+    Name = "${var.project_name}-dev-db-backup"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "dev_db_backup" {
+  bucket = aws_s3_bucket.dev_db_backup.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "dev_db_backup" {
+  bucket = aws_s3_bucket.dev_db_backup.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "dev_db_backup" {
+  bucket = aws_s3_bucket.dev_db_backup.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# -----------------------------------------------------------------------------
+# S3 Bucket for Images (prod)
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket" "prod_images" {
+  bucket = "${var.project_name}-prod-images"
+
+  tags = {
+    Name        = "${var.project_name}-prod-images"
+    Environment = "prod"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "prod_images" {
+  bucket = aws_s3_bucket.prod_images.id
+  versioning_configuration {
+    status = "Disabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "prod_images" {
+  bucket = aws_s3_bucket.prod_images.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_policy" "prod_images_public_read" {
+  bucket = aws_s3_bucket.prod_images.id
+
+  depends_on = [aws_s3_bucket_public_access_block.prod_images]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.prod_images.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_cors_configuration" "prod_images" {
+  bucket = aws_s3_bucket.prod_images.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "HEAD", "PUT"]
+    allowed_origins = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
+# -----------------------------------------------------------------------------
+# S3 Bucket for DB Backup (prod)
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket" "prod_db_backup" {
+  bucket = "${var.project_name}-prod-db-backup"
+
+  tags = {
+    Name        = "${var.project_name}-prod-db-backup"
+    Environment = "prod"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "prod_db_backup" {
+  bucket = aws_s3_bucket.prod_db_backup.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "prod_db_backup" {
+  bucket = aws_s3_bucket.prod_db_backup.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "prod_db_backup" {
+  bucket = aws_s3_bucket.prod_db_backup.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# S3 Bucket for Backend Log Backup (prod)
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket" "prod_backend_log_backup" {
+  bucket = "${var.project_name}-prod-backend-log-backup"
+
+  tags = {
+    Name        = "${var.project_name}-prod-backend-log-backup"
+    Environment = "prod"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "prod_backend_log_backup" {
+  bucket = aws_s3_bucket.prod_backend_log_backup.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "prod_backend_log_backup" {
+  bucket = aws_s3_bucket.prod_backend_log_backup.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
