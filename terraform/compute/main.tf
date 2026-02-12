@@ -259,6 +259,40 @@ resource "aws_iam_role_policy" "s3_access" {
   })
 }
 
+# SSM Agent (SSM Run Command로 배포 명령 수신)
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# ECR Pull (컨테이너 이미지 pull)
+resource "aws_iam_role_policy" "ecr_pull" {
+  name = "${var.project_name}-${local.environment}-ecr-pull"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRAuth"
+        Effect = "Allow"
+        Action = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPull"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}/*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-${local.environment}-ec2-profile"
   role = aws_iam_role.ec2_role.name
@@ -324,7 +358,8 @@ resource "aws_instance" "app" {
   }
 
   tags = {
-    Name = "${var.project_name}-${local.environment}-app"
+    Name    = "${var.project_name}-${local.environment}-app"
+    Service = var.service_tag
   }
 
   lifecycle {

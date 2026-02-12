@@ -68,3 +68,9 @@ variable "ai_port" {
   type        = number
   default     = 8000
 }
+
+variable "service_tag" {
+  description = "Service tag for SSM target discovery (e.g. backend, backend-api, backend-chat)"
+  type        = string
+  default     = "backend"
+}
