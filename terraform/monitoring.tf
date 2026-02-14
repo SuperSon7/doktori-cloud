@@ -100,32 +100,7 @@ resource "aws_security_group" "monitoring" {
 }
 
 # -----------------------------------------------------------------------------
-# Monitoring Instance 1 (x86_64)
-# -----------------------------------------------------------------------------
-resource "aws_instance" "monitoring" {
-  ami                    = "ami-0130d8d35bcd2d433"
-  instance_type          = "t3.micro"
-  key_name               = "doktori-monitoring"
-  subnet_id              = "subnet-0fe7201b30c537419"
-  vpc_security_group_ids = [aws_security_group.monitoring.id]
-
-  root_block_device {
-    volume_size           = 30
-    volume_type           = "gp3"
-    delete_on_termination = true
-  }
-
-  tags = {
-    Name = "${var.project_name}-monitoring"
-  }
-
-  lifecycle {
-    ignore_changes = [ami]
-  }
-}
-
-# -----------------------------------------------------------------------------
-# Monitoring Instance 2 (arm64)
+# Monitoring Instance (arm64)
 # -----------------------------------------------------------------------------
 resource "aws_instance" "monitoring1" {
   ami                    = "ami-04f06fb5ae9dcc778"
@@ -141,7 +116,7 @@ resource "aws_instance" "monitoring1" {
   }
 
   tags = {
-    Name = "${var.project_name}-monitoring1"
+    Name = "${var.project_name}-monitoring"
   }
 
   lifecycle {
@@ -152,19 +127,6 @@ resource "aws_instance" "monitoring1" {
 # -----------------------------------------------------------------------------
 # Elastic IPs for Monitoring
 # -----------------------------------------------------------------------------
-resource "aws_eip" "monitoring" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.project_name}-monitoring-eip"
-  }
-}
-
-resource "aws_eip_association" "monitoring" {
-  allocation_id = aws_eip.monitoring.id
-  instance_id   = aws_instance.monitoring.id
-}
-
 resource "aws_eip" "monitoring1" {
   domain = "vpc"
 

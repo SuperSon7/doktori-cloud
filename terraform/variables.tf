@@ -78,7 +78,7 @@ variable "allowed_admin_cidrs" {
 variable "monitoring_server_ips" {
   description = "Monitoring server IPs for metric scraping access"
   type        = list(string)
-  default     = ["3.36.172.142/32", "3.37.104.151/32"]
+  default     = ["3.37.104.151/32"]
 }
 
 # -----------------------------------------------------------------------------
