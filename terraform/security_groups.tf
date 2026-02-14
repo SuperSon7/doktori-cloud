@@ -140,6 +140,15 @@ resource "aws_security_group" "app" {
     cidr_blocks = var.monitoring_server_ips
   }
 
+  # MySQL (from monitoring SG)
+  ingress {
+    description     = "MySQL from monitoring"
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = ["sg-076938b4dae3f1d03"]
+  }
+
   # Outbound - Allow all
   egress {
     description = "Allow all outbound traffic"

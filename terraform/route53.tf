@@ -46,7 +46,7 @@ resource "aws_route53_record" "monitoring" {
   name    = "monitoring.doktori.kr"
   type    = "A"
   ttl     = 300
-  records = ["3.36.172.142"]
+  records = ["3.37.104.151"]
 }
 
 # MX record for Google Workspace
