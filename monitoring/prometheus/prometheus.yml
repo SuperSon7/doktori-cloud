@@ -1,0 +1,82 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Prometheus 자기 자신
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # ──────────────────────────────────────────────
+  # Node Exporter (Phase 1에서 Alloy remote_write로 전환 시 제거)
+  # ──────────────────────────────────────────────
+  - job_name: node_exporter
+    static_configs:
+      - targets: ["__PROD_APP_IP__:9100"]
+        labels:
+          env: prod
+      - targets: ["__DEV_APP_IP__:9100"]
+        labels:
+          env: dev
+
+  # ──────────────────────────────────────────────
+  # Spring Boot (HTTPS, nginx를 통해 외부에서 스크레이프)
+  # ──────────────────────────────────────────────
+  - job_name: spring-boot-prod
+    scheme: https
+    metrics_path: /api/actuator/prometheus
+    static_configs:
+      - targets: ["doktori.kr"]
+
+  - job_name: spring-boot-dev
+    scheme: https
+    metrics_path: /api/actuator/prometheus
+    static_configs:
+      - targets: ["dev.doktori.kr"]
+
+  # ──────────────────────────────────────────────
+  # Nginx Exporter
+  # ──────────────────────────────────────────────
+  - job_name: nginx
+    static_configs:
+      - targets: ["__PROD_NGINX_IP__:9113"]
+        labels:
+          env: prod
+
+  # ──────────────────────────────────────────────
+  # Nginx Probe (Blackbox Exporter → 엔드포인트 가용성)
+  # ──────────────────────────────────────────────
+  - job_name: nginx-probe
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://doktori.kr/api/actuator/health
+          - https://dev.doktori.kr/api/actuator/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ──────────────────────────────────────────────
+  # MySQL Exporter
+  # ──────────────────────────────────────────────
+  - job_name: mysql-prod
+    static_configs:
+      - targets: ["__PROD_DB_IP__:9104"]
+        labels:
+          env: prod
+
+  - job_name: mysql-dev
+    static_configs:
+      - targets: ["__DEV_DB_IP__:9104"]
+        labels:
+          env: dev

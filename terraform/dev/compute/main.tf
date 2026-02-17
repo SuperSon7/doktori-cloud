@@ -285,57 +285,8 @@ resource "aws_security_group" "dev_app" {
   }
 }
 
-# Monitoring SG
-resource "aws_security_group" "monitoring" {
-  name_prefix = "${var.project_name}-${var.environment}-monitoring-"
-  description = "Monitoring instance security group"
-  vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
-
-  ingress {
-    description = "Grafana from VPC"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "Prometheus from VPC"
-    from_port   = 9090
-    to_port     = 9090
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "Alertmanager from VPC"
-    from_port   = 9093
-    to_port     = 9093
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "Loki from VPC"
-    from_port   = 3100
-    to_port     = 3100
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name    = "${var.project_name}-${var.environment}-monitoring-sg"
-    Service = "monitoring"
-  }
-}
+# Monitoring → terraform/monitoring/ 모듈로 분리됨 (독립 state)
+# 모니터링은 전체 환경(prod/dev)을 관측하므로 환경별 compute에 포함하지 않음
 
 # -----------------------------------------------------------------------------
 # EC2 Instances
@@ -402,30 +353,4 @@ resource "aws_instance" "dev_app" {
   }
 }
 
-# Monitoring EC2 (Private App Subnet - ARM64 for cost savings)
-resource "aws_instance" "monitoring" {
-  ami                    = data.aws_ami.ubuntu_arm64.id
-  instance_type          = var.monitoring_instance_type
-  key_name               = var.key_name
-  subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
-  vpc_security_group_ids = [aws_security_group.monitoring.id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
-
-  metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
-  }
-
-  root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = {
-    Name     = "${var.project_name}-${var.environment}-monitoring"
-    Service  = "monitoring"
-    Part     = "cloud"
-    AutoStop = "true"
-  }
-}
+# Monitoring EC2 → terraform/monitoring/ 모듈로 분리됨

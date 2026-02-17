@@ -1,0 +1,126 @@
+// =============================================================================
+// Grafana Alloy Configuration
+// 타겟 서버(prod/dev)에 배포되는 에이전트 설정
+// 플레이스홀더: __MONITORING_IP__, __ENV__ (prod|dev)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 호스트 메트릭 (Node Exporter 대체)
+// -----------------------------------------------------------------------------
+prometheus.exporter.unix "host" {
+  enable_collectors = [
+    "cpu", "meminfo", "diskstats", "filesystem",
+    "loadavg", "netdev", "uname", "time",
+  ]
+  filesystem {
+    mount_point_exclude = "^/(dev|proc|sys|run)($|/)"
+  }
+}
+
+prometheus.scrape "host_metrics" {
+  targets    = prometheus.exporter.unix.host.targets
+  forward_to = [prometheus.relabel.add_env.receiver]
+  scrape_interval = "15s"
+}
+
+// -----------------------------------------------------------------------------
+// Spring Boot Actuator (API + Chat)
+// -----------------------------------------------------------------------------
+prometheus.scrape "spring_boot" {
+  targets = [
+    { "__address__" = "localhost:8080", "app" = "api" },
+    { "__address__" = "localhost:8081", "app" = "chat" },
+  ]
+  metrics_path    = "/api/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// Nginx Exporter
+// -----------------------------------------------------------------------------
+prometheus.scrape "nginx" {
+  targets = [
+    { "__address__" = "localhost:9113", "app" = "nginx" },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 공통 라벨 추가 (env)
+// -----------------------------------------------------------------------------
+prometheus.relabel "add_env" {
+  rule {
+    target_label = "env"
+    replacement  = "__ENV__"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// Prometheus Remote Write
+// -----------------------------------------------------------------------------
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://__MONITORING_IP__:9090/api/v1/write"
+  }
+}
+
+// =============================================================================
+// 로그 수집
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Spring Boot 애플리케이션 로그
+// -----------------------------------------------------------------------------
+local.file_match "spring_logs" {
+  path_targets = [
+    { "__path__" = "/home/ubuntu/app/backend/*.log", "app" = "spring-boot" },
+  ]
+}
+
+loki.source.file "spring" {
+  targets    = local.file_match.spring_logs.targets
+  forward_to = [loki.relabel.add_env.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// Nginx 액세스/에러 로그
+// -----------------------------------------------------------------------------
+local.file_match "nginx_logs" {
+  path_targets = [
+    { "__path__" = "/var/log/nginx/access.log", "app" = "nginx", "log_type" = "access" },
+    { "__path__" = "/var/log/nginx/error.log",  "app" = "nginx", "log_type" = "error" },
+  ]
+}
+
+loki.source.file "nginx" {
+  targets    = local.file_match.nginx_logs.targets
+  forward_to = [loki.relabel.add_env.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 공통 라벨 추가 (env) + Loki push
+// -----------------------------------------------------------------------------
+loki.relabel "add_env" {
+  rule {
+    target_label = "env"
+    replacement  = "__ENV__"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url = "http://__MONITORING_IP__:3100/loki/api/v1/push"
+  }
+}

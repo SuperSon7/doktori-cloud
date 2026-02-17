@@ -18,22 +18,9 @@ output "dev_app_private_ip" {
   value       = aws_instance.dev_app.private_ip
 }
 
-output "monitoring_instance_id" {
-  description = "Monitoring EC2 instance ID"
-  value       = aws_instance.monitoring.id
-}
-
-output "monitoring_private_ip" {
-  description = "Monitoring EC2 private IP"
-  value       = aws_instance.monitoring.private_ip
-}
-
 output "dev_app_sg_id" {
   description = "Dev app security group ID"
   value       = aws_security_group.dev_app.id
 }
 
-output "monitoring_sg_id" {
-  description = "Monitoring security group ID"
-  value       = aws_security_group.monitoring.id
-}
+# monitoring outputs → terraform/monitoring/outputs.tf 로 이동

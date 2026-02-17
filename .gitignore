@@ -43,6 +43,7 @@ terraform.rc
 !package.json
 !package-lock.json
 !tsconfig.json
+!monitoring/grafana/dashboards/*.json
 
 # AWS credentials
 *.csv

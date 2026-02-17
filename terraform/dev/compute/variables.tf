@@ -33,11 +33,7 @@ variable "bastion_instance_type" {
   default     = "t3.micro"
 }
 
-variable "monitoring_instance_type" {
-  description = "Monitoring EC2 instance type"
-  type        = string
-  default     = "t4g.small"
-}
+# monitoring_instance_type → terraform/monitoring/variables.tf 로 이동
 
 variable "root_volume_size" {
   description = "Root EBS volume size in GB"
