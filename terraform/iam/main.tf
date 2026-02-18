@@ -4,13 +4,13 @@
 data "aws_caller_identity" "current" {}
 
 # -----------------------------------------------------------------------------
-# Remote State: Dev Compute (for app security group ID)
+# Remote State: Nonprod Compute (for app security group ID)
 # -----------------------------------------------------------------------------
-data "terraform_remote_state" "dev_compute" {
+data "terraform_remote_state" "nonprod_compute" {
   backend = "s3"
   config = {
     bucket = var.state_bucket
-    key    = "dev/compute/terraform.tfstate"
+    key    = "nonprod/compute/terraform.tfstate"
     region = var.aws_region
   }
 }
@@ -93,7 +93,7 @@ resource "aws_iam_policy" "dev_github_actions" {
           "ec2:RevokeSecurityGroupIngress"
         ]
         Resource = [
-          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/${data.terraform_remote_state.dev_compute.outputs.security_group_id}"
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/${data.terraform_remote_state.nonprod_compute.outputs.security_group_id}"
         ]
       }
     ]

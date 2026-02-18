@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    key = "dev/compute/terraform.tfstate"
+    key = "nonprod/storage/terraform.tfstate"
   }
 }
 

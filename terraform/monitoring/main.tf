@@ -17,13 +17,13 @@
 #
 # ─── 인스턴스 타입 ───
 # t4g.medium (4 GB RAM) 선택 이유:
-#   - Prometheus + Loki + Grafana 동시 구동 시 메모리 ~1.8-3.2 GB 사용
-#   - t4g.small (2 GB) → 쿼리 스파이크 시 OOM 위험
-#   - t4g.medium → 쿼리 버스트 + OS 페이지 캐시 여유
+#   - Prometheus + Loki + Grafana 동시 구동 시 메모리 ~0.5 ~ 1.5GB
+#   - t4g.small (2 GB) → 현재 시점에서 버틸만함
+#   - t4g.medium → 쿼리 버스트 + OS 페이지 캐시 여유생기지만 비용 부담
 #   - ARM(Graviton) → 동급 x86 대비 ~20% 비용 절감
 #
 # ─── 서브넷 배치: 퍼블릭 + SG 강화 ───
-# 프라이빗 서브넷 고려했으나 현재 부적합:
+# 프라이빗 서브넷 고려-> VPN구성하여 접근, 우선 초기엔 퍼블릭:
 #   - Prometheus가 doktori.kr / dev.doktori.kr HTTPS로 외부 스크레이프
 #   - dev/prod VPC CIDR 동일 (10.0.0.0/16) → VPC 피어링 불가
 #   - 프라이빗 배치 시 NAT 필요 (~$32/월 추가)

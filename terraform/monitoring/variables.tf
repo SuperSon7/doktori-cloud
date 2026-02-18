@@ -26,7 +26,7 @@ variable "architecture" {
 variable "instance_type" {
   description = "EC2 instance type (t4g for ARM, t3 for x86)"
   type        = string
-  default     = "t4g.medium" # 4 GB RAM — Prometheus + Loki + Grafana 동시 구동
+  default     = "t4g.small" # 2 GB RAM — Prometheus + Loki + Grafana 동시 구동
 
   # 변경 가이드:
   # ARM:   t4g.small (2GB, $12/월) | t4g.medium (4GB, $24/월)
