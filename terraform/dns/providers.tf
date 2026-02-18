@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "doktori-terraform-state"
+    bucket         = "doktori-v2-terraform-state"
     key            = "dns/terraform.tfstate"
     region         = "ap-northeast-2"
     encrypt        = true
-    dynamodb_table = "doktori-terraform-locks"
+    dynamodb_table = "doktori-v2-terraform-locks"
   }
 }
 

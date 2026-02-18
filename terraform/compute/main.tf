@@ -4,7 +4,7 @@
 data "terraform_remote_state" "networking" {
   backend = "s3"
   config = {
-    bucket = "doktori-terraform-state"
+    bucket = "doktori-v2-terraform-state"
     key    = "networking/terraform.tfstate"
     region = "ap-northeast-2"
   }
