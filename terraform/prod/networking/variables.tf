@@ -31,13 +31,13 @@ variable "public_subnet_cidr" {
 variable "private_app_subnet_cidr" {
   description = "CIDR block for private app subnet"
   type        = string
-  default     = "10.1.16.0/18"
+  default     = "10.1.16.0/20"
 }
 
 variable "private_db_subnet_cidr" {
   description = "CIDR block for private DB subnet"
   type        = string
-  default     = "10.1.128.0/22"
+  default     = "10.1.32.0/24"
 }
 
 variable "availability_zone" {
