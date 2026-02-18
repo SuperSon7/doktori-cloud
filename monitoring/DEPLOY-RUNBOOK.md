@@ -3,22 +3,65 @@
 ## 아키텍처 요약
 
 ```
-Dev EC2 (Private Subnet)                    Monitoring EC2 (Public Subnet)
-┌──────────────────────────┐                ┌──────────────────────────────┐
-│ Docker Compose (app-net) │                │ Docker Compose (monitoring)  │
-│                          │                │                              │
-│ alloy ───────────────────┼── push ──────→ │ prometheus :9090             │
-│   ├ unix (host metrics)  │  remote_write  │   (--web.enable-remote-     │
-│   ├ mysql (내장 exporter) │                │    write-receiver)           │
-│   ├ actuator (직접 접근)  │                │                              │
-│   ├ nginx-exporter:9113  ├── push ──────→ │ loki :3100                   │
-│   └ docker logs          │  loki push     │                              │
-│                          │                │ grafana :3000                │
-│ nginx-exporter           │                │ blackbox-exporter :9115      │
-│   └ nginx:8888/stub      │                │   └ probe → dev.doktori.kr  │
-└──────────────────────────┘                └──────────────────────────────┘
-     인바운드 포트 0개                            SG: target_server_cidrs
-     (아웃바운드 push만)                                → 9090, 3100
+Dev VPC (10.0.0.0/16)
+┌─────────────────────────────────────────────────────┐
+│ Public Subnet                                       │
+│ ┌─────────────────┐                                 │
+│ │ NAT Instance    │ t4g.nano, $3/월                 │
+│ │ (EIP attached)  │ source_dest_check=false          │
+│ │ iptables MASQ   │ IP forwarding + MASQUERADE       │
+│ └────────▲────────┘                                 │
+│          │                                           │
+│ Private Subnet (route 0.0.0.0/0 → NAT ENI)         │
+│ ┌────────┴────────────────────┐                     │
+│ │ Dev EC2 (Docker Compose)    │                     │
+│ │                              │                     │
+│ │ alloy ──── push (outbound) ─┼──→ NAT ──→ Internet │
+│ │   ├ unix (host metrics)     │         │            │
+│ │   ├ mysql (내장 exporter)    │         ▼            │
+│ │   ├ actuator (Docker 내부)   │  Monitoring EC2      │
+│ │   ├ nginx-exporter:9113     │  ┌────────────────┐  │
+│ │   └ docker logs             │  │ prometheus:9090 │  │
+│ │                              │  │ loki:3100       │  │
+│ │ nginx-exporter              │  │ grafana:3000    │  │
+│ │   └ nginx:8888/stub         │  │ blackbox:9115   │  │
+│ └──────────────────────────────┘  └────────────────┘  │
+│   인바운드 포트 0개                  SG: NAT EIP만     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Step 0: Dev 네트워킹 — NAT Instance 프로비저닝 (Terraform)
+
+> dev 서버는 private subnet에 있어 아웃바운드 트래픽에 NAT가 필요.
+> NAT Gateway($32/월) 대신 **NAT Instance(t4g.nano, $3/월)** 로 ~90% 절감.
+
+```bash
+cd Cloud/terraform/dev/networking/
+
+terraform init
+terraform plan    # NAT Instance 생성 + private route table 변경 확인
+terraform apply
+```
+
+**apply 후 NAT EIP 확인 (모니터링 SG에 필요):**
+```bash
+terraform output nat_public_ip
+# → 이 IP를 Step 1의 target_server_cidrs에 사용
+```
+
+**NAT Instance가 하는 일 (user_data 자동 구성):**
+1. `net.ipv4.ip_forward = 1` (커널 IP 포워딩)
+2. `iptables -t nat MASQUERADE` (VPC CIDR → 외부 NAT 변환)
+3. `iptables-persistent`로 재부팅 후에도 유지
+4. `source_dest_check = false` (NAT에 필수)
+
+**확인:**
+```bash
+# dev 서버(SSM)에서 외부 통신 테스트
+aws ssm start-session --target <DEV_INSTANCE_ID>
+curl -s ifconfig.me  # NAT Instance EIP가 출력되면 성공
 ```
 
 ---
@@ -47,17 +90,12 @@ allowed_admin_cidrs = [
   "YOUR_IP/32",       # 본인 IP
 ]
 
-# dev 서버 퍼블릭 IP (NAT Gateway 또는 EIP)
-# dev 서버가 private subnet → NAT GW 통해 나가므로 NAT GW의 EIP 필요
+# dev NAT Instance EIP (Step 0에서 확인)
+# dev 서버는 private subnet → NAT Instance를 통해 나감
 target_server_cidrs = [
-  "DEV_NAT_GW_EIP/32",  # dev 서버 아웃바운드 IP
+  "NAT_INSTANCE_EIP/32",  # terraform output nat_public_ip 값
 ]
 ```
-
-> **중요**: dev 서버는 private subnet에 있어 아웃바운드 트래픽이 NAT Gateway를 통해 나감.
-> `target_server_cidrs`에는 NAT Gateway의 EIP를 넣어야 함.
-> 확인: AWS 콘솔 → VPC → NAT Gateways → Elastic IP 확인
-> 또는: `aws ec2 describe-nat-gateways --query 'NatGateways[].NatGatewayAddresses[].PublicIp'`
 
 ```bash
 terraform init
@@ -243,6 +281,17 @@ sudo systemctl start node_exporter mysqld_exporter nginx-exporter promtail
 > Alloy에 nginx 내장 exporter가 없어서 stub_status → Prometheus 포맷 변환을 위해 유지합니다.
 > 다만 8MB 이미지 + 32MB 메모리로 오버헤드가 거의 없고,
 > Docker 내부 네트워크에서만 통신하므로 외부 노출은 없습니다.
+
+### "왜 NAT Gateway 대신 NAT Instance를 선택했나요?"
+
+> dev 환경은 서버 1대 + Alloy push 트래픽 정도라 NAT Gateway의 45Gbps 대역폭이 과잉입니다.
+> NAT Instance(t4g.nano)는 **$3/월**로 NAT Gateway($32/월) 대비 **90% 절감**되고,
+> user_data에서 `iptables MASQUERADE`를 자동 구성하므로 관리 부담도 적습니다.
+> prod 환경에서 트래픽이 늘면 그때 NAT Gateway로 전환하면 되고,
+> Terraform에서 `aws_instance.nat` → `aws_nat_gateway`로 변경 + route table 수정만 하면 됩니다.
+>
+> 핵심은 `source_dest_check = false` 설정인데, EC2는 기본적으로 자신이 src/dst가 아닌 패킷을 드롭합니다.
+> NAT는 다른 인스턴스의 패킷을 포워딩해야 하므로 이 체크를 꺼야 합니다.
 
 ### "단일 에이전트의 SPOF(단일 장애점) 문제는?"
 
