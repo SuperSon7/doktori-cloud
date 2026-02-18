@@ -23,9 +23,14 @@ output "private_db_subnet_id" {
   value       = aws_subnet.private_db.id
 }
 
-output "nat_gateway_ip" {
-  description = "NAT Gateway public IP"
+output "nat_public_ip" {
+  description = "NAT Instance public IP (모니터링 서버 SG의 target_server_cidrs에 사용)"
   value       = aws_eip.nat.public_ip
+}
+
+output "nat_instance_id" {
+  description = "NAT Instance ID"
+  value       = aws_instance.nat.id
 }
 
 output "vpc_endpoint_sg_id" {

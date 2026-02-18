@@ -45,3 +45,16 @@ variable "availability_zone" {
   type        = string
   default     = "ap-northeast-2a"
 }
+
+# ── NAT Instance ────────────────────────────────────────────────
+variable "nat_instance_type" {
+  description = "NAT instance type (t4g.nano: ~$3/월, dev에 충분)"
+  type        = string
+  default     = "t4g.nano"
+}
+
+variable "nat_key_name" {
+  description = "NAT instance SSH key pair name (디버깅용)"
+  type        = string
+  default     = "doktori-dev"
+}
