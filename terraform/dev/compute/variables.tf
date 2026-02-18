@@ -27,12 +27,6 @@ variable "dev_app_instance_type" {
   default     = "t3.small"
 }
 
-variable "bastion_instance_type" {
-  description = "Bastion EC2 instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
 # monitoring_instance_type → terraform/monitoring/variables.tf 로 이동
 
 variable "root_volume_size" {

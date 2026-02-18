@@ -1,13 +1,3 @@
-output "bastion_instance_id" {
-  description = "Bastion EC2 instance ID"
-  value       = aws_instance.bastion.id
-}
-
-output "bastion_public_ip" {
-  description = "Bastion EC2 public IP"
-  value       = aws_instance.bastion.public_ip
-}
-
 output "dev_app_instance_id" {
   description = "Dev app EC2 instance ID"
   value       = aws_instance.dev_app.id

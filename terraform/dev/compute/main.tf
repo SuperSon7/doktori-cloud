@@ -164,26 +164,6 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 # Security Groups
 # -----------------------------------------------------------------------------
 
-# Bastion SG - egress only (SSM works via outbound)
-resource "aws_security_group" "bastion" {
-  name_prefix = "${var.project_name}-${var.environment}-bastion-"
-  description = "Bastion host - egress only for SSM"
-  vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name    = "${var.project_name}-${var.environment}-bastion-sg"
-    Service = "bastion"
-  }
-}
-
 # Dev App SG
 resource "aws_security_group" "dev_app" {
   name_prefix = "${var.project_name}-${var.environment}-dev-app-"
@@ -252,7 +232,7 @@ resource "aws_security_group" "dev_app" {
 
   tags = {
     Name    = "${var.project_name}-${var.environment}-dev-app-sg"
-    Service = "dev-app"
+    Service = "app"
   }
 }
 
@@ -262,34 +242,6 @@ resource "aws_security_group" "dev_app" {
 # -----------------------------------------------------------------------------
 # EC2 Instances
 # -----------------------------------------------------------------------------
-
-# Bastion Host (Public Subnet)
-resource "aws_instance" "bastion" {
-  ami                    = data.aws_ami.ubuntu_x86.id
-  instance_type          = var.bastion_instance_type
-  key_name               = var.key_name
-  subnet_id              = data.terraform_remote_state.networking.outputs.public_subnet_id
-  vpc_security_group_ids = [aws_security_group.bastion.id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
-
-  metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
-  }
-
-  root_block_device {
-    volume_size = 8
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = {
-    Name     = "${var.project_name}-${var.environment}-bastion"
-    Service  = "bastion"
-    Part     = "cloud"
-    AutoStop = "true"
-  }
-}
 
 # Dev App EC2 (Private App Subnet - docker-compose full stack)
 resource "aws_instance" "dev_app" {
@@ -318,7 +270,7 @@ resource "aws_instance" "dev_app" {
 
   tags = {
     Name     = "${var.project_name}-${var.environment}-dev-app"
-    Service  = "dev-app"
+    Service  = "app"
     Part     = "cloud"
     AutoStop = "true"
   }
