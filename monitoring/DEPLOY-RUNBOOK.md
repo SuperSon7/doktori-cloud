@@ -38,7 +38,7 @@ Dev VPC (10.0.0.0/16)
 > NAT Gateway($32/월) 대신 **NAT Instance(t4g.nano, $3/월)** 로 ~90% 절감.
 
 ```bash
-cd Cloud/terraform/dev/networking/
+cd Cloud/terraform/nonprod/networking/
 
 terraform init
 terraform plan    # NAT Instance 생성 + private route table 변경 확인
@@ -150,7 +150,7 @@ curl -s localhost:3000/api/health # Grafana
 ## Step 3: Dev 서버 SG 업데이트 (Terraform)
 
 ```bash
-cd Cloud/terraform/dev/compute/
+cd Cloud/terraform/nonprod/compute/
 
 terraform plan    # exporter 포트 4개 제거 확인 (9100/9104/9113/9080)
 terraform apply

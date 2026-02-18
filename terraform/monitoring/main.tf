@@ -205,6 +205,11 @@ resource "aws_instance" "monitoring" {
   vpc_security_group_ids = [aws_security_group.monitoring.id]
   iam_instance_profile   = aws_iam_instance_profile.monitoring.name
 
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name = var.project_name
+    architecture = var.architecture
+  })
+
   metadata_options {
     http_tokens   = "required" # IMDSv2 강제
     http_endpoint = "enabled"

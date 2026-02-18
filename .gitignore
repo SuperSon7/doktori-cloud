@@ -85,10 +85,12 @@ logs/
 
 
 scripts/
+!terraform/**/scripts/
 .github/workflows/
 .github/dependabot.yml
 
 *.sh
+!terraform/**/scripts/*.sh
 
 # =============================================================================
 # Claude Code (local settings & commands)
