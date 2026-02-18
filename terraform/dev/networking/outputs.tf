@@ -32,8 +32,3 @@ output "nat_instance_id" {
   description = "NAT Instance ID"
   value       = aws_instance.nat.id
 }
-
-output "vpc_endpoint_sg_id" {
-  description = "VPC Endpoints security group ID"
-  value       = aws_security_group.vpc_endpoints.id
-}

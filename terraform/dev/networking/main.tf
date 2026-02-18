@@ -216,111 +216,12 @@ resource "aws_route_table_association" "private_db" {
 }
 
 # -----------------------------------------------------------------------------
-# VPC Endpoints - Interface (SSM, ECR, CloudWatch Logs)
+# VPC Endpoint - Gateway (S3: 무료, NAT 부하 절감)
+#
+# Interface Endpoint (SSM, ECR, CloudWatch) 제거: ~$42/월 절감
+# NAT Instance가 있으므로 모든 AWS API는 NAT 경유로 접근 가능
+# 트레이드오프: NAT 장애 시 SSM 접속 불가 → dev에서는 수용 가능
 # -----------------------------------------------------------------------------
-resource "aws_security_group" "vpc_endpoints" {
-  name_prefix = "${var.project_name}-${var.environment}-vpce-"
-  description = "Security group for VPC endpoints"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description = "HTTPS from VPC"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-sg"
-  }
-}
-
-resource "aws_vpc_endpoint" "ssm" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssm"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-ssm"
-  }
-}
-
-resource "aws_vpc_endpoint" "ssmmessages" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-ssmmessages"
-  }
-}
-
-resource "aws_vpc_endpoint" "ec2messages" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ec2messages"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-ec2messages"
-  }
-}
-
-resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-ecr-api"
-  }
-}
-
-resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-ecr-dkr"
-  }
-}
-
-resource "aws_vpc_endpoint" "logs" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.logs"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [aws_subnet.private_app.id]
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpce-logs"
-  }
-}
-
-# VPC Endpoint - Gateway (S3)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
