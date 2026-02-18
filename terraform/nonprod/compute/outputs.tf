@@ -13,4 +13,9 @@ output "dev_app_sg_id" {
   value       = aws_security_group.dev_app.id
 }
 
+output "dev_app_eip" {
+  description = "Dev app Elastic IP"
+  value       = aws_eip.dev_app.public_ip
+}
+
 # monitoring outputs → terraform/monitoring/outputs.tf 로 이동

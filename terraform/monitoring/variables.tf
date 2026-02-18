@@ -34,9 +34,9 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-  description = "SSH key pair name"
+  description = "SSH key pair name (비상용, 주 접근은 SSM)"
   type        = string
-  default     = "doktori-monitoring"
+  default     = "doktori-dev"
 }
 
 variable "root_volume_size" {

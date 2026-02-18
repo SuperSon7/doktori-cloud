@@ -110,7 +110,10 @@ resource "aws_iam_role_policy" "ec2_parameter_store" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*"
+        Resource = [
+            "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*",
+            "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/dev/*",
+          ]
       },
       {
         Effect = "Allow"
@@ -170,21 +173,20 @@ resource "aws_security_group" "dev_app" {
   description = "Dev app instance security group"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
-  # Internal communication only (private subnet, no inbound from internet)
   ingress {
-    description = "HTTP from VPC"
+    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description = "HTTPS from VPC"
+    description = "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
@@ -243,12 +245,13 @@ resource "aws_security_group" "dev_app" {
 # EC2 Instances
 # -----------------------------------------------------------------------------
 
-# Dev App EC2 (Private App Subnet - docker-compose full stack)
+# Dev App EC2 (Public Subnet - docker-compose full stack)
+# 향후 private subnet 이동 시 subnet_id만 변경
 resource "aws_instance" "dev_app" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = var.dev_app_ami != "" ? var.dev_app_ami : data.aws_ami.ubuntu_arm64.id
   instance_type          = var.dev_app_instance_type
   key_name               = var.key_name
-  subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
+  subnet_id              = data.terraform_remote_state.networking.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.dev_app.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
@@ -263,17 +266,33 @@ resource "aws_instance" "dev_app" {
     encrypted   = true
   }
 
-  user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
-  })
+  tags = {
+    Name        = "${var.project_name}-dev-app"
+    Service     = "app"
+    Environment = "dev"
+    Part        = "cloud"
+    AutoStop    = "true"
+  }
+
+  lifecycle {
+    ignore_changes = [ami]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Elastic IP - dev-app
+# -----------------------------------------------------------------------------
+resource "aws_eip" "dev_app" {
+  domain = "vpc"
 
   tags = {
-    Name     = "${var.project_name}-${var.environment}-dev-app"
-    Service  = "app"
-    Part     = "cloud"
-    AutoStop = "true"
+    Name = "${var.project_name}-${var.environment}-dev-app-eip"
   }
+}
+
+resource "aws_eip_association" "dev_app" {
+  allocation_id = aws_eip.dev_app.id
+  instance_id   = aws_instance.dev_app.id
 }
 
 # Monitoring EC2 → terraform/monitoring/ 모듈로 분리됨
