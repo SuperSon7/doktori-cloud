@@ -5,59 +5,42 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.yml
 
+# =============================================================================
+# 메트릭 수집 구조
+#
+# [Push — Alloy remote_write]
+# 각 서버의 Alloy 에이전트가 로컬에서 수집 후 Prometheus로 push
+#   - 호스트 메트릭 (prometheus.exporter.unix)
+#   - Spring Boot actuator (prometheus.scrape)
+#   - MySQL (prometheus.exporter.mysql)
+#   - Nginx (nginx-exporter 사이드카 → Alloy scrape)
+# Prometheus는 --web.enable-remote-write-receiver 플래그로 수신
+#
+# [Pull — Blackbox Exporter]
+# 모니터링 서버에서 외부 URL 프로빙 (엔드포인트 가용성)
+# =============================================================================
+
 scrape_configs:
-  # Prometheus 자기 자신
+  # Prometheus 자체 메트릭
   - job_name: prometheus
     static_configs:
       - targets: ["prometheus:9090"]
 
   # ──────────────────────────────────────────────
-  # Node Exporter (Phase 1에서 Alloy remote_write로 전환 시 제거)
+  # Blackbox Exporter — 외부 엔드포인트 가용성 프로빙
+  # 유일하게 Pull 유지: 모니터링 서버 → HTTPS URL
   # ──────────────────────────────────────────────
-  - job_name: node_exporter
-    static_configs:
-      - targets: ["__PROD_APP_IP__:9100"]
-        labels:
-          env: prod
-      - targets: ["__DEV_APP_IP__:9100"]
-        labels:
-          env: dev
-
-  # ──────────────────────────────────────────────
-  # Spring Boot (HTTPS, nginx를 통해 외부에서 스크레이프)
-  # ──────────────────────────────────────────────
-  - job_name: spring-boot-prod
-    scheme: https
-    metrics_path: /api/actuator/prometheus
-    static_configs:
-      - targets: ["doktori.kr"]
-
-  - job_name: spring-boot-dev
-    scheme: https
-    metrics_path: /api/actuator/prometheus
-    static_configs:
-      - targets: ["dev.doktori.kr"]
-
-  # ──────────────────────────────────────────────
-  # Nginx Exporter
-  # ──────────────────────────────────────────────
-  - job_name: nginx
-    static_configs:
-      - targets: ["__PROD_NGINX_IP__:9113"]
-        labels:
-          env: prod
-
-  # ──────────────────────────────────────────────
-  # Nginx Probe (Blackbox Exporter → 엔드포인트 가용성)
-  # ──────────────────────────────────────────────
-  - job_name: nginx-probe
+  - job_name: blackbox-http
     metrics_path: /probe
     params:
       module: [http_2xx]
     static_configs:
       - targets:
-          - https://doktori.kr/api/actuator/health
           - https://dev.doktori.kr/api/actuator/health
+          - https://dev.doktori.kr/nginx-health
+          # prod 서버 추가 시 아래 주석 해제
+          # - https://doktori.kr/api/actuator/health
+          # - https://doktori.kr/nginx-health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -65,18 +48,3 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
-
-  # ──────────────────────────────────────────────
-  # MySQL Exporter
-  # ──────────────────────────────────────────────
-  - job_name: mysql-prod
-    static_configs:
-      - targets: ["__PROD_DB_IP__:9104"]
-        labels:
-          env: prod
-
-  - job_name: mysql-dev
-    static_configs:
-      - targets: ["__DEV_DB_IP__:9104"]
-        labels:
-          env: dev

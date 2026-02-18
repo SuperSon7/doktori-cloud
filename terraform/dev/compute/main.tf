@@ -239,37 +239,8 @@ resource "aws_security_group" "dev_app" {
     cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
   }
 
-  ingress {
-    description = "Node Exporter from monitoring"
-    from_port   = 9100
-    to_port     = 9100
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "MySQL Exporter from monitoring"
-    from_port   = 9104
-    to_port     = 9104
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "Nginx Exporter from monitoring"
-    from_port   = 9113
-    to_port     = 9113
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
-
-  ingress {
-    description = "Promtail from monitoring"
-    from_port   = 9080
-    to_port     = 9080
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
+  # Alloy push 전환으로 exporter 인바운드 포트 제거 (9100/9104/9113/9080)
+  # Alloy가 내부에서 수집 → 모니터링 서버로 아웃바운드 push (egress만 필요)
 
   egress {
     description = "Allow all outbound"
