@@ -1,10 +1,15 @@
 # -----------------------------------------------------------------------------
+# Current AWS Account (하드코딩 방지)
+# -----------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
+# -----------------------------------------------------------------------------
 # Remote State: Compute (for app security group ID)
 # -----------------------------------------------------------------------------
 data "terraform_remote_state" "compute" {
   backend = "s3"
   config = {
-    bucket = "doktori-terraform-state"
+    bucket = "doktori-v2-terraform-state"
     key    = "compute/terraform.tfstate"
     region = "ap-northeast-2"
   }
@@ -88,7 +93,7 @@ resource "aws_iam_policy" "dev_github_actions" {
           "ec2:RevokeSecurityGroupIngress"
         ]
         Resource = [
-          "arn:aws:ec2:${var.aws_region}:246477585940:security-group/${data.terraform_remote_state.compute.outputs.security_group_id}"
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/${data.terraform_remote_state.compute.outputs.security_group_id}"
         ]
       }
     ]
@@ -195,7 +200,7 @@ resource "aws_iam_policy" "prod_parameter_store_read" {
         Action = [
           "kms:Decrypt"
         ]
-        Resource = "arn:aws:kms:${var.aws_region}:246477585940:key/7e868f04-2ccc-46e3-96cd-61d79860cd72"
+        Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*"
       }
     ]
   })

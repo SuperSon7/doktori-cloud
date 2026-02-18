@@ -76,7 +76,7 @@ resource "aws_iam_policy" "dev_github_actions" {
           "ec2:RevokeSecurityGroupIngress"
         ]
         Resource = [
-          "arn:aws:ec2:${var.aws_region}:246477585940:security-group/${aws_security_group.app.id}"
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/${aws_security_group.app.id}"
         ]
       }
     ]
@@ -183,7 +183,7 @@ resource "aws_iam_policy" "prod_parameter_store_read" {
         Action = [
           "kms:Decrypt"
         ]
-        Resource = "arn:aws:kms:${var.aws_region}:246477585940:key/7e868f04-2ccc-46e3-96cd-61d79860cd72"
+        Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*"
       }
     ]
   })

@@ -66,5 +66,5 @@ variable "db_volume_size" {
 variable "state_bucket" {
   description = "S3 bucket for Terraform remote state"
   type        = string
-  default     = "doktori-terraform-state"
+  default     = "doktori-v2-terraform-state"
 }

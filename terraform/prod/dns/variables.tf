@@ -19,7 +19,7 @@ variable "aws_region" {
 variable "state_bucket" {
   description = "S3 bucket for Terraform remote state"
   type        = string
-  default     = "doktori-terraform-state"
+  default     = "doktori-v2-terraform-state"
 }
 
 variable "nginx_eip" {
