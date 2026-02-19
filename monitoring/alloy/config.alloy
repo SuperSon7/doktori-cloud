@@ -104,13 +104,13 @@ discovery.relabel "docker_logs" {
   // 로그가 있는 컨테이너만 필터
   rule {
     source_labels = ["__meta_docker_container_name"]
-    regex         = "/(backend|chat|ai|frontend|nginx|mysql)"
+    regex         = "/.*(backend|chat|ai|frontend|nginx|mysql).*"
     action        = "keep"
   }
-  // 컨테이너 이름 → app 라벨
+  // 컨테이너 이름 → app 라벨 ({project}-{service}-{replica} → service)
   rule {
     source_labels = ["__meta_docker_container_name"]
-    regex         = "/(.*)"
+    regex         = "/[^-]+-([^-]+)-.*"
     target_label  = "app"
   }
 }

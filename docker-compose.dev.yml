@@ -178,7 +178,9 @@ services:
       - run
       - /etc/alloy/config.alloy
       - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
     volumes:
+      - alloy-data:/var/lib/alloy/data
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -232,3 +234,4 @@ networks:
 volumes:
   mysql-data:
   nginx-logs:
+  alloy-data:

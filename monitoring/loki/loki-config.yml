@@ -9,7 +9,6 @@ limits_config:
   volume_enabled: true
   query_timeout: 5m
   max_query_series: 500
-  query_scheduler_max_outstanding_requests_per_tenant: 512
   retention_period: 30d
 
 common:
@@ -44,5 +43,6 @@ compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
   retention_enabled: true
+  delete_request_store: filesystem
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
