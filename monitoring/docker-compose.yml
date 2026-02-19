@@ -32,7 +32,7 @@ services:
       - monitoring
 
   grafana:
-    image: grafana/grafana:12.4.0
+    image: grafana/grafana:12.3.3
     container_name: grafana
     restart: unless-stopped
     ports:
@@ -41,6 +41,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:3000
+      - DISCORD_CRITICAL_WEBHOOK=${DISCORD_CRITICAL_WEBHOOK:-}
+      - DISCORD_HIGH_WEBHOOK=${DISCORD_HIGH_WEBHOOK:-}
+      - DISCORD_WARNING_WEBHOOK=${DISCORD_WARNING_WEBHOOK:-}
+      - DISCORD_INFO_WEBHOOK=${DISCORD_INFO_WEBHOOK:-}
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
