@@ -187,6 +187,8 @@ services:
       - nginx-logs:/var/log/nginx:ro
     environment:
       - MYSQL_DSN=root:${DB_PASSWORD}@(mysql:3306)/
+      - MONITORING_IP=${MONITORING_IP}
+      - ALLOY_ENV=dev
     networks:
       - app-net
     pid: host

@@ -7,9 +7,9 @@
 //   promtail       (9080) → loki.source.file
 //   nginx-exporter (9113) → 사이드카 유지 (Alloy 내장 없음)
 //
-// 플레이스홀더: __MONITORING_IP__  (모니터링 서버 EIP)
-//              __ENV__            (prod | dev)
-// 환경변수:    MYSQL_DSN          (root:pass@(mysql:3306)/)
+// 환경변수:    MONITORING_IP      (모니터링 서버 EIP)
+//              ALLOY_ENV          (prod | dev)
+//              MYSQL_DSN          (root:pass@(mysql:3306)/)
 // =============================================================================
 
 // ─── 호스트 메트릭 (replaces node_exporter:9100) ────────────────────────────
@@ -24,7 +24,7 @@ prometheus.exporter.unix "host" {
     "loadavg", "netdev", "uname", "time",
   ]
   filesystem {
-    mount_point_exclude = "^/(dev|proc|sys|run|host)($|/)"
+    mount_points_exclude = "^/(dev|proc|sys|run|host)($|/)"
   }
 }
 
@@ -72,7 +72,7 @@ prometheus.scrape "nginx" {
 prometheus.relabel "add_env" {
   rule {
     target_label = "env"
-    replacement  = "__ENV__"
+    replacement  = env("ALLOY_ENV")
   }
   rule {
     target_label = "instance"
@@ -84,7 +84,7 @@ prometheus.relabel "add_env" {
 // ─── Prometheus Remote Write → Monitoring Server ────────────────────────────
 prometheus.remote_write "monitoring" {
   endpoint {
-    url = "http://__MONITORING_IP__:9090/api/v1/write"
+    url = "http://" + env("MONITORING_IP") + ":9090/api/v1/write"
   }
 }
 
@@ -121,24 +121,15 @@ loki.source.docker "containers" {
   forward_to = [loki.relabel.add_env.receiver]
 }
 
-// ─── Nginx 액세스/에러 로그 (파일 기반, 볼륨 마운트) ────────────────────────
-local.file_match "nginx_logs" {
-  path_targets = [
-    { "__path__" = "/var/log/nginx/access.log", "app" = "nginx", "log_type" = "access" },
-    { "__path__" = "/var/log/nginx/error.log",  "app" = "nginx", "log_type" = "error" },
-  ]
-}
-
-loki.source.file "nginx" {
-  targets    = local.file_match.nginx_logs.targets
-  forward_to = [loki.relabel.add_env.receiver]
-}
+// ─── Nginx 로그 ──────────────────────────────────────────────────────────────
+// nginx alpine은 access.log/error.log를 stdout/stderr 심볼릭 링크로 처리하므로
+// 파일 기반 수집 대신 loki.source.docker 로 Docker 소켓 경유 수집 (위 containers 블록)
 
 // ─── 공통 라벨 + Loki push ──────────────────────────────────────────────────
 loki.relabel "add_env" {
   rule {
     target_label = "env"
-    replacement  = "__ENV__"
+    replacement  = env("ALLOY_ENV")
   }
   rule {
     target_label = "instance"
@@ -149,6 +140,6 @@ loki.relabel "add_env" {
 
 loki.write "monitoring" {
   endpoint {
-    url = "http://__MONITORING_IP__:3100/loki/api/v1/push"
+    url = "http://" + env("MONITORING_IP") + ":3100/loki/api/v1/push"
   }
 }
