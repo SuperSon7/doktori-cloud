@@ -85,7 +85,7 @@
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (app) (count_over_time({app=~\"$app\", env=\"$env\"} |~ \"(?i)error|exception\" [5m]))", "legendFormat": "{{app}}", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (app) (count_over_time({app=~\"$app\", env=\"$env\"} | detected_level =~ `error|critical|fatal` [5m]))", "legendFormat": "{{app}}", "refId": "A" }
       ],
       "title": "Error Rate Trend",
       "type": "timeseries"
@@ -105,7 +105,7 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=~\"$app\", env=\"$env\"} |~ \"(?i)error|exception\"", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=~\"$app\", env=\"$env\"} | detected_level =~ `error|critical|fatal`", "legendFormat": "", "refId": "A" }
       ],
       "title": "Error Logs",
       "type": "logs"
@@ -159,7 +159,7 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"nginx\", log_type=\"access\", env=\"$env\"}", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"nginx\", env=\"$env\"} | detected_level != `error` !~ \"Prometheus/|Blackbox-Exporter\"", "legendFormat": "", "refId": "A" }
       ],
       "title": "Nginx Access Log",
       "type": "logs"
@@ -179,7 +179,7 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"nginx\", log_type=\"error\", env=\"$env\"}", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"nginx\", env=\"$env\"} | detected_level = `error`", "legendFormat": "", "refId": "A" }
       ],
       "title": "Nginx Error Log",
       "type": "logs"
