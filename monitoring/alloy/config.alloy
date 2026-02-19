@@ -36,7 +36,7 @@ prometheus.scrape "host_metrics" {
 
 // ─── MySQL 메트릭 (replaces mysqld_exporter:9104) ───────────────────────────
 prometheus.exporter.mysql "db" {
-  data_source_name = env("MYSQL_DSN")
+  data_source_name = sys.env("MYSQL_DSN")
   // DSN 예시: root:${DB_PASSWORD}@(mysql:3306)/
 }
 
@@ -68,15 +68,34 @@ prometheus.scrape "nginx" {
   forward_to      = [prometheus.relabel.add_env.receiver]
 }
 
-// ─── 공통 라벨 (env, instance) ──────────────────────────────────────────────
+// ─── 공통 라벨 (env, instance, job 정리) ─────────────────────────────────────
 prometheus.relabel "add_env" {
+  // env 라벨
   rule {
     target_label = "env"
-    replacement  = env("ALLOY_ENV")
+    replacement  = sys.env("ALLOY_ENV")
   }
+  // app 라벨이 있으면 instance를 app 값으로 설정 (api, chat, nginx)
+  // app이 없으면 기존 instance 유지 (host metrics = exporter 주소, mysql = exporter 주소)
   rule {
-    target_label = "instance"
-    replacement  = constants.hostname
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
+  }
+  // job 라벨에서 Alloy 내부 prefix + _metrics 접미사 제거
+  // prometheus.scrape.host_metrics → host, prometheus.scrape.spring_boot → spring_boot
+  rule {
+    source_labels = ["job"]
+    regex         = "prometheus\\.(?:scrape|exporter)\\.(.+?)(?:_metrics)?"
+    target_label  = "job"
+    replacement   = "$1"
+  }
+  // job의 underscore → hyphen (spring_boot → spring-boot)
+  rule {
+    source_labels = ["job"]
+    regex         = "(.+)_(.+)"
+    target_label  = "job"
+    replacement   = "$1-$2"
   }
   forward_to = [prometheus.remote_write.monitoring.receiver]
 }
@@ -84,7 +103,7 @@ prometheus.relabel "add_env" {
 // ─── Prometheus Remote Write → Monitoring Server ────────────────────────────
 prometheus.remote_write "monitoring" {
   endpoint {
-    url = "http://" + env("MONITORING_IP") + ":9090/api/v1/write"
+    url = "http://" + sys.env("MONITORING_IP") + ":9090/api/v1/write"
   }
 }
 
@@ -129,17 +148,20 @@ loki.source.docker "containers" {
 loki.relabel "add_env" {
   rule {
     target_label = "env"
-    replacement  = env("ALLOY_ENV")
+    replacement  = sys.env("ALLOY_ENV")
   }
+  // discovery.relabel에서 app 라벨 추출됨 → instance로 복사
+  // app이 없는 로그는 기존 instance 유지
   rule {
-    target_label = "instance"
-    replacement  = constants.hostname
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
   }
   forward_to = [loki.write.monitoring.receiver]
 }
 
 loki.write "monitoring" {
   endpoint {
-    url = "http://" + env("MONITORING_IP") + ":3100/loki/api/v1/push"
+    url = "http://" + sys.env("MONITORING_IP") + ":3100/loki/api/v1/push"
   }
 }
