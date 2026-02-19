@@ -6,6 +6,7 @@ policies:
     group_by:
       - grafana_folder
       - alertname
+      - app
     group_wait: 1m
     group_interval: 5m
     repeat_interval: 4h

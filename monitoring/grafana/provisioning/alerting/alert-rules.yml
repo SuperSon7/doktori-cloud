@@ -40,9 +40,9 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.job }}/{{ $labels.instance }} is down"
+          summary: "{{ $labels.app | default $labels.job }}({{ $labels.instance }}) 서비스가 다운됨"
           dashboard_url: "/d/infrastructure"
-        noDataState: OK
+        noDataState: Alerting
         execErrState: Alerting
 
       # --- Probe Failure (critical) ---
@@ -76,9 +76,9 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Probe failed for {{ $labels.instance }}"
+          summary: "{{ $labels.instance }} 외부 프로브 실패"
           dashboard_url: "/d/infrastructure"
-        noDataState: OK
+        noDataState: Alerting
         execErrState: Alerting
 
       # --- Error Rate > 50% (critical) ---
@@ -94,10 +94,11 @@ groups:
             model:
               expr: |
                 (
-                  sum by (instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  sum by (app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
                   /
-                  sum by (instance) (rate(http_server_requests_seconds_count[5m]))
+                  sum by (app, instance) (rate(http_server_requests_seconds_count[5m]))
                 ) > 0.5
+                and on(instance) up == 1
               instant: true
               refId: A
           - refId: C
@@ -117,9 +118,9 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Error rate exceeds 50% on {{ $labels.instance }}"
+          summary: "{{ $labels.app }}({{ $labels.instance }}) 에러율 50% 초과"
           dashboard_url: "/d/application"
-        noDataState: OK
+        noDataState: Alerting
         execErrState: Alerting
 
       # --- Disk > 95% (critical) ---
@@ -155,12 +156,13 @@ groups:
                     params: [0]
               refId: C
         for: 5m
+        keep_firing_for: 10m
         labels:
           severity: critical
         annotations:
-          summary: "Disk usage > 95% on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          summary: "{{ $labels.instance }} 디스크 95% 초과 ({{ $labels.mountpoint }})"
           dashboard_url: "/d/infrastructure"
-        noDataState: OK
+        noDataState: Alerting
         execErrState: Alerting
 
       # --- Memory > 90% (high) ---
@@ -194,10 +196,11 @@ groups:
                     params: [0]
               refId: C
         for: 5m
+        keep_firing_for: 10m
         labels:
           severity: high
         annotations:
-          summary: "Memory usage > 90% on {{ $labels.instance }}"
+          summary: "{{ $labels.instance }} 메모리 90% 초과"
           dashboard_url: "/d/infrastructure"
         noDataState: OK
         execErrState: Alerting
@@ -233,10 +236,11 @@ groups:
                     params: [0]
               refId: C
         for: 5m
+        keep_firing_for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "CPU usage > 80% on {{ $labels.instance }}"
+          summary: "{{ $labels.instance }} CPU 80% 초과"
           dashboard_url: "/d/infrastructure"
         noDataState: OK
         execErrState: Alerting
@@ -274,10 +278,11 @@ groups:
                     params: [0]
               refId: C
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Disk usage > 80% on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          summary: "{{ $labels.instance }} 디스크 80% 초과 ({{ $labels.mountpoint }})"
           dashboard_url: "/d/infrastructure"
         noDataState: OK
         execErrState: Alerting
@@ -303,10 +308,11 @@ groups:
             model:
               expr: |
                 (
-                  sum by (application, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
                   /
-                  sum by (application, instance) (rate(http_server_requests_seconds_count[5m]))
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count[5m]))
                 ) > 0.1
+                and on(instance) up == 1
               instant: true
               refId: A
           - refId: C
@@ -326,7 +332,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "Error rate > 10% on {{ $labels.application }}({{ $labels.instance }})"
+          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) 에러율 10% 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -344,10 +350,11 @@ groups:
             model:
               expr: |
                 histogram_quantile(0.99,
-                  sum by (le, application, instance) (
+                  sum by (le, application, app, instance) (
                     rate(http_server_requests_seconds_bucket[5m])
                   )
                 ) > 5
+                and on(instance) up == 1
               instant: true
               refId: A
           - refId: C
@@ -367,7 +374,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "p99 latency > 5s on {{ $labels.application }}({{ $labels.instance }})"
+          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) p99 지연시간 5초 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -383,7 +390,9 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: hikaricp_connections_pending > 0
+              expr: |
+                hikaricp_connections_pending > 0
+                and on(instance) up == 1
               instant: true
               refId: A
           - refId: C
@@ -403,7 +412,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "HikariCP has pending connections on {{ $labels.application }}({{ $labels.instance }})"
+          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) HikariCP 대기 커넥션 발생"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -419,7 +428,9 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: jvm_gc_pause_seconds_max > 0.5
+              expr: |
+                jvm_gc_pause_seconds_max > 0.5
+                and on(instance) up == 1
               instant: true
               refId: A
           - refId: C
@@ -439,7 +450,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "GC pause > 500ms on {{ $labels.application }}({{ $labels.instance }})"
+          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) GC pause 500ms 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -483,6 +494,43 @@ groups:
         labels:
           severity: info
         annotations:
-          summary: "{{ $labels.job }}/{{ $labels.instance }} has restarted"
+          summary: "{{ $labels.app | default $labels.job }}({{ $labels.instance }}) 서비스가 재시작됨"
         noDataState: OK
         execErrState: OK
+
+      # --- Watchdog (info) — 모니터링 파이프라인 헬스체크 ---
+      # 항상 firing. 멈추면 모니터링 파이프라인 자체 장애.
+      # Discord #alert-normal에 12시간마다 반복 수신됨 → 안 오면 모니터링 죽은 것.
+      - uid: watchdog
+        title: Watchdog
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: vector(1)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: "Watchdog alive — 모니터링 파이프라인 정상"
+        noDataState: Alerting
+        execErrState: Alerting
