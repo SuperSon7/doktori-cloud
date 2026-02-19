@@ -13,7 +13,7 @@
 | 0 | [Migration](#phase-0-migration) | ✅ Done | 2026-02-18 | Docker Compose 스택 |
 | 1 | [Alloy 전환](#phase-1-alloy-전환) | ✅ Done | 2026-02-18 | 단일 에이전트 수집 |
 | 2 | [대시보드 체계화](#phase-2-대시보드-체계화) | ✅ Done | 2026-02-18 | 5개 대시보드 신규 |
-| 3 | [알림 체계 구축](#phase-3-알림-체계-구축) | 🔲 Todo | - | Grafana Unified Alerting |
+| 3 | [알림 체계 구축](#phase-3-알림-체계-구축) | ✅ Done | 2026-02-19 | Grafana Unified Alerting |
 | 4 | [AI 장애 분석](#phase-4-ai-장애-분석) | 🔲 Todo | - | LLM 자동 분석 |
 | 5 | [Tracing + ChatOps](#phase-5-tracing--chatops) | 🔲 Todo | - | Tempo + Discord Bot |
 
@@ -98,21 +98,27 @@
 | P4 | Info | 다음 업무일 | `#alert-info` | 배포 완료, 인증서 30일 전 만료, 주간 리포트 |
 
 ### Checklist
-- [ ] Discord webhook 4개 생성 (채널별)
-- [ ] Grafana Contact Points 설정 (4개 Discord webhook)
-- [ ] Notification Policy 설정 (severity label 기반 라우팅)
-- [ ] Alert Rules 작성
-  - [ ] P1: `up == 0`, `probe_success == 0`, error rate > 50%
-  - [ ] P2: p99 > 5s, error rate > 10%, memory > 90%, HikariCP pending > 0
-  - [ ] P3: CPU > 80% 5분, disk > 80%, GC pause 증가
-  - [ ] P4: 배포 알림, 인증서 만료 예고
-- [ ] 커스텀 메시지 템플릿 작성 (severity별 색상, runbook 링크 포함)
-- [ ] Alert rule provisioning JSON/YAML 작성 (Git 관리)
-- [ ] 테스트: 각 severity 알림 발화 확인
+- [x] Discord webhook 생성 (2채널: `#alert-urgent`, `#alert-normal`)
+- [x] Grafana Contact Points 설정 (4개 Discord webhook → 2채널로 매핑)
+- [x] Notification Policy 설정 (severity label 기반 라우팅)
+- [x] Alert Rules 작성
+  - [x] P1: `up == 0`, `probe_success == 0`, error rate > 50%, disk > 95%
+  - [x] P2: p99 > 5s, error rate > 10%, memory > 90%, HikariCP pending > 0
+  - [x] P3: CPU > 80% 5분, disk > 80%, GC pause > 500ms
+  - [x] P4: 서비스 재시작 감지
+- [x] 커스텀 메시지 템플릿 작성 (severity별 이모지, dashboard/runbook 링크 포함)
+- [x] Alert rule provisioning YAML 작성 (Git 관리, file-based provisioning)
+- [x] 테스트: Discord 알림 발송 확인
 
-### 산출물 (예상)
-- `Cloud/monitoring/grafana/provisioning/alerting/` (rules, contact points, policies)
-- Discord 채널 4개
+### 산출물
+- `Cloud/monitoring/grafana/provisioning/alerting/contact-points.yml`
+- `Cloud/monitoring/grafana/provisioning/alerting/notification-policies.yml`
+- `Cloud/monitoring/grafana/provisioning/alerting/alert-rules.yml`
+- `Cloud/monitoring/grafana/provisioning/alerting/templates.yml`
+- Discord 2채널 (urgent: critical+high, normal: warning+info)
+
+### 관련 커밋
+- Cloud `05d59b1` feat(alerting): add Grafana alerting provisioning (Phase 3)
 
 ---
 
