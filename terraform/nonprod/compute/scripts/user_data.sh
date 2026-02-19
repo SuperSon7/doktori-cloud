@@ -69,8 +69,8 @@ apt-get install -y htop vim curl wget jq net-tools tree
 # Application directory
 # -----------------------------------------------------------------------------
 echo "=== Creating application directory ==="
-mkdir -p /opt/app
-chown -R ubuntu:ubuntu /opt/app
+mkdir -p /home/ubuntu/app
+chown -R ubuntu:ubuntu /home/ubuntu/app
 
 # -----------------------------------------------------------------------------
 # Swap (2GB for t3.small)

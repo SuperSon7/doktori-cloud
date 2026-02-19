@@ -69,6 +69,80 @@ resource "aws_iam_role" "github_actions_deploy" {
 }
 
 # -----------------------------------------------------------------------------
+# Deploy Role: ECR Push (이미지 빌드 후 push)
+# -----------------------------------------------------------------------------
+resource "aws_iam_role_policy" "deploy_ecr_push" {
+  name = "${var.project_name}-deploy-ecr-push"
+  role = aws_iam_role.github_actions_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRAuth"
+        Effect = "Allow"
+        Action = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPush"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload"
+        ]
+        Resource = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/${var.project_name}/*"
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# Deploy Role: SSM Run Command (SSH 없이 EC2에 배포 명령)
+# -----------------------------------------------------------------------------
+resource "aws_iam_role_policy" "deploy_ssm_command" {
+  name = "${var.project_name}-deploy-ssm-command"
+  role = aws_iam_role.github_actions_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "SSMSendCommandDocument"
+        Effect = "Allow"
+        Action = "ssm:SendCommand"
+        Resource = "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
+      },
+      {
+        Sid    = "SSMSendCommandInstances"
+        Effect = "Allow"
+        Action = "ssm:SendCommand"
+        Resource = "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/*"
+        Condition = {
+          StringEquals = {
+            "ssm:resourceTag/Project" = var.project_name
+          }
+        }
+      },
+      {
+        Sid    = "SSMCommandStatus"
+        Effect = "Allow"
+        Action = [
+          "ssm:ListCommandInvocations",
+          "ssm:GetCommandInvocation"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
 # GitHub Actions IAM User
 # -----------------------------------------------------------------------------
 resource "aws_iam_user" "github_action" {
