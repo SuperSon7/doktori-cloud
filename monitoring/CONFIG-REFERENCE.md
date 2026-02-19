@@ -46,7 +46,7 @@
 | `TZ` | `Asia/Seoul` | 알림 template의 `.Local.Format`이 KST로 출력되도록 설정. Grafana는 표시 계층이라 TZ 변경해도 데이터(Prometheus/Loki)에 영향 없음. 다른 컨테이너에는 넣지 말 것 |
 | `GF_SECURITY_ADMIN_PASSWORD` | `${GF_ADMIN_PASSWORD:-admin}` | `.env`에서 주입. 미설정 시 `admin` (dev 전용, prod에서는 반드시 변경) |
 | `GF_USERS_ALLOW_SIGN_UP` | `false` | 셀프 회원가입 비활성화. admin만 사용 |
-| `GF_SERVER_ROOT_URL` | `http://localhost:3000` | 알림 메시지의 대시보드 링크 기준 URL. prod에서는 실제 도메인으로 변경 필요 |
+| `GF_SERVER_ROOT_URL` | `${GRAFANA_ROOT_URL:-http://localhost:3000}` | 알림 메시지의 대시보드 링크 기준 URL. `.env`에 `GRAFANA_ROOT_URL` 설정. 미설정 시 localhost 폴백 |
 | `DISCORD_*_WEBHOOK` | `.env`에서 주입 | Grafana가 provisioning YAML의 `${VAR}` 구문을 자동 resolve. **비어있으면 Grafana 기동 실패** |
 | provisioning volume | `:ro` | read-only 마운트. Grafana가 provisioning 파일을 수정하지 못하게 강제 (Git이 single source of truth) |
 
@@ -182,10 +182,17 @@ __address__ → blackbox-exporter:9115 (실제 요청 대상을 Blackbox로 변�
 
 ```
 env      = ALLOY_ENV 환경변수 (dev/prod)
-instance = constants.hostname (호스트명)
+instance = app 라벨 값 (api, chat, nginx) 또는 기존값 유지 (host, mysql exporter 주소)
+job      = Alloy 내부 prefix 제거 (spring-boot, nginx, host, mysql)
 ```
 
 > 모든 메트릭/로그에 `env`, `instance` 라벨 자동 부착 → 대시보드에서 환경별 필터링 가능
+>
+> instance 라벨은 `app` 라벨이 있는 경우(Spring Boot, Nginx) app 값으로 덮어씀.
+> host metrics, MySQL은 `app` 라벨 없으므로 exporter 주소 유지.
+>
+> job 라벨은 `prometheus.scrape.` / `prometheus.exporter.` prefix와 `_metrics` 접미사 제거 후
+> underscore를 hyphen으로 변환: `prometheus.scrape.spring_boot` → `spring-boot`
 
 ### 리소스 제한
 
@@ -212,7 +219,7 @@ instance = constants.hostname (호스트명)
 
 | 설정 | 값 | 설명 |
 |------|-----|------|
-| `group_by` | `[grafana_folder, alertname]` | 같은 폴더+같은 alert를 하나의 그룹으로 묶어 알림 발송. 개별 instance마다 보내지 않음 |
+| `group_by` | `[grafana_folder, alertname, app]` | 같은 폴더+같은 alert+같은 app을 하나의 그룹으로 묶어 발송. `app` 추가로 서비스별 개별 알림 (중복 `[FIRING:2]` 방지) |
 | `group_wait` | severity별 다름 | 그룹 첫 알림 대기 시간. critical은 10s(즉시), info는 5m(묶어서) |
 | `group_interval` | severity별 다름 | 그룹에 새 알림 추가 시 재발송 대기 |
 | `repeat_interval` | severity별 다름 | 동일 알림 반복 발송 간격. critical 15분마다, info 12시간마다 |
@@ -220,15 +227,77 @@ instance = constants.hostname (호스트명)
 
 ### alert-rules.yml
 
+#### 공통 설정
+
 | 설정 | 설명 |
 |------|------|
 | `condition: C` | refId C (threshold expression)의 결과로 발화 여부 결정 |
 | `datasourceUid: __expr__` | Grafana 내장 expression 엔진. PromQL 결과를 threshold와 비교 |
 | `relativeTimeRange.from: 300` | 최근 5분(300초) 데이터 조회 |
 | `instant: true` | 범위 쿼리 대신 최신 값만 조회. 알림 평가에 range는 불필요 |
-| `for` | 이 시간 동안 조건 지속 시 발화. 일시적 스파이크 무시. critical은 1~2분, warning은 5~10분 |
-| `noDataState: OK` | 데이터 없을 때 OK 처리. 서비스가 아직 시작 안 했거나 메트릭이 없는 경우 오알림 방지 |
-| `execErrState: Alerting` | 쿼리 실행 에러 시 Alerting. Prometheus 연결 끊김 등 자체가 장애 신호 |
+
+#### Threshold 선정 근거
+
+| 룰 | Threshold | 근거 |
+|----|-----------|------|
+| `service_down` | `up == 0`, for 1m | 1분간 연속 down이면 일시적 scrape 실패가 아닌 실제 장애. scrape_interval 15s 기준 4회 연속 실패 |
+| `probe_failure` | `probe_success == 0`, for 2m | 외부 프로빙은 네트워크 일시 불안정 가능성 → 2분으로 여유. 8회 연속 실패 |
+| `error_rate_critical` | `> 50%`, for 1m | 전체 요청의 절반 이상이 5xx → 서비스 사실상 사용 불가. 즉시 대응 필요 |
+| `error_rate_high` | `> 10%`, for 3m | 10%는 유의미한 장애 신호. 3분 지속으로 일시적 배포 스파이크 무시 |
+| `p99_high` | `> 5s`, for 3m | 5초는 사용자 이탈 임계점 (Google RAIL 모델). 3분으로 일시적 cold start 무시 |
+| `hikari_pending` | `> 0`, for 2m | pending이 0 이상이면 커넥션 풀 고갈 시작. 2분으로 순간 burst 무시 |
+| `gc_pause_high` | `> 500ms`, for 5m | 500ms GC pause는 요청 타임아웃 유발 가능. 5분으로 Major GC 단발 무시 |
+| `memory_high` | `> 90%`, for 5m | 90%는 OOM killer 발동 직전 단계. 5분으로 일시적 캐시 사용 무시 |
+| `cpu_high` | `> 80%`, for 5m | 80%는 여유분 20%만 남은 상태. 5분으로 배포/빌드 스파이크 무시 |
+| `disk_critical` | `< 5%`, for 5m | 5% 미만은 로그 기록 불가 임계점. Docker overlay 포함 |
+| `disk_warning` | `< 20%`, for 10m | 20%는 조치 여유 있는 사전 경고. 10분으로 대용량 파일 임시 생성 무시 |
+
+#### `for` (pending 기간)
+
+일시적 스파이크를 무시하기 위한 대기 시간:
+
+| severity | `for` 범위 | 이유 |
+|----------|-----------|------|
+| critical | 1~5분 | 빠른 대응 필요하되 scrape 실패 1~2회로 오알림 방지 |
+| high | 2~5분 | 영향 크지만 즉시 대응까진 불필요. 배포 직후 안정화 대기 |
+| warning | 5~10분 | 사전 경고 성격. 충분히 지속될 때만 알림 |
+
+#### `noDataState` / `execErrState` 설정
+
+| 상태 | 적용 대상 | 설정 | 근거 |
+|------|----------|------|------|
+| `noDataState` | critical 룰 (`service_down`, `probe_failure`, `error_rate_critical`, `disk_critical`) | `Alerting` | 데이터 없음 = 수집 파이프라인 장애 가능성. 모니터링 사각지대 방지 |
+| `noDataState` | high/warning/info 룰 | `OK` | 서비스 미시작 또는 메트릭 미생성 시 오알림 방지 |
+| `execErrState` | 전체 | `Alerting` | 쿼리 실행 에러 = Prometheus 연결 끊김 등 자체 장애 신호 |
+| `execErrState` | `service_restarted` (info) | `OK` | 참고용 알림이므로 에러 시 무시 |
+
+#### 노이즈 감소 전략
+
+**1. `keep_firing_for: 10m` (flapping 방지)**
+
+threshold 근처에서 진동하는 메트릭(memory, CPU, disk)에 적용. 조건 해소 후에도 10분간 firing 유지하여 알림-해소-알림 반복 방지.
+
+적용 대상: `memory_high`, `cpu_high`, `disk_warning`, `disk_critical`
+
+**2. Alert 의존성 (PromQL 인코딩)**
+
+Grafana Built-in Alertmanager는 inhibition rule 미지원 → PromQL `and on(instance) up == 1`로 처리.
+
+Application 룰들(`error_rate_high`, `p99_high`, `hikari_pending`, `gc_pause_high`)과 Infrastructure의 `error_rate_critical`에 적용:
+- 호스트/서비스가 down이면 Application 알림 suppress
+- 호스트 down + error rate critical + p99 high가 동시에 발생해도 service_down 하나만 알림
+
+한계: PromQL 레벨 의존성은 `up` 메트릭 기준이므로 Alloy 자체가 죽으면 up 데이터도 없어짐 → noDataState: Alerting으로 보완
+
+**3. `group_by: [grafana_folder, alertname, app]`**
+
+같은 alertname이라도 서비스별(api, chat, nginx)로 그룹 분리 → `[FIRING:2]` 중복 알림 방지.
+예: api와 chat 모두 error rate 초과 시 개별 알림 2건 발송 (하나의 묶음 알림이 아닌).
+
+**4. Watchdog Alert**
+
+`vector(1)` — 항상 firing. Discord `#alert-normal`에 12시간마다 반복 수신.
+안 오면 모니터링 파이프라인(Prometheus → Grafana → Discord) 중 어딘가 장애.
 
 ### templates.yml
 
@@ -236,5 +305,23 @@ instance = constants.hostname (호스트명)
 |------|------|
 | `severity_emoji` | critical=🔴, high=🟠, warning=🟡, info=🔵. Discord 메시지에서 시각적 구분 |
 | `.Status == "resolved"` | 해소 시 ✅ 이모지 + `EndsAt` 시각 표시 |
-| `.StartsAt.Local.Format` | Go time format. KST 표시 |
-| `dashboard_url`, `runbook_url` | annotations에 설정된 링크를 메시지에 포함. 알림 → 대시보드 원클릭 이동 |
+| `.StartsAt.Local.Format` | Go time format. KST 표시 (Grafana 컨테이너 `TZ=Asia/Seoul` 필수) |
+| `dashboard_url`, `runbook_url` | annotations에 설정된 링크를 메시지에 포함. `GF_SERVER_ROOT_URL` 기반 절대 URL 생성 |
+
+---
+
+## 8. 향후 개선 로드맵
+
+| 항목 | 설명 | 시기 |
+|------|------|------|
+| 이중 윈도우 burn-rate | error rate/latency를 SLO 기반으로 전환 (1h/5m, 6h/30m). 현재 단일 윈도우는 장기 degradation 감지 불가 | 트래픽 안정화 후 |
+| Prometheus recording rules | burn-rate 계산 사전 집계. 알림 평가 시 실시간 계산 부하 감소 | 이중 윈도우 도입 시 |
+| Runbook 작성 + 링크 연결 | 각 알림별 대응 가이드 문서. annotations의 `runbook_url`에 연결 | Phase 4 전 |
+| 외부 Alertmanager 전환 | inhibition rule 네이티브 지원. PromQL 의존성 인코딩 한계 극복 | 알림이 10개+ 될 때 |
+
+### 현재 한계점
+
+1. **단일 윈도우 threshold**: 현재 모든 알림이 단일 시간 윈도우(5분) 기반. 장기간 서서히 악화되는 상황(slow degradation) 감지 불가
+2. **PromQL 의존성**: `and on(instance) up == 1`은 `up` 메트릭 존재를 전제. Alloy 장애 시 up 데이터도 사라져 의존성 무력화
+3. **정적 threshold**: 트래픽 패턴에 따라 정상 범위가 달라질 수 있으나 고정값 사용. 향후 SLO 기반으로 전환 필요
+4. **Watchdog 한계**: Prometheus → Grafana 구간만 검증. Grafana → Discord webhook 구간은 별도 검증 필요
