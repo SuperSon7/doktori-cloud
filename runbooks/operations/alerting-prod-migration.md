@@ -128,7 +128,7 @@ docker logs grafana --tail 20 2>&1 | grep -E 'provisioning|error|panic'
 
 | 룰 | Dev | Prod 권장 | 이유 |
 |---|---|---|---|
-| `service_down` for | 1m | 1m | 서비스 다운은 즉시 알아야 함 |
+| `service_down` for | 3m | 3m | BG 배포 전환 2~3분 커버 |
 | `probe_failure` for | 5m | 5m | 배포 중 오발 방지 |
 | `error_rate_critical` for | 1m | 2m | prod 트래픽이 많으면 순간 스파이크 가능 |
 | `disk_critical` for | 5m | 5m | 유지 |
@@ -138,6 +138,50 @@ docker logs grafana --tail 20 2>&1 | grep -E 'provisioning|error|panic'
 | high repeat_interval | 1h | 1h | 유지 |
 
 > Dev와 동일하게 시작하고, 오발이 발생하면 `for` 값을 조정.
+
+---
+
+## 배포 알림 억제 (Grafana Silence API)
+
+`deploy-prd.sh`에 이미 Silence API 연동 코드가 포함되어 있음. 환경변수만 설정하면 활성화됨.
+
+### Step 1: Grafana Service Account 토큰 발급
+
+prod 모니터링 서버 Grafana UI에서:
+
+1. **Administration** → **Service accounts** → **Add service account**
+2. Display name: `deploy-silence`, Role: **Editor**
+3. 생성된 account → **Add service account token** → **Generate token**
+4. `glsa_xxxxxxxx...` 형태 토큰 복사
+
+### Step 2: prod 앱 서버에 환경변수 설정
+
+```bash
+# /etc/environment 에 추가 (재부팅 후에도 유지)
+GRAFANA_URL=http://<PROD_MONITORING_PRIVATE_IP>:3000
+GRAFANA_SA_TOKEN=glsa_복사한토큰값
+```
+
+> Private IP 사용 — VPC 내부 통신. 모니터링 서버에서 `hostname -I`로 확인.
+
+### Step 3: jq 설치 확인
+
+```bash
+which jq || sudo apt-get install -y jq
+```
+
+### 동작 확인
+
+환경변수 설정 후 다음 배포 시 로그에서 확인:
+```
+🔇 Silence created: abc-123-... (10분 자동 만료)
+...
+🔔 Silence deleted: abc-123-...
+```
+
+미설정 시에는 `⚠️ GRAFANA_URL/GRAFANA_SA_TOKEN 미설정 — Silence 건너뜀`이 출력되고 기존과 동일하게 배포 진행.
+
+> 상세 전략: `deploy-alert-suppression.md` 참고
 
 ---
 
@@ -171,3 +215,6 @@ Discord 서버
 - [ ] Alert rules 3개 폴더 로드 확인
 - [ ] Contact points Test 버튼으로 Discord 수신 확인
 - [ ] Watchdog 알림 수신 확인 (12시간 내)
+- [ ] Grafana Service Account 토큰 발급 (Editor role)
+- [ ] Prod 앱 서버에 `GRAFANA_URL` + `GRAFANA_SA_TOKEN` 환경변수 설정
+- [ ] Prod 앱 서버에 `jq` 설치 확인
