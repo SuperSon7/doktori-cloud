@@ -172,7 +172,7 @@
       "id": 7,
       "options": { "minVizHeight": 75, "minVizWidth": 75, "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_server_requests_seconds_count{env=\"$env\", status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{env=\"$env\"}[5m])) * 100", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "(sum(rate(http_server_requests_seconds_count{env=\"$env\", status=~\"5..\"}[5m])) or vector(0)) / sum(rate(http_server_requests_seconds_count{env=\"$env\"}[5m])) * 100", "legendFormat": "", "refId": "A" }
       ],
       "title": "Overall Error Rate",
       "type": "gauge"
@@ -328,7 +328,7 @@
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (app) (rate(http_server_requests_seconds_count{env=\"$env\", status=~\"5..\"}[5m])) / sum by (app) (rate(http_server_requests_seconds_count{env=\"$env\"}[5m])) * 100", "legendFormat": "{{app}}", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "(sum by (app) (rate(http_server_requests_seconds_count{env=\"$env\", status=~\"5..\"}[5m])) or 0 * sum by (app) (rate(http_server_requests_seconds_count{env=\"$env\"}[5m]))) / sum by (app) (rate(http_server_requests_seconds_count{env=\"$env\"}[5m])) * 100", "legendFormat": "{{app}}", "refId": "A" }
       ],
       "title": "Error Rate by Service",
       "type": "timeseries"

@@ -62,7 +62,7 @@
       "id": 2,
       "options": { "minVizHeight": 75, "minVizWidth": 75, "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_memory_used_bytes{app=\"api\", env=\"$env\", area=\"heap\"} / jvm_memory_max_bytes{app=\"api\", env=\"$env\", area=\"heap\"}", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(jvm_memory_used_bytes{app=\"api\", env=\"$env\", area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{app=\"api\", env=\"$env\", area=\"heap\"} != -1), 1)", "legendFormat": "", "refId": "A" }
       ],
       "title": "Heap Usage %",
       "type": "gauge"
@@ -121,7 +121,7 @@
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_memory_used_bytes{app=\"api\", env=\"$env\", area=\"heap\"}", "legendFormat": "Used ({{id}})", "refId": "A" },
         { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_memory_committed_bytes{app=\"api\", env=\"$env\", area=\"heap\"}", "legendFormat": "Committed ({{id}})", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_memory_max_bytes{app=\"api\", env=\"$env\", area=\"heap\"}", "legendFormat": "Max ({{id}})", "refId": "C" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_memory_max_bytes{app=\"api\", env=\"$env\", area=\"heap\"} != -1", "legendFormat": "Max ({{id}})", "refId": "C" }
       ],
       "title": "Heap Memory",
       "type": "timeseries"

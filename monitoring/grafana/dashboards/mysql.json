@@ -44,7 +44,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -139,7 +139,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -199,7 +199,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum by (command) (\n  increase(mysql_global_status_commands_total{\n    instance=\"$host\",\n    command=~\"select|insert|update|delete\"\n  }[1h])\n)",
@@ -214,7 +214,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -279,7 +279,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -344,7 +344,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -402,7 +402,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(rate(mysql_global_status_commands_total{\n  instance=\"$host\",\n  command=~\"insert|update|delete\"\n}[5m]))",
@@ -419,7 +419,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -484,7 +484,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -592,7 +592,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -661,7 +661,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "(mysql_global_variables_innodb_buffer_pool_size{instance=\"$host\"} * 100) / on (instance) node_memory_MemTotal_bytes{instance=\"$host\"}",
           "interval": "5m",
@@ -675,7 +675,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "MySQL Server Uptime - The time elapsed since the last restart of the MySQL server.",
       "fieldConfig": {
@@ -735,7 +735,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_status_uptime{instance=\"$host\"}",
           "interval": "5m",
@@ -749,7 +749,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "InnoDB Storage Engine Buffer Pool Size - InnoDB maintains a storage area called the buffer pool for caching data and indexes in memory.  Knowing how the InnoDB buffer pool works, and taking advantage of it to keep frequently accessed data in memory, is one of the most important aspects of MySQL tuning. The goal is to keep the working set in memory. In most cases, this should be between 60%-90% of available memory on a dedicated database host, but depends on many factors.",
       "fieldConfig": {
@@ -815,7 +815,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_variables_innodb_buffer_pool_size{instance=\"$host\"}",
           "interval": "$interval",
@@ -829,7 +829,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Queries Processed By Server Per Second\nBased on the queries reported by MySQL's ``SHOW STATUS`` command, it is the number of statements executed by the server within the last second. This variable includes statements executed within stored programs, unlike the Questions variable. It does not count \n``COM_PING`` or ``COM_STATISTICS`` commands.",
       "fieldConfig": {
@@ -889,7 +889,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "rate(mysql_global_status_queries{instance=\"$host\"}[$interval]) or irate(mysql_global_status_queries{instance=\"$host\"}[5m])",
           "interval": "$interval",
@@ -916,7 +916,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Max Clients Connections - Max Connections is the maximum permitted number of simultaneous client connections. By default, this is 151. Increasing this value increases the number of file descriptors that mysqld requires. If the required number of descriptors are not available, the server reduces the value of Max Connections. \nmysqld actually permits Max Connections + 1 clients to connect. The extra connection is reserved for use by accounts that have the SUPER privilege, such as root.\nMax Used Connections is the maximum number of connections that have been in use simultaneously since the server started.\nConnections is the number of connection attempts to the MySQL server.",
       "fieldConfig": {
@@ -1012,7 +1012,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "max(max_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[$interval])  or mysql_global_status_threads_connected{instance=\"$host\"} )",
           "interval": "$interval",
@@ -1022,7 +1022,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_status_max_used_connections{instance=\"$host\"}",
           "hide": false,
@@ -1033,7 +1033,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_variables_max_connections{instance=\"$host\"}",
           "hide": false,
@@ -1048,7 +1048,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Description: MySQL Active Threads - Threads Connected is the number of open connections, while Threads Running is the number of threads not sleeping.",
       "fieldConfig": {
@@ -1181,7 +1181,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "max_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[5m])",
           "interval": "$interval",
@@ -1191,7 +1191,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "max_over_time(mysql_global_status_threads_running{instance=\"$host\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_running{instance=\"$host\"}[5m])",
           "hide": false,
@@ -1202,7 +1202,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "avg_over_time(mysql_global_status_threads_running{instance=\"$host\"}[$interval]) or \r\navg_over_time(mysql_global_status_threads_running{instance=\"$host\"}[5m])",
           "hide": false,
@@ -1230,7 +1230,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Top Command Counters - The Com_{{xxx}} statement counter variables indicate the number of times each xxx statement has been executed. There is one status variable for each type of statement. For example, Com_delete and Com_update count [``DELETE``](https://dev.mysql.com/doc/refman/5.7/en/delete.html) and [``UPDATE``](https://dev.mysql.com/doc/refman/5.7/en/update.html) statements, respectively. Com_delete_multi and Com_update_multi are similar but apply to [``DELETE``](https://dev.mysql.com/doc/refman/5.7/en/delete.html) and [``UPDATE``](https://dev.mysql.com/doc/refman/5.7/en/update.html) statements that use multiple-table syntax.",
       "fieldConfig": {
@@ -1326,7 +1326,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "topk(5, rate(mysql_global_status_commands_total{instance=\"$host\"}[$interval])>0) or topk(5, irate(mysql_global_status_commands_total{instance=\"$host\"}[5m])>0)",
           "interval": "$interval",
@@ -1340,7 +1340,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Top Command Counters - The Com_{{xxx}} statement counter variables indicate the number of times each xxx statement has been executed. There is one status variable for each type of statement. For example, Com_delete and Com_update count [``DELETE``](https://dev.mysql.com/doc/refman/5.7/en/delete.html) and [``UPDATE``](https://dev.mysql.com/doc/refman/5.7/en/update.html) statements, respectively. Com_delete_multi and Com_update_multi are similar but apply to [``DELETE``](https://dev.mysql.com/doc/refman/5.7/en/delete.html) and [``UPDATE``](https://dev.mysql.com/doc/refman/5.7/en/update.html) statements that use multiple-table syntax.",
       "fieldConfig": {
@@ -1438,7 +1438,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "topk(5, increase(mysql_global_status_commands_total{instance=\"$host\"}[1h])>0)",
           "interval": "15m",
@@ -1452,7 +1452,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "Handler statistics are internal statistics on how MySQL is selecting, updating, inserting, and modifying rows, tables, and indexes.\nThis is in fact the layer between the Storage Engine and MySQL.\n* `read_rnd_next` is incremented when the server performs a full table scan and this is a counter you don't really want to see with a high value.\n* `read_key` is incremented when a read is done with an index.\n* `read_next` is incremented when the storage engine is asked to 'read the next index entry'. A high value means a lot of index scans are being done.",
       "fieldConfig": {
@@ -1542,7 +1542,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "rate(mysql_global_status_handlers_total{instance=\"$host\", handler!~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{instance=\"$host\", handler!~\"commit|rollback|savepoint.*|prepare\"}[5m])",
           "interval": "$interval",
@@ -1556,7 +1556,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "",
       "fieldConfig": {
@@ -1646,7 +1646,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "rate(mysql_global_status_handlers_total{instance=\"$host\", handler=~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{instance=\"$host\", handler=~\"commit|rollback|savepoint.*|prepare\"}[5m])\r",
           "interval": "$interval",
@@ -1665,6 +1665,394 @@
         "x": 0,
         "y": 59
       },
+      "id": 45,
+      "panels": [],
+      "title": "Query Performance",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Slow queries rate per second. Any non-zero value should be investigated immediately.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
+      "id": 46,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_slow_queries{instance=\"$host\"}[$interval])",
+          "legendFormat": "Slow Queries",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Slow Queries Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "InnoDB row-level operation rates. A sudden spike in Rows Read indicates full table scans or wide range scans.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
+      "id": 47,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_innodb_rows_read{instance=\"$host\"}[$interval])",
+          "legendFormat": "Rows Read",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_innodb_rows_inserted{instance=\"$host\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Rows Inserted",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_innodb_rows_updated{instance=\"$host\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Rows Updated",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_innodb_rows_deleted{instance=\"$host\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Rows Deleted",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "InnoDB Row Operations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Table scan and join metrics. Rising Full Table Scan or Full Join rates indicate missing indexes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 68
+      },
+      "id": 48,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_select_scan{instance=\"$host\"}[$interval])",
+          "legendFormat": "Full Table Scan",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_select_full_join{instance=\"$host\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Full Join (no index)",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_created_tmp_disk_tables{instance=\"$host\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Tmp Tables on Disk",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Table Scan Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
       "id": 28,
       "panels": [],
       "title": "Memory Utilization",
@@ -1673,7 +2061,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "***System Memory***: Total Memory for the system.\\\n***InnoDB Buffer Pool Data***: InnoDB maintains a storage area called the buffer pool for caching data and indexes in memory.\\\n***TokuDB Cache Size***: Similar in function to the InnoDB Buffer Pool,  TokuDB will allocate 50% of the installed RAM for its own cache.\\\n***Key Buffer Size***: Index blocks for MYISAM tables are buffered and are shared by all threads. key_buffer_size is the size of the buffer used for index blocks.\\\n***Adaptive Hash Index Size***: When InnoDB notices that some index values are being accessed very frequently, it builds a hash index for them in memory on top of B-Tree indexes.\\\n ***Query Cache Size***: The query cache stores the text of a SELECT statement together with the corresponding result that was sent to the client. The query cache has huge scalability problems in that only one thread can do an operation in the query cache at the same time.\\\n***InnoDB Dictionary Size***: The data dictionary is InnoDB \u2018s internal catalog of tables. InnoDB stores the data dictionary on disk, and loads entries into memory while the server is running.\\\n***InnoDB Log Buffer Size***: The MySQL InnoDB log buffer allows transactions to run without having to write the log to disk before the transactions commit.\n",
       "fieldConfig": {
@@ -1758,7 +2146,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 77
       },
       "id": 30,
       "links": [
@@ -1789,7 +2177,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_status_innodb_page_size{instance=\"$host\"} * on (instance) mysql_global_status_buffer_pool_pages{instance=\"$host\",state=\"data\"}",
           "interval": "",
@@ -1799,7 +2187,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "node_memory_MemTotal_bytes{instance=\"$host\"}",
           "hide": false,
@@ -1811,7 +2199,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_variables_innodb_log_buffer_size{instance=\"$host\"}",
           "hide": false,
@@ -1822,7 +2210,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_variables_innodb_additional_mem_pool_size{instance=\"$host\"}",
           "hide": false,
@@ -1834,7 +2222,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_status_innodb_mem_dictionary{instance=\"$host\"}",
           "hide": false,
@@ -1845,7 +2233,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_variables_key_buffer_size{instance=\"$host\"}",
           "hide": false,
@@ -1856,7 +2244,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "mysql_global_status_innodb_mem_adaptive_hash{instance=\"$host\"}",
           "hide": false,
@@ -1874,7 +2262,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 86
       },
       "id": 36,
       "panels": [],
@@ -1884,7 +2272,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "MySQL Network Traffic\nMySQL Network Traffic - Here we can see how much network traffic is generated by MySQL. Outbound is network traffic sent from MySQL and Inbound is network traffic MySQL has received.",
       "fieldConfig": {
@@ -1949,7 +2337,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 70
+        "y": 87
       },
       "id": 32,
       "options": {
@@ -1974,7 +2362,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "rate(mysql_global_status_bytes_received{instance=\"$host\"}[$interval]) or irate(mysql_global_status_bytes_received{instance=\"$host\"}[5m])",
           "interval": "$interval",
@@ -1984,7 +2372,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "rate(mysql_global_status_bytes_sent{instance=\"$host\"}[$interval]) or irate(mysql_global_status_bytes_sent{instance=\"$host\"}[5m])",
           "hide": false,
@@ -1999,7 +2387,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "description": "MySQL Network Usage Hourly\nMySQL Network Usage Hourly - Here we can see how much network traffic is generated by MySQL per hour. You can use the bar graph to compare data sent by MySQL and data received by MySQL.",
       "fieldConfig": {
@@ -2085,7 +2473,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 70
+        "y": 87
       },
       "id": 34,
       "options": {
@@ -2111,7 +2499,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "increase(mysql_global_status_bytes_received{instance=\"$host\"}[1h])",
           "interval": "30m",
@@ -2121,7 +2509,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "efc7v9unfuo00b"
+            "uid": "prometheus"
           },
           "expr": "increase(mysql_global_status_bytes_sent{instance=\"$host\"}[1h])",
           "hide": false,
@@ -2204,7 +2592,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
+          "uid": "prometheus"
         },
         "definition": "label_values(mysql_up, instance)",
         "description": "Server to Monitor",
@@ -2227,7 +2615,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "Asia/Seoul",
   "title": "MySQL Dashboard",
   "uid": "r4uc0hUGk",
   "version": 5,
