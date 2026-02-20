@@ -42,7 +42,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.app | default $labels.job }}({{ $labels.instance }}) 서비스가 다운됨"
+          summary: "{{ or $labels.app $labels.job }}({{ $labels.instance }}) 서비스가 다운됨"
           dashboard_url: "/d/infrastructure"
         noDataState: OK
         execErrState: Alerting
@@ -330,7 +330,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) 에러율 10% 초과"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) 에러율 10% 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -372,7 +372,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) p99 지연시간 5초 초과"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) p99 지연시간 5초 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -410,7 +410,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) HikariCP 대기 커넥션 발생"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) HikariCP 대기 커넥션 발생"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -448,7 +448,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.app | default $labels.application }}({{ $labels.instance }}) GC pause 500ms 초과"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) GC pause 500ms 초과"
           dashboard_url: "/d/application"
         noDataState: OK
         execErrState: Alerting
@@ -492,7 +492,7 @@ groups:
         labels:
           severity: info
         annotations:
-          summary: "{{ $labels.app | default $labels.job }}({{ $labels.instance }}) 서비스가 재시작됨"
+          summary: "{{ or $labels.app $labels.job }}({{ $labels.instance }}) 서비스가 재시작됨"
         noDataState: OK
         execErrState: OK
 
