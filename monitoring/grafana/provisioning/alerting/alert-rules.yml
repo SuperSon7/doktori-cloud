@@ -38,7 +38,7 @@ groups:
                     type: lt
                     params: [1]
               refId: C
-        for: 1m
+        for: 3m
         labels:
           severity: critical
         annotations:
@@ -74,7 +74,7 @@ groups:
                     type: lt
                     params: [1]
               refId: C
-        for: 2m
+        for: 5m
         labels:
           severity: critical
         annotations:

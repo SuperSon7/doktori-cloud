@@ -240,8 +240,8 @@ job      = Alloy 내부 prefix 제거 (spring-boot, nginx, host, mysql)
 
 | 룰 | Threshold | 근거 |
 |----|-----------|------|
-| `service_down` | `up == 0`, for 1m | 1분간 연속 down이면 일시적 scrape 실패가 아닌 실제 장애. scrape_interval 15s 기준 4회 연속 실패 |
-| `probe_failure` | `probe_success == 0`, for 2m | 외부 프로빙은 네트워크 일시 불안정 가능성 → 2분으로 여유. 8회 연속 실패 |
+| `service_down` | `up == 0`, for 3m | Blue-Green 배포 전환에 2~3분 소요 → 배포 중 오발 방지. scrape_interval 15s 기준 12회 연속 실패 |
+| `probe_failure` | `probe_success == 0`, for 5m | 배포 시 컨테이너 Recreate + Spring Boot 기동(~37초) + healthcheck 대기 = 최소 2~3분. 네트워크 불안정까지 고려해 5분 |
 | `error_rate_critical` | `> 50%`, for 1m | 전체 요청의 절반 이상이 5xx → 서비스 사실상 사용 불가. 즉시 대응 필요 |
 | `error_rate_high` | `> 10%`, for 3m | 10%는 유의미한 장애 신호. 3분 지속으로 일시적 배포 스파이크 무시 |
 | `p99_high` | `> 5s`, for 3m | 5초는 사용자 이탈 임계점 (Google RAIL 모델). 3분으로 일시적 cold start 무시 |
@@ -258,7 +258,7 @@ job      = Alloy 내부 prefix 제거 (spring-boot, nginx, host, mysql)
 
 | severity | `for` 범위 | 이유 |
 |----------|-----------|------|
-| critical | 1~5분 | 빠른 대응 필요하되 scrape 실패 1~2회로 오알림 방지 |
+| critical | 3~5분 | 빠른 대응 필요하되 Blue-Green 배포 전환(2~3분) 중 오알림 방지 |
 | high | 2~5분 | 영향 크지만 즉시 대응까진 불필요. 배포 직후 안정화 대기 |
 | warning | 5~10분 | 사전 경고 성격. 충분히 지속될 때만 알림 |
 
@@ -266,8 +266,7 @@ job      = Alloy 내부 prefix 제거 (spring-boot, nginx, host, mysql)
 
 | 상태 | 적용 대상 | 설정 | 근거 |
 |------|----------|------|------|
-| `noDataState` | critical 룰 (`service_down`, `probe_failure`, `error_rate_critical`, `disk_critical`) | `Alerting` | 데이터 없음 = 수집 파이프라인 장애 가능성. 모니터링 사각지대 방지 |
-| `noDataState` | high/warning/info 룰 | `OK` | 서비스 미시작 또는 메트릭 미생성 시 오알림 방지 |
+| `noDataState` | 전체 | `OK` | `up` 메트릭을 threshold(`< 1`)로 판단하는 방식이므로, 데이터가 없으면 Alerting 대신 OK로 처리. `up==0` 필터 방식에서는 정상 시 빈 결과 → noData 오발 문제가 있어 모든 룰을 OK로 통일 |
 | `execErrState` | 전체 | `Alerting` | 쿼리 실행 에러 = Prometheus 연결 끊김 등 자체 장애 신호 |
 | `execErrState` | `service_restarted` (info) | `OK` | 참고용 알림이므로 에러 시 무시 |
 
@@ -294,7 +293,18 @@ Application 룰들(`error_rate_high`, `p99_high`, `hikari_pending`, `gc_pause_hi
 같은 alertname이라도 서비스별(api, chat, nginx)로 그룹 분리 → `[FIRING:2]` 중복 알림 방지.
 예: api와 chat 모두 error rate 초과 시 개별 알림 2건 발송 (하나의 묶음 알림이 아닌).
 
-**4. Watchdog Alert**
+**4. 배포 중 알림 억제**
+
+Blue-Green 배포 시 컨테이너 Recreate → MySQL healthcheck 대기 → Spring Boot 기동(~37초) → healthcheck 통과로 최소 2~3분 서비스 불가. 이 동안 Service Down, Probe Failure, Service Restarted, Error Rate 알림이 발생할 수 있음.
+
+현재 적용된 대책:
+- `service_down` for: 3m, `probe_failure` for: 5m으로 배포 시간보다 긴 대기
+- Application 룰의 `and on(instance) up == 1` 조건으로 서비스 다운 중 평가 건너뜀
+
+향후 도입 가능: Grafana Silence API 자동 연동, 배포 메트릭 조건 제외, SLO 기반 Multi-Window Burn Rate.
+상세: `runbooks/operations/deploy-alert-suppression.md`
+
+**5. Watchdog Alert**
 
 `vector(1)` — 항상 firing. Discord `#alert-normal`에 12시간마다 반복 수신.
 안 오면 모니터링 파이프라인(Prometheus → Grafana → Discord) 중 어딘가 장애.
@@ -314,10 +324,15 @@ Application 룰들(`error_rate_high`, `p99_high`, `hikari_pending`, `gc_pause_hi
 
 | 항목 | 설명 | 시기 |
 |------|------|------|
-| 이중 윈도우 burn-rate | error rate/latency를 SLO 기반으로 전환 (1h/5m, 6h/30m). 현재 단일 윈도우는 장기 degradation 감지 불가 | 트래픽 안정화 후 |
+| Grafana Silence API 연동 | 배포 스크립트에서 자동 Silence 생성/삭제. `deploy-prd.sh`에 통합 | 1순위 |
+| 배포 메트릭 조건 제외 | `deployment_in_progress` 메트릭으로 알림 규칙 자체에서 배포 상태 인지 (Google SRE 방식) | Silence API 이후 |
+| 이중 윈도우 burn-rate | error rate/latency를 SLO 기반으로 전환 (1h/5m). 배포 스파이크에 자연 면역 | 트래픽 안정화 후 |
 | Prometheus recording rules | burn-rate 계산 사전 집계. 알림 평가 시 실시간 계산 부하 감소 | 이중 윈도우 도입 시 |
 | Runbook 작성 + 링크 연결 | 각 알림별 대응 가이드 문서. annotations의 `runbook_url`에 연결 | Phase 4 전 |
 | 외부 Alertmanager 전환 | inhibition rule 네이티브 지원. PromQL 의존성 인코딩 한계 극복 | 알림이 10개+ 될 때 |
+
+> 배포 알림 억제 전략 상세: `runbooks/operations/deploy-alert-suppression.md`
+> Prod 환경 마이그레이션 가이드: `runbooks/operations/alerting-prod-migration.md`
 
 ### 현재 한계점
 
