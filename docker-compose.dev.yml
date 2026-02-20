@@ -28,6 +28,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       FIREBASE_CREDENTIALS_PATH: file:/app/secrets/firebase-service-account.json
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC"
     volumes:
       - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     ports:
@@ -60,6 +61,7 @@ services:
     image: ${ECR_REGISTRY}/doktori/backend-chat:develop
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC"
     ports:
       - "8081:8081"
     networks:
@@ -77,7 +79,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
           cpus: '0.5'
     stop_grace_period: 30s
     logging:
@@ -108,8 +110,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
-          cpus: '1.5'
+          memory: 1G
+          cpus: '1.0'
     stop_grace_period: 15s
     logging:
       driver: "json-file"
