@@ -1,6 +1,10 @@
 # -----------------------------------------------------------------------------
 # GitHub OIDC Provider
 # -----------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
+
 resource "aws_iam_openid_connect_provider" "github_actions" {
   url = "https://token.actions.githubusercontent.com"
 
@@ -100,6 +104,48 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
           "ssm:GetCommandInvocation",
         ]
         Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "github_actions_cdn" {
+  count = var.static_bucket_name != null && var.cloudfront_distribution_id != null ? 1 : 0
+
+  name = "${var.project_name}-gha-cdn"
+  role = aws_iam_role.github_actions_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "StaticBucketList"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+        ]
+        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"
+      },
+      {
+        Sid    = "StaticBucketObjectRW"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+        ]
+        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"
+      },
+      {
+        Sid    = "CloudFrontInvalidation"
+        Effect = "Allow"
+        Action = [
+          "cloudfront:CreateInvalidation",
+          "cloudfront:GetDistribution",
+          "cloudfront:GetDistributionConfig",
+        ]
+        Resource = "arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"
       },
     ]
   })
