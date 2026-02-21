@@ -23,9 +23,19 @@ output "private_db_subnet_id" {
   value       = aws_subnet.private_db.id
 }
 
+output "private_rds_subnet_id" {
+  description = "Private RDS subnet ID"
+  value       = aws_subnet.private_rds.id
+}
+
 output "nat_gateway_ip" {
-  description = "NAT Gateway public IP"
+  description = "NAT public IP"
   value       = aws_eip.nat.public_ip
+}
+
+output "nat_instance_id" {
+  description = "NAT Instance ID"
+  value       = aws_instance.nat.id
 }
 
 output "vpc_endpoint_sg_id" {

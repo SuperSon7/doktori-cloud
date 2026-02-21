@@ -51,18 +51,6 @@ variable "ai_instance_type" {
   default     = "t3.small"
 }
 
-variable "db_instance_type" {
-  description = "DB EC2 instance type"
-  type        = string
-  default     = "t3.small"
-}
-
-variable "db_volume_size" {
-  description = "DB EBS volume size in GB"
-  type        = number
-  default     = 30
-}
-
 variable "state_bucket" {
   description = "S3 bucket for Terraform remote state"
   type        = string
