@@ -11,6 +11,13 @@
 #   connpool         커넥션 풀 복원력 (10분)
 #   websocket        WebSocket 전환 안정성 (15분)
 #   full-journey     전체 사용자 여정 (15분)
+#   data-integrity   데이터 무손실 검증 (15분)
+#   service-deploy   서비스 배포 가용성 (10분)
+#   nginx-switch     Nginx 라우팅 전환 가용성 (10분)
+#   rollback-db      DB 롤백 검증 (10분)
+#   rollback-service 서비스 롤백 검증 (7분)
+#   rollback-nginx   Nginx 롤백 검증 (5분)
+#   rollback-full    전체 롤백 검증 (15분)
 #   all              전체 순차 실행
 #
 # 옵션:
@@ -102,18 +109,57 @@ case $SCENARIO in
         run_scenario "full-journey" "full-user-journey.js" \
             "전체 사용자 여정 테스트 (15분)"
         ;;
+    data-integrity)
+        run_scenario "data-integrity" "data-integrity-verification.js" \
+            "데이터 무손실 검증 테스트 (15분)"
+        ;;
+    service-deploy)
+        run_scenario "service-deploy" "service-deploy-availability.js" \
+            "서비스 배포 가용성 테스트 (10분)"
+        ;;
+    nginx-switch)
+        run_scenario "nginx-switch" "nginx-switch-availability.js" \
+            "Nginx 라우팅 전환 가용성 테스트 (10분)"
+        ;;
+    rollback-db)
+        EXTRA_ARGS="$EXTRA_ARGS --env ROLLBACK_TYPE=db"
+        run_scenario "rollback-db" "rollback-verification.js" \
+            "DB 롤백 검증 테스트 (10분)"
+        ;;
+    rollback-service)
+        EXTRA_ARGS="$EXTRA_ARGS --env ROLLBACK_TYPE=service"
+        run_scenario "rollback-service" "rollback-verification.js" \
+            "서비스 롤백 검증 테스트 (7분)"
+        ;;
+    rollback-nginx)
+        EXTRA_ARGS="$EXTRA_ARGS --env ROLLBACK_TYPE=nginx"
+        run_scenario "rollback-nginx" "rollback-verification.js" \
+            "Nginx 롤백 검증 테스트 (5분)"
+        ;;
+    rollback-full)
+        EXTRA_ARGS="$EXTRA_ARGS --env ROLLBACK_TYPE=full"
+        run_scenario "rollback-full" "rollback-verification.js" \
+            "전체 롤백 검증 테스트 (15분)"
+        ;;
     all)
         echo "=== 전체 마이그레이션 테스트 순차 실행 ==="
         echo ""
-        echo "순서: db-cutover → connpool → full-journey → websocket → dns-switch"
-        echo "총 예상 시간: ~80분"
+        echo "순서: db-cutover → data-integrity → connpool → service-deploy"
+        echo "     → nginx-switch → full-journey → websocket → dns-switch"
+        echo "총 예상 시간: ~115분"
         echo ""
         read -p "시작하시겠습니까? (y/N): " CONFIRM
         [ "$CONFIRM" != "y" ] && exit 0
 
         run_scenario "db-cutover" "db-cutover-traffic.js" "DB 컷오버 (10분)"
         sleep 5
+        run_scenario "data-integrity" "data-integrity-verification.js" "데이터 무손실 검증 (15분)"
+        sleep 5
         run_scenario "connpool" "connection-pool-resilience.js" "커넥션 풀 (10분)"
+        sleep 5
+        run_scenario "service-deploy" "service-deploy-availability.js" "서비스 배포 (10분)"
+        sleep 5
+        run_scenario "nginx-switch" "nginx-switch-availability.js" "Nginx 전환 (10분)"
         sleep 5
         run_scenario "full-journey" "full-user-journey.js" "사용자 여정 (15분)"
         sleep 5
@@ -134,7 +180,17 @@ case $SCENARIO in
         echo "  connpool       커넥션 풀 복원력 (10분)"
         echo "  websocket      WebSocket 전환 안정성 (15분)"
         echo "  full-journey   전체 사용자 여정 (15분)"
-        echo "  all            전체 순차 실행 (~80분)"
+        echo "  data-integrity 데이터 무손실 검증 (15분)"
+        echo "  service-deploy 서비스 배포 가용성 (10분)"
+        echo "  nginx-switch   Nginx 라우팅 전환 가용성 (10분)"
+        echo ""
+        echo "  [롤백 검증]"
+        echo "  rollback-db      DB 롤백 검증 (10분)"
+        echo "  rollback-service 서비스 롤백 검증 (7분)"
+        echo "  rollback-nginx   Nginx 롤백 검증 (5분)"
+        echo "  rollback-full    전체 롤백 검증 (15분)"
+        echo ""
+        echo "  all            전체 순차 실행 (~115분)"
         echo ""
         echo "환경변수:"
         echo "  BASE_URL       API 기본 URL (필수)"
