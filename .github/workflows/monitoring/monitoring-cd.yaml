@@ -1,0 +1,149 @@
+name: Monitoring CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'monitoring/**'
+
+concurrency:
+  group: monitoring-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- monitoring/)
+          echo "changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "compose=false" >> $GITHUB_OUTPUT
+          echo "prometheus=false" >> $GITHUB_OUTPUT
+          echo "loki=false" >> $GITHUB_OUTPUT
+          echo "grafana_alerting=false" >> $GITHUB_OUTPUT
+          echo "grafana_dashboards=false" >> $GITHUB_OUTPUT
+
+          if echo "$CHANGED" | grep -q "^monitoring/docker-compose.yml"; then
+            echo "compose=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -q "^monitoring/prometheus/"; then
+            echo "prometheus=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -q "^monitoring/loki/"; then
+            echo "loki=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -q "^monitoring/grafana/provisioning/alerting/"; then
+            echo "grafana_alerting=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -q "^monitoring/grafana/dashboards/"; then
+            echo "grafana_dashboards=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::group::Changed files"
+          echo "$CHANGED"
+          echo "::endgroup::"
+
+      - name: Transfer files to monitoring server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.MONITORING_EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.MONITORING_SSH_KEY }}
+          source: "monitoring/"
+          target: "/home/ubuntu/"
+          overwrite: true
+
+      - name: Conditional service restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.MONITORING_EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.MONITORING_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/ubuntu/monitoring
+
+            COMPOSE_CHANGED="${{ steps.changes.outputs.compose }}"
+            PROMETHEUS_CHANGED="${{ steps.changes.outputs.prometheus }}"
+            LOKI_CHANGED="${{ steps.changes.outputs.loki }}"
+            ALERTING_CHANGED="${{ steps.changes.outputs.grafana_alerting }}"
+            DASHBOARDS_CHANGED="${{ steps.changes.outputs.grafana_dashboards }}"
+
+            if [ "$COMPOSE_CHANGED" = "true" ]; then
+              echo "🔄 docker-compose.yml changed — recreating services..."
+              docker compose up -d
+            else
+              if [ "$PROMETHEUS_CHANGED" = "true" ]; then
+                echo "🔄 Prometheus config changed — hot reloading..."
+                curl -sf -X POST http://localhost:9090/-/reload
+                echo " ✅ Prometheus reloaded"
+              fi
+
+              if [ "$LOKI_CHANGED" = "true" ]; then
+                echo "🔄 Loki config changed — restarting..."
+                docker compose restart loki
+              fi
+
+              if [ "$ALERTING_CHANGED" = "true" ]; then
+                echo "🔄 Grafana alerting changed — restarting..."
+                docker compose restart grafana
+              fi
+
+              if [ "$DASHBOARDS_CHANGED" = "true" ]; then
+                echo "📊 Grafana dashboards updated — auto-reload in ~30s (no restart needed)"
+              fi
+            fi
+
+            echo "✅ Monitoring deployment complete"
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="배포 성공"
+          else
+            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="배포 실패"
+          fi
+
+          CHANGED_SUMMARY=$(echo '${{ steps.changes.outputs.changed }}' | head -5)
+          if [ $(echo '${{ steps.changes.outputs.changed }}' | wc -l) -gt 5 ]; then
+            CHANGED_SUMMARY="${CHANGED_SUMMARY}\n... and more"
+          fi
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{
+                 \"content\": \"$STATUS_EMOJI **Monitoring 배포 알림**\",
+                 \"embeds\": [{
+                   \"title\": \"📡 [Monitoring] $STATUS_TEXT\",
+                   \"color\": $COLOR,
+                   \"fields\": [
+                     {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                     {\"name\": \"🌿 브랜치\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                     {\"name\": \"🔖 커밋\", \"value\": \"[\`$SHORT_SHA\`]($COMMIT_URL)\", \"inline\": true},
+                     {\"name\": \"💬 커밋 메시지\", \"value\": \"$COMMIT_MSG\", \"inline\": false},
+                     {\"name\": \"👤 작성자\", \"value\": \"$COMMIT_AUTHOR\", \"inline\": true},
+                     {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인]($ACTIONS_URL)\", \"inline\": true},
+                     {\"name\": \"📂 변경 파일\", \"value\": \"\`\`\`$CHANGED_SUMMARY\`\`\`\", \"inline\": false}
+                   ],
+                   \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                 }]
+               }" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }} || true

@@ -86,7 +86,8 @@ logs/
 
 scripts/
 !terraform/**/scripts/
-.github/workflows/
+.github/workflows/*
+!.github/workflows/monitoring/
 .github/dependabot.yml
 
 *.sh
