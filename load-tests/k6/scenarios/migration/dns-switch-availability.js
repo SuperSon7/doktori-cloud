@@ -147,19 +147,23 @@ export function mixedUserFlow() {
 
   sleep(0.3);
 
-  // ── 5. 알림 읽음 처리 (쓰기, 인증 필요) ──
-  const writeRes = http.put(`${config.baseUrl}/notifications`, null, {
-    headers: getHeaders(true),
-    tags: { name: 'PUT /notifications', type: 'write' },
-    timeout: '10s',
-  });
+  // ── 5. 알림 설정 토글 (쓰기, 인증 필요 — 실제 DB UPDATE) ──
+  const writeRes = http.put(
+    `${config.baseUrl}/users/me/notifications`,
+    JSON.stringify({ pushNotificationAgreed: true }),
+    {
+      headers: getHeaders(true),
+      tags: { name: 'PUT /users/me/notifications', type: 'write' },
+      timeout: '10s',
+    }
+  );
   totalRequests.add(1);
   const writeOk = writeRes.status >= 200 && writeRes.status < 300;
   availability.add(writeOk || writeRes.status === 401);
   if (writeOk) writeLatency.add(writeRes.timings.duration);
   if (!writeOk && writeRes.status !== 401) {
     failedRequests.add(1);
-    console.log(`[${timestamp}] FAIL PUT /notifications: ${writeRes.status}`);
+    console.log(`[${timestamp}] FAIL PUT /users/me/notifications: ${writeRes.status}`);
   }
 
   sleep(randomItem([1, 1.5, 2, 2.5, 3]));

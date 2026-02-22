@@ -6,7 +6,7 @@
  *
  * 시나리오:
  *   1. Before: 마이그레이션 전 baseline 데이터 수집 (row count)
- *   2. During: 지속적인 쓰기 부하 (모임 참여, 알림 읽기 등)
+ *   2. During: 지속적인 쓰기 부하 (모임 생성 — POST /meetings)
  *   3. After: 마이그레이션 후 row count 비교
  *
  * 핵심 메트릭:
@@ -28,7 +28,11 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Rate, Trend, Counter, Gauge } from 'k6/metrics';
 import { config } from '../../config.js';
-import { getHeaders, initAuth, randomItem } from '../../helpers.js';
+import { getHeaders, initAuth, randomItem, randomInt } from '../../helpers.js';
+
+// ── 테스트 데이터 ──
+const bookKeywords = ['해리포터', '아몬드', '데미안', '어린왕자', '사피엔스', '코스모스'];
+const genreIds = [1, 2, 3, 4, 5];
 
 // ── 메트릭 ──
 const writeAttempted = new Counter('integrity_write_attempted');
@@ -115,52 +119,98 @@ export function setup() {
   return { startTime: Date.now(), initialCount };
 }
 
-// ── 쓰기 부하 ──
+// ── 쓰기 부하: 모임 생성 (POST /meetings) ──
 export function writeLoad() {
   const timestamp = new Date().toISOString();
-  const elapsed = Math.floor((Date.now() - phaseStartTime) / 1000 / 60);
 
-  // 다양한 쓰기 작업 수행
-  const writeTypes = [
-    { weight: 40, fn: writeNotificationRead },
-    { weight: 30, fn: writeMeetingJoin },
-    { weight: 30, fn: writeSearch },
-  ];
-
-  // 가중치 기반 선택
-  const rand = Math.random() * 100;
-  let cumulative = 0;
-  let selectedFn = writeNotificationRead;
-
-  for (const wt of writeTypes) {
-    cumulative += wt.weight;
-    if (rand < cumulative) {
-      selectedFn = wt.fn;
-      break;
-    }
-  }
-
-  selectedFn(timestamp);
-  sleep(1);
-}
-
-// 알림 읽음 처리 (PUT — DB UPDATE)
-function writeNotificationRead(timestamp) {
   writeAttempted.add(1);
   totalWriteAttempts++;
 
-  const res = http.put(`${config.baseUrl}/notifications`, null, {
-    headers: getHeaders(true),
-    tags: { name: 'PUT /notifications', type: 'write_integrity' },
-    timeout: '10s',
-  });
+  // 1. 도서 검색 (모임 생성에 필요)
+  const keyword = randomItem(bookKeywords);
+  const bookRes = http.get(
+    `${config.baseUrl}/books?query=${encodeURIComponent(keyword)}&page=1&size=5`,
+    {
+      headers: getHeaders(true),
+      tags: { name: 'GET /books (integrity)', type: 'write_integrity' },
+      timeout: '10s',
+    }
+  );
 
-  const ok = res.status >= 200 && res.status < 300;
+  let book = null;
+  if (bookRes.status === 200) {
+    try {
+      const data = bookRes.json();
+      const items = data.data?.items || [];
+      if (items.length > 0) {
+        book = randomItem(items);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (!book) {
+    writeFailed.add(1);
+    totalWriteFailures++;
+    console.log(`[${timestamp}] WRITE SKIP: 도서 검색 실패`);
+    sleep(2);
+    return;
+  }
+
+  // 2. 모임 생성
+  const now = new Date();
+  const firstRoundDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const recruitmentDeadline = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const formatDate = (d) => d.toISOString().split('T')[0];
+
+  const meetingData = {
+    title: `[무손실검증] ${Date.now()}`,
+    description: '마이그레이션 데이터 무손실 검증용 모임입니다.',
+    readingGenreId: randomItem(genreIds),
+    capacity: randomInt(3, 8),
+    roundCount: 1,
+    leaderIntro: '부하테스트 리더',
+    leaderIntroSavePolicy: false,
+    firstRoundAt: formatDate(firstRoundDate),
+    recruitmentDeadline: formatDate(recruitmentDeadline),
+    time: {
+      startTime: '19:00',
+      endTime: '20:30',
+    },
+    rounds: [
+      { roundNo: 1, date: formatDate(firstRoundDate) },
+    ],
+    booksByRound: [
+      {
+        roundNo: 1,
+        book: {
+          title: book.title,
+          authors: book.authors,
+          publisher: book.publisher,
+          thumbnailUrl: book.thumbnailUrl,
+          publishedAt: book.publishedAt,
+          isbn13: book.isbn13,
+        },
+      },
+    ],
+  };
+
+  const res = http.post(
+    `${config.baseUrl}/meetings`,
+    JSON.stringify(meetingData),
+    {
+      headers: getHeaders(true),
+      tags: { name: 'POST /meetings', type: 'write_integrity' },
+      timeout: '15s',
+    }
+  );
+
+  const ok = res.status === 201;
   writeSuccessRate.add(ok);
 
   if (ok) {
     writeSucceeded.add(1);
     totalWriteSuccesses++;
+    successfulWriteIds.add(1);
     writeLatency.add(res.timings.duration);
   } else if (res.status === 401) {
     // 인증 문제는 쓰기 실패로 카운트하지 않음
@@ -169,99 +219,31 @@ function writeNotificationRead(timestamp) {
     writeFailed.add(1);
     totalWriteFailures++;
     console.log(
-      `[${timestamp}] WRITE FAIL (notification): ${res.status} ` +
+      `[${timestamp}] WRITE FAIL (meeting create): ${res.status} ` +
       `(${res.timings.duration}ms)`
     );
   }
-}
 
-// 모임 참여 시도 (POST — DB INSERT)
-function writeMeetingJoin(timestamp) {
-  writeAttempted.add(1);
-  totalWriteAttempts++;
-
-  const meetingId = config.testData.meetingId;
-  const res = http.post(
-    `${config.baseUrl}/meetings/${meetingId}/participations`,
-    null,
-    {
-      headers: getHeaders(true),
-      tags: { name: 'POST /meetings/:id/participations', type: 'write_integrity' },
-      timeout: '10s',
-    }
-  );
-
-  // 200, 201 = 성공, 400/409 = 이미 참여/정원초과 (정상 응답)
-  const ok = res.status >= 200 && res.status < 500;
-  writeSuccessRate.add(ok);
-
-  if (res.status >= 200 && res.status < 300) {
-    writeSucceeded.add(1);
-    totalWriteSuccesses++;
-    writeLatency.add(res.timings.duration);
-  } else if (res.status >= 400 && res.status < 500) {
-    // 비즈니스 에러 (이미 참여 등) — 서버는 정상
-    writeSucceeded.add(1);
-    totalWriteSuccesses++;
-  } else {
-    writeFailed.add(1);
-    totalWriteFailures++;
-    console.log(
-      `[${timestamp}] WRITE FAIL (join): ${res.status} ` +
-      `(${res.timings.duration}ms)`
-    );
-  }
-}
-
-// 검색 (GET — 캐시 미스 시 DB 조회)
-function writeSearch(timestamp) {
-  writeAttempted.add(1);
-  totalWriteAttempts++;
-
-  const keyword = randomItem(config.searchKeywords);
-  const res = http.get(
-    `${config.baseUrl}/meetings/search?keyword=${encodeURIComponent(keyword)}&size=5`,
-    {
-      headers: getHeaders(false),
-      tags: { name: 'GET /meetings/search', type: 'write_integrity' },
-      timeout: '10s',
-    }
-  );
-
-  const ok = res.status === 200;
-  writeSuccessRate.add(ok);
-
-  if (ok) {
-    writeSucceeded.add(1);
-    totalWriteSuccesses++;
-    writeLatency.add(res.timings.duration);
-  } else {
-    writeFailed.add(1);
-    totalWriteFailures++;
-    console.log(
-      `[${timestamp}] SEARCH FAIL: ${res.status} (${res.timings.duration}ms)`
-    );
-  }
+  sleep(2);
 }
 
 // ── 읽기 검증 (데이터 반영 확인) ──
 export function readVerify() {
   const timestamp = new Date().toISOString();
 
-  // 모임 목록 조회 (DB에서 데이터가 정상적으로 읽히는지)
+  // 1. 모임 목록 조회
   const meetingsRes = http.get(`${config.baseUrl}/meetings?size=20`, {
     headers: getHeaders(false),
     tags: { name: 'GET /meetings (verify)', type: 'read_verify' },
     timeout: '10s',
   });
 
-  const ok = meetingsRes.status === 200;
-  readSuccess.add(ok);
+  const listOk = meetingsRes.status === 200;
+  readSuccess.add(listOk);
 
-  if (ok) {
+  if (listOk) {
     readLatency.add(meetingsRes.timings.duration);
 
-    // 응답에서 데이터 건수 확인
     try {
       const data = meetingsRes.json();
       const items = data.data?.items || data.data?.content || [];
@@ -272,7 +254,29 @@ export function readVerify() {
       // ignore
     }
   } else {
-    console.log(`[${timestamp}] READ FAIL: ${meetingsRes.status}`);
+    console.log(`[${timestamp}] READ FAIL (list): ${meetingsRes.status}`);
+  }
+
+  sleep(1);
+
+  // 2. 검색 조회
+  const keyword = randomItem(config.searchKeywords);
+  const searchRes = http.get(
+    `${config.baseUrl}/meetings/search?keyword=${encodeURIComponent(keyword)}&size=5`,
+    {
+      headers: getHeaders(false),
+      tags: { name: 'GET /meetings/search (verify)', type: 'read_verify' },
+      timeout: '10s',
+    }
+  );
+
+  const searchOk = searchRes.status === 200;
+  readSuccess.add(searchOk);
+
+  if (searchOk) {
+    readLatency.add(searchRes.timings.duration);
+  } else {
+    console.log(`[${timestamp}] READ FAIL (search): ${searchRes.status}`);
   }
 
   sleep(2);
@@ -311,7 +315,7 @@ export function teardown(data) {
   console.log('  - integrity_read_success: 읽기 성공률 (데이터 반영 확인)');
   console.log('');
   console.log('검증 방법:');
-  console.log('  1. 쓰기 성공(integrity_write_succeeded)이 모두 DB에 반영되었는지');
+  console.log('  1. 모임 생성 성공 수(integrity_write_succeeded)가 DB의 신규 모임 수와 일치하는지');
   console.log('  2. 09-checksum-verify.sh로 Master/Slave CHECKSUM 일치 확인');
   console.log('  3. 실패 건수(integrity_write_failed)가 마이그레이션 구간에만 집중되는지');
 }

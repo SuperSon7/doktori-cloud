@@ -113,15 +113,19 @@ export function dbHeavyRead() {
   sleep(0.3);
 }
 
-// ── DB 쓰기 (UPDATE 쿼리) ──
+// ── DB 쓰기 (UPDATE 쿼리 — 알림 설정 토글) ──
 export function dbWrite() {
   const timestamp = new Date().toISOString();
 
-  const res = http.put(`${config.baseUrl}/notifications`, null, {
-    headers: getHeaders(true),
-    tags: { name: 'PUT /notifications', type: 'db_write' },
-    timeout: '10s',
-  });
+  const res = http.put(
+    `${config.baseUrl}/users/me/notifications`,
+    JSON.stringify({ pushNotificationAgreed: true }),
+    {
+      headers: getHeaders(true),
+      tags: { name: 'PUT /users/me/notifications', type: 'db_write' },
+      timeout: '10s',
+    }
+  );
 
   // 401은 인증 문제, 5xx가 DB 문제
   const isServerError = res.status >= 500;

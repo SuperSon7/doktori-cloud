@@ -159,29 +159,29 @@ export function readTraffic() {
 export function writeTraffic() {
   const timestamp = new Date().toISOString();
 
-  // 1. 알림 전체 읽음 처리 (PUT — DB UPDATE)
-  const markReadRes = http.put(
-    `${config.baseUrl}/notifications`,
-    null,
+  // 1. 알림 설정 토글 (PUT — DB UPDATE on users table)
+  const settingsRes = http.put(
+    `${config.baseUrl}/users/me/notifications`,
+    JSON.stringify({ pushNotificationAgreed: true }),
     {
       headers: getHeaders(true),
-      tags: { name: 'PUT /notifications', type: 'write' },
+      tags: { name: 'PUT /users/me/notifications', type: 'write' },
       timeout: '10s',
     }
   );
 
-  const writeOk = markReadRes.status >= 200 && markReadRes.status < 300;
+  const writeOk = settingsRes.status >= 200 && settingsRes.status < 300;
   writeSuccess.add(writeOk);
   overallAvailability.add(writeOk);
 
   if (writeOk) {
-    writeLatency.add(markReadRes.timings.duration);
+    writeLatency.add(settingsRes.timings.duration);
   } else {
     writeErrors.add(1);
     writeFailedDuringCutover.add(1);
     console.log(
-      `[${timestamp}] WRITE FAIL PUT /notifications: ${markReadRes.status} ` +
-      `(${markReadRes.timings.duration}ms) — ${markReadRes.body ? markReadRes.body.substring(0, 100) : 'no body'}`
+      `[${timestamp}] WRITE FAIL PUT /users/me/notifications: ${settingsRes.status} ` +
+      `(${settingsRes.timings.duration}ms) — ${settingsRes.body ? settingsRes.body.substring(0, 100) : 'no body'}`
     );
   }
 

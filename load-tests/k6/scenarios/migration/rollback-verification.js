@@ -252,12 +252,16 @@ export function rollbackWriteCheck() {
   const timestamp = new Date().toISOString();
   const phaseLabel = getPhaseLabel();
 
-  // 알림 읽음 처리 (UPDATE — 가벼운 쓰기)
-  const res = http.put(`${config.baseUrl}/notifications`, null, {
-    headers: getHeaders(true),
-    tags: { name: 'PUT /notifications', phase: phaseLabel },
-    timeout: '10s',
-  });
+  // 알림 설정 토글 (UPDATE users — 실제 DB 쓰기)
+  const res = http.put(
+    `${config.baseUrl}/users/me/notifications`,
+    JSON.stringify({ pushNotificationAgreed: true }),
+    {
+      headers: getHeaders(true),
+      tags: { name: 'PUT /users/me/notifications', phase: phaseLabel },
+      timeout: '10s',
+    }
+  );
 
   const ok = res.status >= 200 && res.status < 300;
   const isAuthError = res.status === 401;

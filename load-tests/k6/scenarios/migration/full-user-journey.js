@@ -7,7 +7,7 @@
  * 사용자 시나리오 (5가지):
  *   1. 비로그인 탐색 (40%): 메인 → 모임 목록 → 검색 → 상세
  *   2. 로그인 사용자 (30%): 로그인 → 내 모임 → 알림 확인
- *   3. 모임 참여 (15%): 모임 검색 → 상세 → 참여 신청
+ *   3. 모임 생성 (15%): 도서 검색 → 모임 생성 (실제 DB INSERT)
  *   4. 채팅 (10%): 채팅방 목록 → 입장
  *   5. 도서 검색 (5%): 도서 검색 (외부 API 의존)
  *
@@ -27,7 +27,12 @@ import { config } from '../../config.js';
 import {
   apiGet, getHeaders, initAuth,
   randomItem, randomInt, thinkTime,
+  extractData,
 } from '../../helpers.js';
+
+// ── 모임 생성용 데이터 ──
+const bookKeywords = ['해리포터', '아몬드', '데미안', '어린왕자', '사피엔스', '코스모스'];
+const genreIds = [1, 2, 3, 4, 5];
 
 // ── 시나리오별 메트릭 ──
 const guestFlowSuccess = new Rate('journey_guest_success');
@@ -54,11 +59,11 @@ export const options = {
       duration: '15m',
       exec: 'loggedInUser',
     },
-    meeting_join: {
+    meeting_create: {
       executor: 'constant-vus',
       vus: 3,
       duration: '15m',
-      exec: 'meetingJoinAttempt',
+      exec: 'meetingCreateFlow',
     },
     chat_usage: {
       executor: 'constant-vus',
@@ -212,53 +217,84 @@ export function loggedInUser() {
   thinkTime(3, 6);
 }
 
-// ── 시나리오 3: 모임 참여 시도 (15%) ──
-export function meetingJoinAttempt() {
+// ── 시나리오 3: 모임 생성 (15%) ──
+export function meetingCreateFlow() {
   const timestamp = new Date().toISOString();
   const journeyStart = Date.now();
   let success = true;
 
-  group('meeting_join', () => {
-    // 1. 모임 검색
-    const keyword = randomItem(['소설', '에세이', '경제', '자기계발']);
-    const searchRes = http.get(
-      `${config.baseUrl}/meetings/search?keyword=${encodeURIComponent(keyword)}&size=5`,
-      {
-        headers: getHeaders(false),
-        tags: { name: 'GET /meetings/search', scenario: 'join' },
-        timeout: '10s',
-      }
-    );
-    if (searchRes.status !== 200) {
-      success = false;
-      console.log(`[${timestamp}] JOIN: search fail ${searchRes.status}`);
-    }
-    thinkTime(2, 4);
-
-    // 2. 모임 상세
-    const detailRes = http.get(`${config.baseUrl}/meetings/${config.testData.meetingId}`, {
-      headers: getHeaders(false),
-      tags: { name: 'GET /meetings/:id', scenario: 'join' },
-      timeout: '10s',
-    });
-    if (detailRes.status !== 200) success = false;
-    thinkTime(2, 3);
-
-    // 3. 참여 신청 (POST — 쓰기 작업, DB 컷오버 중 실패 가능)
-    const joinRes = http.post(
-      `${config.baseUrl}/meetings/${config.testData.meetingId}/participations`,
-      null,
+  group('meeting_create', () => {
+    // 1. 도서 검색 (Kakao API)
+    const keyword = randomItem(bookKeywords);
+    const bookRes = http.get(
+      `${config.baseUrl}/books?query=${encodeURIComponent(keyword)}&page=1&size=5`,
       {
         headers: getHeaders(true),
-        tags: { name: 'POST /meetings/:id/participations', scenario: 'join' },
-        timeout: '10s',
+        tags: { name: 'GET /books', scenario: 'create' },
+        timeout: '15s',
       }
     );
-    // 409(이미 참여) 또는 400(정원 초과)도 정상 동작으로 간주
-    const joinOk = joinRes.status >= 200 && joinRes.status < 500;
-    if (!joinOk) {
+
+    let book = null;
+    if (bookRes.status === 200) {
+      try {
+        const data = bookRes.json();
+        const items = data.data?.items || [];
+        if (items.length > 0) book = randomItem(items);
+      } catch (e) { /* ignore */ }
+    }
+
+    if (!book) {
       success = false;
-      console.log(`[${timestamp}] JOIN: participation fail ${joinRes.status}`);
+      console.log(`[${timestamp}] CREATE: book search fail ${bookRes.status}`);
+      return;
+    }
+    thinkTime(1, 2);
+
+    // 2. 모임 생성 (POST — DB INSERT)
+    const now = new Date();
+    const firstRoundDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const recruitmentDeadline = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+    const formatDate = (d) => d.toISOString().split('T')[0];
+
+    const meetingData = {
+      title: `[여정테스트] ${Date.now()}`,
+      description: '마이그레이션 사용자 여정 테스트용 모임입니다.',
+      readingGenreId: randomItem(genreIds),
+      capacity: randomInt(3, 8),
+      roundCount: 1,
+      leaderIntro: '부하테스트 리더',
+      leaderIntroSavePolicy: false,
+      firstRoundAt: formatDate(firstRoundDate),
+      recruitmentDeadline: formatDate(recruitmentDeadline),
+      time: { startTime: '19:00', endTime: '20:30' },
+      rounds: [{ roundNo: 1, date: formatDate(firstRoundDate) }],
+      booksByRound: [{
+        roundNo: 1,
+        book: {
+          title: book.title,
+          authors: book.authors,
+          publisher: book.publisher,
+          thumbnailUrl: book.thumbnailUrl,
+          publishedAt: book.publishedAt,
+          isbn13: book.isbn13,
+        },
+      }],
+    };
+
+    const createRes = http.post(
+      `${config.baseUrl}/meetings`,
+      JSON.stringify(meetingData),
+      {
+        headers: getHeaders(true),
+        tags: { name: 'POST /meetings', scenario: 'create' },
+        timeout: '15s',
+      }
+    );
+
+    if (createRes.status !== 201) {
+      success = false;
+      console.log(`[${timestamp}] CREATE: meeting create fail ${createRes.status}`);
     }
   });
 
