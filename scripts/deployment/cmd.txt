@@ -1,0 +1,134 @@
+# 1. 서비스 파일 생성
+sudo vim /etc/systemd/system/doktori-be-blue.service
+sudo vim /etc/systemd/system/doktori-be-green.service
+sudo vim /etc/systemd/system/doktori-ai-blue.service
+sudo vim /etc/systemd/system/doktori-ai-green.service
+
+# 2. systemd 리로드
+sudo systemctl daemon-reload
+
+# 3. 서비스 활성화 (부팅 시 자동 시작)
+sudo systemctl enable doktori-be-blue
+sudo systemctl enable doktori-be-green
+sudo systemctl enable doktori-ai-blue
+sudo systemctl enable doktori-ai-green
+
+# 4. 로그 디렉토리 생성
+mkdir -p /home/ubuntu/app/backend/logs
+mkdir -p /home/ubuntu/app/ai-blue/logs
+mkdir -p /home/ubuntu/app/ai-green/logs
+
+---
+
+# AI 서버 gunicorn 설정
+
+# AI 프로젝트에 gunicorn 추가
+cd /home/ubuntu/app/ai-repo
+source venv/bin/activate
+pip install gunicorn
+
+# requirements.txt에 추가
+echo "gunicorn" >> requirements.txt
+
+---
+
+# 버전관리 디렉토리 생성
+
+# 버전 관리 구조 생성
+mkdir -p /home/ubuntu/app/versions/{fe,be,ai}
+
+# 권한 설정
+chown -R ubuntu:ubuntu /home/ubuntu/app/versions
+
+---
+# 스크립트 배치
+
+# 스크립트 복사
+sudo cp deploy-prd.sh /usr/local/bin/deploy-prd
+sudo cp rollback.sh /usr/local/bin/rollback
+
+# 실행 권한 부여
+sudo chmod +x /usr/local/bin/deploy-prd
+sudo chmod +x /usr/local/bin/rollback
+
+---
+# 환경 파일 설정
+# 프로덕션 환경 표시
+echo "prd" | sudo tee /etc/deploy-env
+```
+
+## 5. 버전 관리 전략
+
+### 5.1 버전 보관 정책
+
+**보관 개수**: 최근 5개 버전
+- 디스크 공간 절약
+- 충분한 롤백 옵션 제공
+- 대부분의 문제는 1-2단계 롤백으로 해결 가능
+
+**버전 네이밍**: `vYYYYMMDD-HHMMSS`
+```
+v20250127-143022  ← 2025년 1월 27일 14:30:22 배포
+v20250127-091534
+v20250126-183401
+...
+```
+
+### 5.2 디렉토리 구조
+```
+/home/ubuntu/app/versions/
+├── fe/
+│   ├── v20250127-143022/
+│   │   ├── frontend.tar.gz
+│   │   └── VERSION
+│   ├── v20250127-091534/
+│   ├── v20250126-183401/
+│   └── ...
+├── be/
+│   ├── v20250127-143022/
+│   │   ├── app.jar
+│   │   ├── .env
+│   │   └── VERSION
+│   └── ...
+└── ai/
+    ├── v20250127-143022/
+    │   ├── app/
+    │   ├── requirements.txt
+    │   ├── .env
+    │   └── VERSION
+    └── ...
+
+5.3 자동 정리 메커니즘
+스크립트에 내장된 cleanup_old_versions() 함수가:
+
+각 서비스별로 버전 개수 확인
+MAX_VERSIONS(5개) 초과 시 오래된 버전 삭제
+배포 성공 시마다 자동 실행
+
+--- 수동 명령어 정리
+
+# 버전 목록 확인
+ls -lht /home/ubuntu/app/versions/be/
+
+# 특정 버전 수동 삭제
+rm -rf /home/ubuntu/app/versions/be/v20250120-120000
+
+# 디스크 사용량 확인
+du -sh /home/ubuntu/app/versions/*
+
+# 모든 버전 일괄 삭제 (주의!)
+# rm -rf /home/ubuntu/app/versions/*/v*
+
+--- systemd 모니터링
+# 서비스 상태 확인
+sudo systemctl status doktori-be-blue
+sudo systemctl status doktori-ai-green
+
+# 로그 확인 (실시간)
+sudo journalctl -u doktori-be-blue -f
+
+# 로그 확인 (최근 100줄)
+sudo journalctl -u doktori-ai-blue -n 100
+
+# 모든 doktori 서비스 상태
+sudo systemctl list-units 'doktori-*'

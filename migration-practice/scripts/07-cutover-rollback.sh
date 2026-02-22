@@ -121,18 +121,32 @@ else
 fi
 echo ""
 
-# ── 4. 앱 엔드포인트 원복 안내 ──
-log "=== STEP 4: 앱 DB 엔드포인트 원복 ==="
+# ── 4. Nginx stream 프록시 upstream 롤백 (→ 로컬 MySQL) ──
+log "=== STEP 4: DB 프록시 upstream 롤백 (→ 로컬 MySQL) ==="
 echo ""
-echo "  지금 해야 할 것:"
-echo "  1. AWS Parameter Store에서 DB_URL을 구 Master로 원복"
-echo "     /doktori/dev/DB_URL → jdbc:mysql://${MASTER_HOST}:${MASTER_PORT}/doktoridb?..."
+
+STREAM_CONF="${STREAM_CONF:-/etc/nginx/stream.d/db-proxy.conf}"
+
+log "  현재 upstream:"
+grep "server " "$STREAM_CONF" 2>/dev/null | head -1 || echo "  (확인 불가)"
 echo ""
-echo "  2. 앱 컨테이너 재시작"
-echo "     docker restart backend-api backend-chat"
+echo "  롤백: RDS → 로컬 MySQL (${MASTER_HOST}:${MASTER_PORT})"
 echo ""
-echo "  3. 헬스체크 + 쓰기 정상 확인"
+
+# upstream을 로컬 MySQL로 원복
+sed -i "s|server .*:.*|server ${MASTER_HOST}:${MASTER_PORT};|" "$STREAM_CONF"
+log "  upstream 변경 완료 → ${MASTER_HOST}:${MASTER_PORT}"
+
+if nginx -t 2>&1; then
+    systemctl reload nginx
+    log "  ✅ nginx reload 완료 — 새 연결은 로컬 MySQL로 전달됨"
+else
+    log "  ❌ nginx -t 실패! 수동으로 ${STREAM_CONF}을 확인하세요."
+fi
+
 echo ""
+echo "  HikariCP 커넥션 갱신 대기 중..."
+echo "  헬스체크 + 쓰기 정상 확인 후 Enter"
 read -p "  완료 후 Enter: " _
 
 ROLLBACK_END=$(date +%s)
