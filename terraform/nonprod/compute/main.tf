@@ -90,6 +90,8 @@ resource "aws_iam_role_policy" "ec2_s3_access" {
         Resource = [
           "arn:aws:s3:::${var.project_name}-v2-${var.environment}",
           "arn:aws:s3:::${var.project_name}-v2-${var.environment}/*",
+          "arn:aws:s3:::${var.project_name}-v2-dev",
+          "arn:aws:s3:::${var.project_name}-v2-dev/*",
         ]
       },
     ]
