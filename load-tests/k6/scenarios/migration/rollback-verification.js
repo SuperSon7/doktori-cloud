@@ -255,7 +255,7 @@ export function rollbackWriteCheck() {
   // 알림 설정 토글 (UPDATE users — 실제 DB 쓰기)
   const res = http.put(
     `${config.baseUrl}/users/me/notifications`,
-    JSON.stringify({ pushNotificationAgreed: true }),
+    JSON.stringify({ notificationAgreement: true }),
     {
       headers: getHeaders(true),
       tags: { name: 'PUT /users/me/notifications', phase: phaseLabel },

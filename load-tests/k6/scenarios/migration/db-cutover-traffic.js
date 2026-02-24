@@ -17,7 +17,7 @@
  *   1. 이 스크립트 실행 (10분간 부하)
  *   2. 2~3분 후 Master에 SET GLOBAL read_only = 1
  *   3. 동기화 확인 후 RDS 승격
- *   4. 앱 DB 엔드포인트 전환 + 재시작
+ *   4. nginx stream upstream 전환 + nginx reload (앱 재시작 불필요)
  *   5. 쓰기 복구 확인
  */
 
@@ -162,7 +162,7 @@ export function writeTraffic() {
   // 1. 알림 설정 토글 (PUT — DB UPDATE on users table)
   const settingsRes = http.put(
     `${config.baseUrl}/users/me/notifications`,
-    JSON.stringify({ pushNotificationAgreed: true }),
+    JSON.stringify({ notificationAgreement: true }),
     {
       headers: getHeaders(true),
       tags: { name: 'PUT /users/me/notifications', type: 'write' },
@@ -202,7 +202,7 @@ export function writeTraffic() {
     // 알림 설정 토글 (쓰기)
     const notiRes = http.put(
       `${config.baseUrl}/users/me/notifications`,
-      JSON.stringify({ pushNotificationAgreed: true }),
+      JSON.stringify({ notificationAgreement: true }),
       {
         headers: getHeaders(true),
         tags: { name: 'PUT /users/me/notifications', type: 'write' },

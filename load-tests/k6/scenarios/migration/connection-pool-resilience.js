@@ -89,7 +89,7 @@ export function dbHeavyRead() {
   const timestamp = new Date().toISOString();
 
   // 모임 목록 (JOIN + pagination — DB 커넥션 확실히 사용)
-  const res = http.get(`${config.baseUrl}/meetings?size=20`, {
+  const res = http.get(`${config.baseUrl}/meetings?size=10`, {
     headers: getHeaders(false),
     tags: { name: 'GET /meetings', type: 'db_read' },
     timeout: '10s',
@@ -119,7 +119,7 @@ export function dbWrite() {
 
   const res = http.put(
     `${config.baseUrl}/users/me/notifications`,
-    JSON.stringify({ pushNotificationAgreed: true }),
+    JSON.stringify({ notificationAgreement: true }),
     {
       headers: getHeaders(true),
       tags: { name: 'PUT /users/me/notifications', type: 'db_write' },

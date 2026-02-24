@@ -109,12 +109,13 @@ export function setup() {
   if (meetingsRes.status === 200) {
     try {
       const data = meetingsRes.json();
-      initialCount = data.data?.pageInfo?.totalElements || 'N/A';
+      const items = data.data?.items || [];
+      initialCount = items.length;
     } catch (e) {
       // ignore
     }
   }
-  console.log(`초기 모임 수: ${initialCount}`);
+  console.log(`초기 모임 수 (첫 페이지 기준): ${initialCount}`);
 
   return { startTime: Date.now(), initialCount };
 }
@@ -141,7 +142,7 @@ export function writeLoad() {
   if (bookRes.status === 200) {
     try {
       const data = bookRes.json();
-      const items = data.data?.items || [];
+      const items = data.data?.data || [];
       if (items.length > 0) {
         book = randomItem(items);
       }
@@ -163,35 +164,29 @@ export function writeLoad() {
   const formatDate = (d) => d.toISOString().split('T')[0];
 
   const meetingData = {
+    meetingImagePath: 'images/meetings/load-test-default.png',
     title: `[무손실검증] ${Date.now()}`,
     description: '마이그레이션 데이터 무손실 검증용 모임입니다.',
     readingGenreId: randomItem(genreIds),
     capacity: randomInt(3, 8),
     roundCount: 1,
-    leaderIntro: '부하테스트 리더',
-    leaderIntroSavePolicy: false,
-    firstRoundAt: formatDate(firstRoundDate),
-    recruitmentDeadline: formatDate(recruitmentDeadline),
-    time: {
-      startTime: '19:00',
-      endTime: '20:30',
-    },
     rounds: [
-      { roundNo: 1, date: formatDate(firstRoundDate) },
-    ],
-    booksByRound: [
       {
         roundNo: 1,
+        date: formatDate(firstRoundDate),
         book: {
+          isbn: book.isbn,
           title: book.title,
-          authors: book.authors,
-          publisher: book.publisher,
-          thumbnailUrl: book.thumbnailUrl,
-          publishedAt: book.publishedAt,
-          isbn13: book.isbn13,
+          authors: book.authors || '',
+          publisher: book.publisher || '',
         },
       },
     ],
+    startTime: '19:00',
+    leaderIntro: '부하테스트 리더',
+    leaderIntroSavePolicy: false,
+    durationMinutes: 60,
+    recruitmentDeadline: formatDate(recruitmentDeadline),
   };
 
   const res = http.post(
@@ -232,7 +227,7 @@ export function readVerify() {
   const timestamp = new Date().toISOString();
 
   // 1. 모임 목록 조회
-  const meetingsRes = http.get(`${config.baseUrl}/meetings?size=20`, {
+  const meetingsRes = http.get(`${config.baseUrl}/meetings?size=10`, {
     headers: getHeaders(false),
     tags: { name: 'GET /meetings (verify)', type: 'read_verify' },
     timeout: '10s',
