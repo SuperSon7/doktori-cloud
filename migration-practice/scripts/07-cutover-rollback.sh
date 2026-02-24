@@ -134,11 +134,11 @@ echo "  롤백: RDS → 로컬 MySQL (${MASTER_HOST}:${MASTER_PORT})"
 echo ""
 
 # upstream을 로컬 MySQL로 원복
-sed -i "s|server .*:.*|server ${MASTER_HOST}:${MASTER_PORT};|" "$STREAM_CONF"
+sudo sed -i "s|server .*:.*|server ${MASTER_HOST}:${MASTER_PORT};|" "$STREAM_CONF"
 log "  upstream 변경 완료 → ${MASTER_HOST}:${MASTER_PORT}"
 
-if nginx -t 2>&1; then
-    systemctl reload nginx
+if sudo nginx -t 2>&1; then
+    sudo systemctl reload nginx
     log "  ✅ nginx reload 완료 — 새 연결은 로컬 MySQL로 전달됨"
 else
     log "  ❌ nginx -t 실패! 수동으로 ${STREAM_CONF}을 확인하세요."

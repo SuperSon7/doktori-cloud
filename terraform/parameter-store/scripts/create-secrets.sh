@@ -101,6 +101,7 @@ create_secret "AWS_S3_ENDPOINT" "YOUR_VALUE_HERE" "AWS S3 endpoint URL"
 create_secret "AWS_S3_DB_BACKUP" "YOUR_VALUE_HERE" "AWS S3 DB backup bucket"
 
 # --- AI Configuration ---
+create_param  "AI_BASE_URL" "http://ai:8000/ai" "AI service base URL (docker-compose internal, includes /ai prefix)"
 create_secret "AI_API_KEY" "YOUR_VALUE_HERE" "AI service API key"
 create_secret "AI_DB_URL" "YOUR_VALUE_HERE" "AI database URL"
 create_secret "GEMINI_API_KEY" "YOUR_VALUE_HERE" "Gemini API key"
