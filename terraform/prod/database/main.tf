@@ -10,12 +10,33 @@ data "terraform_remote_state" "networking" {
   }
 }
 
-data "terraform_remote_state" "compute" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "prod/compute/terraform.tfstate"
-    region = var.aws_region
+# -----------------------------------------------------------------------------
+# RDS Security Group
+# -----------------------------------------------------------------------------
+resource "aws_security_group" "rds" {
+  name_prefix = "${var.project_name}-${var.environment}-rds-"
+  description = "RDS MySQL - from app instances only"
+  vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
+
+  ingress {
+    description = "MySQL from VPC (api, chat)"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-rds-sg"
+    Service = "db"
   }
 }
 
@@ -97,7 +118,7 @@ resource "aws_db_instance" "main" {
   password = random_password.db.result
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [data.terraform_remote_state.compute.outputs.db_sg_id]
+  vpc_security_group_ids = [aws_security_group.rds.id]
   availability_zone      = var.db_availability_zone
   publicly_accessible    = false
 

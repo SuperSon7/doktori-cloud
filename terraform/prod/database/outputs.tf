@@ -32,3 +32,8 @@ output "db_instance_id" {
   description = "RDS instance identifier"
   value       = aws_db_instance.main.identifier
 }
+
+output "rds_sg_id" {
+  description = "RDS security group ID"
+  value       = aws_security_group.rds.id
+}
