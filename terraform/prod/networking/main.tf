@@ -71,10 +71,95 @@ resource "aws_subnet" "private_rds" {
 }
 
 # -----------------------------------------------------------------------------
-# NAT: t4g.nano NAT 인스턴스 사용 중 (Terraform 외부 관리)
-# 관리형 NAT Gateway 대비 비용 절감 목적
-# Private RT의 0.0.0.0/0 → NAT 인스턴스로 수동 라우팅됨
+# NAT Instance (t4g.nano) — 관리형 NAT Gateway 대비 비용 절감
 # -----------------------------------------------------------------------------
+data "aws_ami" "nat_arm64" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-kernel-*-arm64-gp2"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+resource "aws_security_group" "nat" {
+  name_prefix = "${var.project_name}-${var.environment}-nat-"
+  description = "NAT instance - forward traffic from private subnets"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "All traffic from VPC (NAT forwarding)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nat-sg"
+  }
+}
+
+resource "aws_instance" "nat" {
+  ami                    = data.aws_ami.nat_arm64.id
+  instance_type          = "t4g.nano"
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.nat.id]
+  source_dest_check      = false
+
+  user_data = <<-EOF
+    #!/bin/bash
+    sysctl -w net.ipv4.ip_forward=1
+    iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE
+  EOF
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
+  root_block_device {
+    volume_size = 8
+    volume_type = "gp3"
+    encrypted   = true
+  }
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-nat"
+    Service = "nat"
+  }
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nat-eip"
+  }
+}
+
+resource "aws_eip_association" "nat" {
+  instance_id   = aws_instance.nat.id
+  allocation_id = aws_eip.nat.id
+}
 
 # -----------------------------------------------------------------------------
 # Route Tables

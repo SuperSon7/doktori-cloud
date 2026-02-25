@@ -28,9 +28,14 @@ output "private_rds_subnet_id" {
   value       = aws_subnet.private_rds.id
 }
 
-output "nat_instance_note" {
-  description = "NAT is a t4g.nano instance managed outside Terraform"
-  value       = "NAT instance managed externally"
+output "nat_instance_id" {
+  description = "NAT instance ID"
+  value       = aws_instance.nat.id
+}
+
+output "nat_eip" {
+  description = "NAT instance public IP"
+  value       = aws_eip.nat.public_ip
 }
 
 output "vpc_endpoint_sg_id" {
