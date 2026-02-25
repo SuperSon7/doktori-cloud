@@ -327,7 +327,7 @@ resource "aws_security_group" "chat" {
 
 # ai SG - from nginx only
 resource "aws_security_group" "ai" {
-  name        = "${var.project_name}-${var.environment}-ai-sg"
+  name_prefix = "${var.project_name}-${var.environment}-ai-"
   description = "AI server - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -521,7 +521,7 @@ resource "aws_instance" "chat" {
 
 # ai EC2 (Private App Subnet)
 resource "aws_instance" "ai" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.ai_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id

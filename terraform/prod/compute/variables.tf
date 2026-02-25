@@ -48,7 +48,7 @@ variable "chat_instance_type" {
 variable "ai_instance_type" {
   description = "AI EC2 instance type"
   type        = string
-  default     = "t3.small"
+  default     = "t4g.small"
 }
 
 variable "state_bucket" {
