@@ -28,6 +28,13 @@ schema_config:
       index:
         prefix: index_
         period: 24h
+    - from: "2026-02-26"
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
 
 storage_config:
   tsdb_shipper:
@@ -35,6 +42,9 @@ storage_config:
     cache_location: /loki/index_cache
   filesystem:
     directory: /loki/chunks
+  aws:
+    s3: s3://ap-northeast-2/doktori-monitoring-loki
+    s3forcepathstyle: true
 
 pattern_ingester:
   enabled: true
