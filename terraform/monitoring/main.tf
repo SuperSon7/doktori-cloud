@@ -271,6 +271,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "loki" {
   rule {
     id     = "loki-log-lifecycle"
     status = "Enabled"
+    filter {}
 
     transition {
       days          = 30
