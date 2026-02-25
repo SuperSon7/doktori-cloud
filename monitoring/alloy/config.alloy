@@ -4,7 +4,7 @@
 // 대체하는 컴포넌트:
 //   node_exporter  (9100) → prometheus.exporter.unix
 //   mysqld_exporter(9104) → prometheus.exporter.mysql
-//   promtail       (9080) → loki.source.file
+//   promtail       (9080) → loki.source.docker
 //   nginx-exporter (9113) → 사이드카 유지 (Alloy 내장 없음)
 //
 // 환경변수:    MONITORING_IP      (모니터링 서버 EIP)
