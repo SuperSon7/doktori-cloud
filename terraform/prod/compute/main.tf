@@ -115,7 +115,10 @@ resource "aws_iam_role_policy" "ec2_parameter_store" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*"
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}",
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*",
+        ]
       },
       {
         Effect = "Allow"
@@ -393,8 +396,9 @@ resource "aws_instance" "nginx" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -430,8 +434,9 @@ resource "aws_instance" "front" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -462,8 +467,9 @@ resource "aws_instance" "api" {
   })
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -494,8 +500,9 @@ resource "aws_instance" "chat" {
   })
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -521,8 +528,9 @@ resource "aws_instance" "ai" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -549,8 +557,9 @@ resource "aws_instance" "rds_monitoring" {
   associate_public_ip_address = true
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
