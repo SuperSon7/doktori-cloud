@@ -30,7 +30,7 @@ variable "nginx_instance_type" {
 variable "front_instance_type" {
   description = "Frontend EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t4g.small"
 }
 
 variable "api_instance_type" {

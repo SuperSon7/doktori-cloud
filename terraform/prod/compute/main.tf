@@ -28,6 +28,38 @@ data "aws_ami" "ubuntu_x86" {
   }
 }
 
+data "aws_ami" "ubuntu_arm64" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# Refer to shared networking SGs managed in prod/networking state.
+data "aws_security_group" "nat" {
+  filter {
+    name   = "vpc-id"
+    values = [data.terraform_remote_state.networking.outputs.vpc_id]
+  }
+
+  filter {
+    name   = "tag:Name"
+    values = ["${var.project_name}-${var.environment}-nat-sg"]
+  }
+}
+
+data "aws_security_group" "vpc_endpoints" {
+  id = data.terraform_remote_state.networking.outputs.vpc_endpoint_sg_id
+}
+
 # -----------------------------------------------------------------------------
 # IAM Role for EC2 Instances (SSM + S3 + Parameter Store + ECR)
 # -----------------------------------------------------------------------------
@@ -151,7 +183,7 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 
 # nginx SG - public facing
 resource "aws_security_group" "nginx" {
-  name        = "${var.project_name}-${var.environment}-nginx-sg"
+  name_prefix = "${var.project_name}-${var.environment}-nginx-"
   description = "Nginx reverse proxy - public HTTP/HTTPS"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -187,7 +219,7 @@ resource "aws_security_group" "nginx" {
 
 # front SG - from nginx only
 resource "aws_security_group" "front" {
-  name        = "${var.project_name}-${var.environment}-front-sg"
+  name_prefix = "${var.project_name}-${var.environment}-front-"
   description = "Frontend - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -200,10 +232,26 @@ resource "aws_security_group" "front" {
   }
 
   egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description     = "Allow all outbound via NAT SG"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [data.aws_security_group.nat.id]
+  }
+
+  egress {
+    description     = "HTTPS to VPC endpoints (SSM/ECR)"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [data.aws_security_group.vpc_endpoints.id]
+  }
+
+  egress {
+    description = "HTTPS to internet (ECR/S3 fallback)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -392,7 +440,7 @@ resource "aws_eip" "nginx" {
 
 # front EC2 (Private App Subnet)
 resource "aws_instance" "front" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.front_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
