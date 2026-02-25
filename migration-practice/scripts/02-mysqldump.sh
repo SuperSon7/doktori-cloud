@@ -20,6 +20,11 @@ DB_NAME="${DB_NAME:-doktoridb}"
 DUMP_DIR="${DUMP_DIR:-/tmp/db-migration}"
 DUMP_FILE="${DUMP_DIR}/master-dump-$(date +%Y%m%d-%H%M%S).sql"
 
+RDS_HOST="${RDS_HOST:-}"
+RDS_PORT="${RDS_PORT:-3306}"
+RDS_USER="${RDS_USER:-${MYSQL_USER}}"
+RDS_PASS="${RDS_PASS:-${MYSQL_PASS}}"
+
 mkdir -p "$DUMP_DIR"
 
 MYSQLDUMP_CMD="mysqldump -h${MYSQL_HOST} -P${MYSQL_PORT} -u${MYSQL_USER}"
@@ -95,12 +100,54 @@ else
     echo "  binlog가 활성화되어 있는지 01-check-master-status.sh 로 확인하세요."
 fi
 
+# ============================================================
+# STEP 4: RDS에 덤프 적재 (pv progress bar)
+# ============================================================
 echo ""
 echo "========================================"
-echo " 다음 단계"
+echo " RDS 적재"
 echo "========================================"
-echo ""
-echo "1. 덤프 파일을 RDS에 적재:"
-echo "   mysql -h <RDS_ENDPOINT> -u <USER> -p $DB_NAME < $DUMP_FILE"
-echo ""
-echo "2. 적재 완료 후 03-setup-replication.sh 실행"
+
+if [ -z "$RDS_HOST" ]; then
+    echo ""
+    echo "  RDS_HOST가 설정되지 않았습니다. 수동 적재:"
+    echo "  pv $DUMP_FILE | mysql -h <RDS_ENDPOINT> -u <USER> -p $DB_NAME"
+    echo ""
+    echo "  또는 RDS_HOST=xxx 환경변수 설정 후 재실행"
+    echo ""
+    echo "  적재 완료 후 → 03-setup-replication.sh"
+else
+    RDS_MYSQL_CMD="mysql -h${RDS_HOST} -P${RDS_PORT} -u${RDS_USER}"
+    [ -n "$RDS_PASS" ] && RDS_MYSQL_CMD="$RDS_MYSQL_CMD -p${RDS_PASS}"
+
+    echo ""
+    echo "  대상: ${RDS_HOST}:${RDS_PORT}/${DB_NAME}"
+    echo "  파일: $DUMP_FILE ($DUMP_SIZE)"
+    echo ""
+    read -p "  ↵ Enter를 눌러 RDS 적재 시작... " _
+    echo ""
+
+    echo "[4/4] RDS 적재 중..."
+    IMPORT_START=$(date +%s)
+
+    if command -v pv &>/dev/null; then
+        pv -f "$DUMP_FILE" | $RDS_MYSQL_CMD "$DB_NAME" 2>/dev/null
+    else
+        # pv 없으면 백그라운드 모니터로 대체
+        $RDS_MYSQL_CMD "$DB_NAME" < "$DUMP_FILE" 2>/dev/null &
+        IMPORT_PID=$!
+        while kill -0 $IMPORT_PID 2>/dev/null; do
+            IMPORT_ELAPSED=$(( $(date +%s) - IMPORT_START ))
+            printf "\r  적재 중... (경과: %ds)  " "$IMPORT_ELAPSED"
+            sleep 3
+        done
+        wait $IMPORT_PID
+        echo ""
+    fi
+
+    IMPORT_END=$(date +%s)
+    IMPORT_ELAPSED=$((IMPORT_END - IMPORT_START))
+    echo "  ✅ RDS 적재 완료 (${IMPORT_ELAPSED}초 소요)"
+    echo ""
+    echo "  다음 → 03-setup-replication.sh"
+fi

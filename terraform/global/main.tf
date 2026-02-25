@@ -17,12 +17,20 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # GitHub Actions Deploy Role (OIDC)
 # -----------------------------------------------------------------------------
 locals {
-  github_oidc_subjects = flatten([
-    for repo in var.github_repos : [
-      "repo:${var.github_org}/${repo}:ref:refs/heads/main",
-      "repo:${var.github_org}/${repo}:ref:refs/heads/develop",
-    ]
-  ])
+  github_oidc_subjects = concat(
+    flatten([
+      for repo in var.github_repos : [
+        "repo:${var.github_org}/${repo}:ref:refs/heads/main",
+        "repo:${var.github_org}/${repo}:ref:refs/heads/develop",
+        "repo:${var.github_org}/${repo}:ref:refs/heads/staging",
+      ]
+    ]),
+    # TODO: 테스트 후 제거
+    [
+      "repo:SuperSon7/5-team-service-be:ref:refs/heads/main",
+      "repo:SuperSon7/5-team-service-be:ref:refs/heads/develop",
+    ],
+  )
 }
 
 resource "aws_iam_role" "github_actions_deploy" {
@@ -180,11 +188,20 @@ resource "aws_iam_group_policy" "be_team_ssm" {
         ]
         Condition = {
           StringEquals = {
-            "ssm:resourceTag/Service"     = ["api", "chat", "db", "dev-app"]
+            "ssm:resourceTag/Service"     = ["app"]
             "ssm:resourceTag/Environment" = ["dev"]
             "ssm:resourceTag/Project"     = var.project_name
           }
         }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:StartSession",
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}::document/AWS-StartPortForwardingSession",
+        ]
       },
       {
         Effect = "Allow"
