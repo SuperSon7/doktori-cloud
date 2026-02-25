@@ -19,6 +19,7 @@ variable "aws_region" {
 variable "key_name" {
   description = "EC2 key pair name"
   type        = string
+  default     = "doktori-prod"
 }
 
 variable "nginx_instance_type" {

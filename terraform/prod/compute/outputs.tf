@@ -48,16 +48,6 @@ output "ai_private_ip" {
   value       = aws_instance.ai.private_ip
 }
 
-output "db_instance_id" {
-  description = "DB EC2 instance ID"
-  value       = aws_instance.db.id
-}
-
-output "db_private_ip" {
-  description = "DB EC2 private IP"
-  value       = aws_instance.db.private_ip
-}
-
 output "nginx_sg_id" {
   description = "Nginx security group ID"
   value       = aws_security_group.nginx.id
@@ -68,7 +58,17 @@ output "api_sg_id" {
   value       = aws_security_group.api.id
 }
 
-output "db_sg_id" {
-  description = "DB security group ID"
-  value       = aws_security_group.db.id
+output "rds_monitoring_instance_id" {
+  description = "RDS monitoring EC2 instance ID"
+  value       = aws_instance.rds_monitoring.id
+}
+
+output "rds_monitoring_private_ip" {
+  description = "RDS monitoring EC2 private IP"
+  value       = aws_instance.rds_monitoring.private_ip
+}
+
+output "rds_monitoring_sg_id" {
+  description = "RDS monitoring security group ID"
+  value       = aws_security_group.rds_monitoring.id
 }
