@@ -46,7 +46,7 @@ resource "aws_db_subnet_group" "main" {
 
   subnet_ids = [
     data.terraform_remote_state.networking.outputs.private_db_subnet_id,   # ap-northeast-2a
-    data.terraform_remote_state.networking.outputs.private_db_subnet_2c_id,  # ap-northeast-2c
+    data.terraform_remote_state.networking.outputs.private_rds_subnet_id,  # ap-northeast-2c
   ]
 
   tags = {

@@ -59,38 +59,22 @@ resource "aws_subnet" "private_db" {
   }
 }
 
-resource "aws_subnet" "private_db_2c" {
+resource "aws_subnet" "private_rds" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_db_subnet_2c_cidr
+  cidr_block        = var.private_rds_subnet_cidr
   availability_zone = var.secondary_availability_zone
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-db-2c"
+    Name = "${var.project_name}-${var.environment}-private-rds"
     Tier = "private-db"
   }
 }
 
 # -----------------------------------------------------------------------------
-# NAT Gateway
+# NAT: t4g.nano NAT 인스턴스 사용 중 (Terraform 외부 관리)
+# 관리형 NAT Gateway 대비 비용 절감 목적
+# Private RT의 0.0.0.0/0 → NAT 인스턴스로 수동 라우팅됨
 # -----------------------------------------------------------------------------
-resource "aws_eip" "nat" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
-  }
-}
-
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public.id
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nat"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
 
 # -----------------------------------------------------------------------------
 # Route Tables
@@ -111,13 +95,15 @@ resource "aws_route_table" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  }
+  # 0.0.0.0/0 → NAT 인스턴스 라우팅은 Terraform 외부에서 관리
+  # (NAT 인스턴스 교체 시 수동으로 route 업데이트 필요)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-rt"
+  }
+
+  lifecycle {
+    ignore_changes = [route]
   }
 }
 
@@ -137,8 +123,8 @@ resource "aws_route_table_association" "private_db" {
   route_table_id = aws_route_table.private.id
 }
 
-resource "aws_route_table_association" "private_db_2c" {
-  subnet_id      = aws_subnet.private_db_2c.id
+resource "aws_route_table_association" "private_rds" {
+  subnet_id      = aws_subnet.private_rds.id
   route_table_id = aws_route_table.private.id
 }
 

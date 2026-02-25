@@ -23,14 +23,14 @@ output "private_db_subnet_id" {
   value       = aws_subnet.private_db.id
 }
 
-output "private_db_subnet_2c_id" {
-  description = "Private DB subnet ID (ap-northeast-2c) - RDS subnet group용"
-  value       = aws_subnet.private_db_2c.id
+output "private_rds_subnet_id" {
+  description = "Private RDS subnet ID (ap-northeast-2c) - RDS subnet group용"
+  value       = aws_subnet.private_rds.id
 }
 
-output "nat_gateway_ip" {
-  description = "NAT Gateway public IP"
-  value       = aws_eip.nat.public_ip
+output "nat_instance_note" {
+  description = "NAT is a t4g.nano instance managed outside Terraform"
+  value       = "NAT instance managed externally"
 }
 
 output "vpc_endpoint_sg_id" {
