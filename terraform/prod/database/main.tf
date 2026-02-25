@@ -113,22 +113,10 @@ resource "aws_db_instance" "main" {
 
   parameter_group_name = aws_db_parameter_group.main.name
 
-  # ---- 변경 적용 정책 ----
-  apply_immediately = false  # 유지보수 윈도우에 적용 (운영 안전)
-
-  # ---- 백업 & 유지보수 ----
   backup_retention_period = var.db_backup_retention
   backup_window           = "18:00-19:00"         # UTC (KST 03:00-04:00)
   maintenance_window      = "Mon:19:00-Mon:20:00" # UTC (KST 월 04:00-05:00)
-  copy_tags_to_snapshot   = true
 
-  # ---- 모니터링 ----
-  performance_insights_enabled = true
-  performance_insights_retention_period = 7  # 무료 티어 (7일)
-
-  enabled_cloudwatch_logs_exports = ["error", "slowquery"]
-
-  # ---- 보호 ----
   auto_minor_version_upgrade = true
   deletion_protection        = true
   skip_final_snapshot        = false
@@ -141,6 +129,5 @@ resource "aws_db_instance" "main" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [password]
   }
 }
