@@ -211,8 +211,9 @@ resource "aws_instance" "monitoring" {
   })
 
   metadata_options {
-    http_tokens   = "required" # IMDSv2 강제
-    http_endpoint = "enabled"
+    http_tokens                 = "required" # IMDSv2 강제
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2 # Docker 컨테이너 → IMDS 접근 허용
   }
 
   root_block_device {
@@ -231,6 +232,80 @@ resource "aws_instance" "monitoring" {
   lifecycle {
     ignore_changes = [ami]
   }
+}
+
+# -----------------------------------------------------------------------------
+# S3 Bucket - Loki prod 로그 저장소
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket" "loki" {
+  bucket = "doktori-monitoring-loki"
+
+  tags = {
+    Name    = "doktori-monitoring-loki"
+    Service = "monitoring"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "loki" {
+  bucket = aws_s3_bucket.loki.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "loki" {
+  bucket = aws_s3_bucket.loki.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "loki" {
+  bucket = aws_s3_bucket.loki.id
+
+  rule {
+    id     = "loki-log-lifecycle"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    expiration {
+      days = 90
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# IAM Inline Policy - Loki → S3 접근
+# -----------------------------------------------------------------------------
+resource "aws_iam_role_policy" "loki_s3" {
+  name = "${var.project_name}-monitoring-loki-s3"
+  role = aws_iam_role.monitoring.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        aws_s3_bucket.loki.arn,
+        "${aws_s3_bucket.loki.arn}/*"
+      ]
+    }]
+  })
 }
 
 # -----------------------------------------------------------------------------
