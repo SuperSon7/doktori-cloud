@@ -30,25 +30,25 @@ variable "nginx_instance_type" {
 variable "front_instance_type" {
   description = "Frontend EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t4g.small"
 }
 
 variable "api_instance_type" {
   description = "API EC2 instance type"
   type        = string
-  default     = "t3.small"
+  default     = "t4g.small"
 }
 
 variable "chat_instance_type" {
   description = "Chat EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t4g.micro"
 }
 
 variable "ai_instance_type" {
   description = "AI EC2 instance type"
   type        = string
-  default     = "t3.small"
+  default     = "t4g.small"
 }
 
 variable "db_instance_type" {
@@ -61,6 +61,12 @@ variable "db_volume_size" {
   description = "DB EBS volume size in GB"
   type        = number
   default     = 30
+}
+
+variable "custom_ami_id" {
+  description = "Custom AMI ID (pre-baked). If empty, uses latest Ubuntu 22.04 arm64 from Canonical."
+  type        = string
+  default     = ""
 }
 
 variable "state_bucket" {

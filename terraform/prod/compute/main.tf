@@ -13,19 +13,24 @@ data "terraform_remote_state" "networking" {
 # -----------------------------------------------------------------------------
 # AMI Data Source
 # -----------------------------------------------------------------------------
-data "aws_ami" "ubuntu_x86" {
+data "aws_ami" "ubuntu_arm64" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
   }
 
   filter {
     name   = "virtualization-type"
     values = ["hvm"]
   }
+}
+
+locals {
+  # custom_ami_id가 지정되면 사용, 아니면 최신 Ubuntu arm64 AMI 사용
+  ami_id = var.custom_ami_id != "" ? var.custom_ami_id : data.aws_ami.ubuntu_arm64.id
 }
 
 # -----------------------------------------------------------------------------
@@ -355,7 +360,7 @@ resource "aws_security_group" "db" {
 
 # nginx EC2 (Public Subnet - reverse proxy + Let's Encrypt)
 resource "aws_instance" "nginx" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.nginx_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.public_subnet_id
@@ -392,12 +397,17 @@ resource "aws_eip" "nginx" {
 
 # front EC2 (Private App Subnet)
 resource "aws_instance" "front" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = local.ami_id
   instance_type          = var.front_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
   vpc_security_group_ids = [aws_security_group.front.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name = var.project_name
+    environment  = var.environment
+  })
 
   metadata_options {
     http_tokens   = "required"
@@ -419,12 +429,17 @@ resource "aws_instance" "front" {
 
 # api EC2 (Private App Subnet)
 resource "aws_instance" "api" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = local.ami_id
   instance_type          = var.api_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
   vpc_security_group_ids = [aws_security_group.api.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name = var.project_name
+    environment  = var.environment
+  })
 
   metadata_options {
     http_tokens   = "required"
@@ -446,12 +461,17 @@ resource "aws_instance" "api" {
 
 # chat EC2 (Private App Subnet)
 resource "aws_instance" "chat" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = local.ami_id
   instance_type          = var.chat_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
   vpc_security_group_ids = [aws_security_group.chat.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name = var.project_name
+    environment  = var.environment
+  })
 
   metadata_options {
     http_tokens   = "required"
@@ -473,12 +493,17 @@ resource "aws_instance" "chat" {
 
 # ai EC2 (Private App Subnet)
 resource "aws_instance" "ai" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = local.ami_id
   instance_type          = var.ai_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
   vpc_security_group_ids = [aws_security_group.ai.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name = var.project_name
+    environment  = var.environment
+  })
 
   metadata_options {
     http_tokens   = "required"
@@ -500,7 +525,7 @@ resource "aws_instance" "ai" {
 
 # db EC2 (Private DB Subnet)
 resource "aws_instance" "db" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.db_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.private_db_subnet_id
