@@ -19,15 +19,6 @@ data "terraform_remote_state" "compute" {
   }
 }
 
-data "terraform_remote_state" "storage" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "prod/storage/terraform.tfstate"
-    region = var.aws_region
-  }
-}
-
 # -----------------------------------------------------------------------------
 # DB Password (random → SSM Parameter Store)
 # -----------------------------------------------------------------------------
@@ -37,10 +28,9 @@ resource "random_password" "db" {
 }
 
 resource "aws_ssm_parameter" "db_password" {
-  name   = "/${var.project_name}/${var.environment}/db/password"
-  type   = "SecureString"
-  value  = random_password.db.result
-  key_id = data.terraform_remote_state.storage.outputs.kms_key_arn
+  name  = "/${var.project_name}/${var.environment}/db/password"
+  type  = "SecureString"
+  value = random_password.db.result
 
   tags = {
     Name = "${var.project_name}-${var.environment}-db-password"
@@ -56,7 +46,7 @@ resource "aws_db_subnet_group" "main" {
 
   subnet_ids = [
     data.terraform_remote_state.networking.outputs.private_db_subnet_id,   # ap-northeast-2a
-    data.terraform_remote_state.networking.outputs.private_rds_subnet_id,  # ap-northeast-2c
+    data.terraform_remote_state.networking.outputs.private_db_subnet_2c_id,  # ap-northeast-2c
   ]
 
   tags = {

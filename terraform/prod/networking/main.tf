@@ -59,6 +59,17 @@ resource "aws_subnet" "private_db" {
   }
 }
 
+resource "aws_subnet" "private_db_2c" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_db_subnet_2c_cidr
+  availability_zone = var.secondary_availability_zone
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-private-db-2c"
+    Tier = "private-db"
+  }
+}
+
 # -----------------------------------------------------------------------------
 # NAT Gateway
 # -----------------------------------------------------------------------------
@@ -123,6 +134,11 @@ resource "aws_route_table_association" "private_app" {
 
 resource "aws_route_table_association" "private_db" {
   subnet_id      = aws_subnet.private_db.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_db_2c" {
+  subnet_id      = aws_subnet.private_db_2c.id
   route_table_id = aws_route_table.private.id
 }
 

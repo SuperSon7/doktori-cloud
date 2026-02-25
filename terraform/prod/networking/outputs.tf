@@ -19,8 +19,13 @@ output "private_app_subnet_id" {
 }
 
 output "private_db_subnet_id" {
-  description = "Private DB subnet ID"
+  description = "Private DB subnet ID (ap-northeast-2a)"
   value       = aws_subnet.private_db.id
+}
+
+output "private_db_subnet_2c_id" {
+  description = "Private DB subnet ID (ap-northeast-2c) - RDS subnet group용"
+  value       = aws_subnet.private_db_2c.id
 }
 
 output "nat_gateway_ip" {

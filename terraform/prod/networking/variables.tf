@@ -41,7 +41,19 @@ variable "private_db_subnet_cidr" {
 }
 
 variable "availability_zone" {
-  description = "Availability zone"
+  description = "Primary availability zone"
   type        = string
   default     = "ap-northeast-2a"
+}
+
+variable "secondary_availability_zone" {
+  description = "Secondary availability zone (RDS subnet group requires 2 AZs)"
+  type        = string
+  default     = "ap-northeast-2c"
+}
+
+variable "private_db_subnet_2c_cidr" {
+  description = "CIDR block for private DB subnet in secondary AZ"
+  type        = string
+  default     = "10.1.33.0/24"
 }
