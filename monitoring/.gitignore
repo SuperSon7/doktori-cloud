@@ -1,7 +1,1 @@
-grafana/grafana.db
-grafana/png/
-grafana/csv/
-grafana/pdf/
-grafana/plugins/
-loki/data/
-prometheus/data/
+.env

@@ -1,0 +1,50 @@
+apiVersion: 1
+
+templates:
+  - orgId: 1
+    name: discord.message
+    template: |
+      {{ define "severity_emoji" -}}
+        {{- if eq .severity "critical" }}🔴
+        {{- else if eq .severity "high" }}🟠
+        {{- else if eq .severity "warning" }}🟡
+        {{- else }}🔵
+        {{- end }}
+      {{- end }}
+
+      {{ define "severity_label" -}}
+        {{- if eq .severity "critical" }}CRITICAL
+        {{- else if eq .severity "high" }}HIGH
+        {{- else if eq .severity "warning" }}WARNING
+        {{- else }}INFO
+        {{- end }}
+      {{- end }}
+
+      {{ define "discord.message" -}}
+        {{ if eq .Status "resolved" -}}
+          ✅ **[RESOLVED]** {{ (index .Alerts 0).Labels.alertname }}
+          ━━━━━━━━━━━━━━━━━━━━
+          {{ range .Alerts -}}
+          **Alert:**    {{ .Labels.alertname }}
+          **Instance:** {{ .Labels.instance }}
+          **Summary:**  {{ .Annotations.summary }}
+          **Resolved:** {{ .EndsAt.Local.Format "2006-01-02 15:04:05 KST" }}
+          {{ if .Annotations.dashboard_url }}🔗 [Dashboard]({{ .Annotations.dashboard_url }}){{ end }}
+          {{ if .Annotations.runbook_url }}📖 [Runbook]({{ .Annotations.runbook_url }}){{ end }}
+          {{ end -}}
+          ━━━━━━━━━━━━━━━━━━━━
+        {{ else -}}
+          {{ $severity := (index .Alerts 0).Labels.severity -}}
+          {{ template "severity_emoji" (index .Alerts 0).Labels }} **[{{ template "severity_label" (index .Alerts 0).Labels }}]** {{ (index .Alerts 0).Labels.alertname }}
+          ━━━━━━━━━━━━━━━━━━━━
+          {{ range .Alerts -}}
+          **Alert:**    {{ .Labels.alertname }}
+          **Instance:** {{ .Labels.instance }}
+          **Summary:**  {{ .Annotations.summary }}
+          **Started:**  {{ .StartsAt.Local.Format "2006-01-02 15:04:05 KST" }}
+          {{ if .Annotations.dashboard_url }}🔗 [Dashboard]({{ .Annotations.dashboard_url }}){{ end }}
+          {{ if .Annotations.runbook_url }}📖 [Runbook]({{ .Annotations.runbook_url }}){{ end }}
+          {{ end -}}
+          ━━━━━━━━━━━━━━━━━━━━
+        {{ end -}}
+      {{ end }}

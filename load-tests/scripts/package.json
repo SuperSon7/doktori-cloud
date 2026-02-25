@@ -1,0 +1,12 @@
+{
+  "name": "doktori-load-test-scripts",
+  "version": "1.0.0",
+  "description": "부하테스트 보조 스크립트",
+  "scripts": {
+    "get-token": "node get-token.js",
+    "get-token:headless": "node get-token.js --headless --save"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

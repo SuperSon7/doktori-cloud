@@ -1,0 +1,1 @@
+이 문서는 [runbooks/compute/instance-setup.md](runbooks/compute/instance-setup.md)로 이동했습니다.

@@ -43,6 +43,7 @@ terraform.rc
 !package.json
 !package-lock.json
 !tsconfig.json
+!monitoring/grafana/dashboards/*.json
 
 # AWS credentials
 *.csv
@@ -83,16 +84,19 @@ Thumbs.db
 logs/
 
 
-scripts/
 .github/workflows/
 .github/dependabot.yml
 
-*.sh
+# =============================================================================
+# Claude Code (local settings & commands)
+# =============================================================================
+.claude/
+CLAUDE.md
 
 # =============================================================================
 # Load Test Results
 # =============================================================================
-load-tests/**/*.html
+load-tests/result/
 
 # =============================================================================
 # Service Repos (cloned by make setup, managed independently)

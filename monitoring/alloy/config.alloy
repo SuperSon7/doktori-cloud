@@ -1,0 +1,167 @@
+// =============================================================================
+// Grafana Alloy Configuration — Dev Server (Docker Compose all-in-one)
+//
+// 대체하는 컴포넌트:
+//   node_exporter  (9100) → prometheus.exporter.unix
+//   mysqld_exporter(9104) → prometheus.exporter.mysql
+//   promtail       (9080) → loki.source.docker
+//   nginx-exporter (9113) → 사이드카 유지 (Alloy 내장 없음)
+//
+// 환경변수:    MONITORING_IP      (모니터링 서버 EIP)
+//              ALLOY_ENV          (prod | dev)
+//              MYSQL_DSN          (root:pass@(mysql:3306)/)
+// =============================================================================
+
+// ─── 호스트 메트릭 (replaces node_exporter:9100) ────────────────────────────
+prometheus.exporter.unix "host" {
+  // Docker 컨테이너 → 호스트 파일시스템 마운트 경로
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  enable_collectors = [
+    "cpu", "meminfo", "diskstats", "filesystem",
+    "loadavg", "netdev", "uname", "time",
+  ]
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|sys|run|host)($|/)"
+  }
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.add_env.receiver]
+  scrape_interval = "15s"
+}
+
+// ─── MySQL 메트릭 (replaces mysqld_exporter:9104) ───────────────────────────
+prometheus.exporter.mysql "db" {
+  data_source_name = sys.env("MYSQL_DSN")
+  // DSN 예시: root:${DB_PASSWORD}@(mysql:3306)/
+}
+
+prometheus.scrape "mysql_metrics" {
+  targets         = prometheus.exporter.mysql.db.targets
+  forward_to      = [prometheus.relabel.add_env.receiver]
+  scrape_interval = "15s"
+}
+
+// ─── Spring Boot Actuator (API + Chat) ──────────────────────────────────────
+// Docker compose 네트워크(app-net)에서 서비스명으로 접근
+prometheus.scrape "spring_boot" {
+  targets = [
+    { "__address__" = "backend:8080", "app" = "api" },
+    { "__address__" = "chat:8081",    "app" = "chat" },
+  ]
+  metrics_path    = "/api/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
+// ─── Nginx 메트릭 (nginx-exporter 사이드카 scrape) ──────────────────────────
+// nginx stub_status → nginx-exporter가 Prometheus 포맷 변환 → Alloy가 수집
+prometheus.scrape "nginx" {
+  targets = [
+    { "__address__" = "nginx-exporter:9113", "app" = "nginx" },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
+// ─── 공통 라벨 (env, instance, job 정리) ─────────────────────────────────────
+prometheus.relabel "add_env" {
+  // env 라벨
+  rule {
+    target_label = "env"
+    replacement  = sys.env("ALLOY_ENV")
+  }
+  // app 라벨이 있으면 instance를 app 값으로 설정 (api, chat, nginx)
+  // app이 없으면 기존 instance 유지 (host metrics = exporter 주소, mysql = exporter 주소)
+  rule {
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
+  }
+  // job 라벨에서 Alloy 내부 prefix + _metrics 접미사 제거
+  // prometheus.scrape.host_metrics → host, prometheus.scrape.spring_boot → spring_boot
+  rule {
+    source_labels = ["job"]
+    regex         = "prometheus\\.(?:scrape|exporter)\\.(.+?)(?:_metrics)?"
+    target_label  = "job"
+    replacement   = "$1"
+  }
+  // job의 underscore → hyphen (spring_boot → spring-boot)
+  rule {
+    source_labels = ["job"]
+    regex         = "(.+)_(.+)"
+    target_label  = "job"
+    replacement   = "$1-$2"
+  }
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+}
+
+// ─── Prometheus Remote Write → Monitoring Server ────────────────────────────
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://" + sys.env("MONITORING_IP") + ":9090/api/v1/write"
+  }
+}
+
+// =============================================================================
+// 로그 수집 (replaces promtail:9080)
+// =============================================================================
+
+// ─── Spring Boot 로그 (Docker json-file 로그 드라이버) ──────────────────────
+// 컨테이너 stdout/stderr → Docker json-file → Alloy 수집
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  // 로그가 있는 컨테이너만 필터
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/.*(backend|chat|ai|frontend|nginx|mysql).*"
+    action        = "keep"
+  }
+  // 컨테이너 이름 → app 라벨 ({project}-{service}-{replica} → service)
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/[^-]+-([^-]+)-.*"
+    target_label  = "app"
+  }
+}
+
+loki.source.docker "containers" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.docker_logs.output
+  forward_to = [loki.relabel.add_env.receiver]
+}
+
+// ─── Nginx 로그 ──────────────────────────────────────────────────────────────
+// nginx alpine은 access.log/error.log를 stdout/stderr 심볼릭 링크로 처리하므로
+// 파일 기반 수집 대신 loki.source.docker 로 Docker 소켓 경유 수집 (위 containers 블록)
+
+// ─── 공통 라벨 + Loki push ──────────────────────────────────────────────────
+loki.relabel "add_env" {
+  rule {
+    target_label = "env"
+    replacement  = sys.env("ALLOY_ENV")
+  }
+  // discovery.relabel에서 app 라벨 추출됨 → instance로 복사
+  // app이 없는 로그는 기존 instance 유지
+  rule {
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
+  }
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url = "http://" + sys.env("MONITORING_IP") + ":3100/loki/api/v1/push"
+  }
+}

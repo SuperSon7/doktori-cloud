@@ -1,0 +1,46 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord-critical
+    receivers:
+      - uid: discord_critical
+        type: discord
+        disableResolveMessage: false
+        settings:
+          url: ${DISCORD_CRITICAL_WEBHOOK}
+          use_discord_username: true
+          message: '{{ template "discord.message" . }}'
+
+  - orgId: 1
+    name: discord-high
+    receivers:
+      - uid: discord_high
+        type: discord
+        disableResolveMessage: false
+        settings:
+          url: ${DISCORD_HIGH_WEBHOOK}
+          use_discord_username: true
+          message: '{{ template "discord.message" . }}'
+
+  - orgId: 1
+    name: discord-warning
+    receivers:
+      - uid: discord_warning
+        type: discord
+        disableResolveMessage: false
+        settings:
+          url: ${DISCORD_WARNING_WEBHOOK}
+          use_discord_username: true
+          message: '{{ template "discord.message" . }}'
+
+  - orgId: 1
+    name: discord-info
+    receivers:
+      - uid: discord_info
+        type: discord
+        disableResolveMessage: false
+        settings:
+          url: ${DISCORD_INFO_WEBHOOK}
+          use_discord_username: true
+          message: '{{ template "discord.message" . }}'

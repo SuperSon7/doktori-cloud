@@ -1,0 +1,534 @@
+apiVersion: 1
+
+groups:
+  # =========================================================================
+  # Infrastructure — 인프라 장애 감지
+  # =========================================================================
+  - orgId: 1
+    name: Infrastructure
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      # --- Service Down (critical) ---
+      # up 메트릭을 그대로 가져와서 threshold < 1 로 판단
+      # (up==0 필터 방식은 정상 시 빈 결과 → noData 오발)
+      - uid: service_down
+        title: Service Down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+              refId: C
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ or $labels.app $labels.job }}({{ $labels.instance }}) 서비스가 다운됨"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Probe Failure (critical) ---
+      - uid: probe_failure
+        title: Probe Failure
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: probe_success
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+              refId: C
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} 외부 프로브 실패"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Error Rate > 50% (critical) ---
+      - uid: error_rate_critical
+        title: "Error Rate > 50%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (
+                  sum by (app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  /
+                  sum by (app, instance) (rate(http_server_requests_seconds_count[5m]))
+                )
+                and on(instance) up == 1
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.app }}({{ $labels.instance }}) 에러율 50% 초과"
+          dashboard_url: "/d/application"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Disk > 95% (critical) ---
+      - uid: disk_critical
+        title: "Disk > 95%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                1 - (
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                  /
+                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+                )
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.95]
+              refId: C
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} 디스크 95% 초과 ({{ $labels.mountpoint }})"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Memory > 90% (high) ---
+      - uid: memory_high
+        title: "Memory > 90%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.9]
+              refId: C
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "{{ $labels.instance }} 메모리 90% 초과"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- CPU > 80% (warning) ---
+      - uid: cpu_high
+        title: "CPU > 80%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.8]
+              refId: C
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} CPU 80% 초과"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Disk > 80% (warning) ---
+      - uid: disk_warning
+        title: "Disk > 80%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                1 - (
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                  /
+                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+                )
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.8]
+              refId: C
+        for: 10m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} 디스크 80% 초과 ({{ $labels.mountpoint }})"
+          dashboard_url: "/d/infrastructure"
+        noDataState: OK
+        execErrState: Alerting
+
+  # =========================================================================
+  # Application — 앱 레벨 이상 감지
+  # =========================================================================
+  - orgId: 1
+    name: Application
+    folder: Application
+    interval: 1m
+    rules:
+      # --- Error Rate > 10% (high) ---
+      - uid: error_rate_high
+        title: "Error Rate > 10%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  /
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count[5m]))
+                )
+                and on(instance) up == 1
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.1]
+              refId: C
+        for: 3m
+        labels:
+          severity: high
+        annotations:
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) 에러율 10% 초과"
+          dashboard_url: "/d/application"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- p99 > 5s (high) ---
+      - uid: p99_high
+        title: "p99 Latency > 5s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.99,
+                  sum by (le, application, app, instance) (
+                    rate(http_server_requests_seconds_bucket[5m])
+                  )
+                )
+                and on(instance) up == 1
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+              refId: C
+        for: 3m
+        labels:
+          severity: high
+        annotations:
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) p99 지연시간 5초 초과"
+          dashboard_url: "/d/application"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- HikariCP Pending > 0 (high) ---
+      - uid: hikari_pending
+        title: HikariCP Pending Connections
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                hikaricp_connections_pending
+                and on(instance) up == 1
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) HikariCP 대기 커넥션 발생"
+          dashboard_url: "/d/application"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- GC Pause > 500ms (warning) ---
+      - uid: gc_pause_high
+        title: "GC Pause > 500ms"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                jvm_gc_pause_seconds_max
+                and on(instance) up == 1
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) GC pause 500ms 초과"
+          dashboard_url: "/d/application"
+        noDataState: OK
+        execErrState: Alerting
+
+  # =========================================================================
+  # Info — 참고용 알림
+  # =========================================================================
+  - orgId: 1
+    name: Info
+    folder: Info
+    interval: 1m
+    rules:
+      # --- Service Restarted (info) ---
+      - uid: service_restarted
+        title: Service Restarted
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: changes(process_start_time_seconds[5m]) > 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ or $labels.app $labels.job }}({{ $labels.instance }}) 서비스가 재시작됨"
+        noDataState: OK
+        execErrState: OK
+
+      # --- Watchdog (info) — 모니터링 파이프라인 헬스체크 ---
+      # 항상 firing. 멈추면 모니터링 파이프라인 자체 장애.
+      # Discord #alert-normal에 12시간마다 반복 수신됨 → 안 오면 모니터링 죽은 것.
+      - uid: watchdog
+        title: Watchdog
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: vector(1)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: "Watchdog alive — 모니터링 파이프라인 정상"
+        noDataState: Alerting
+        execErrState: Alerting

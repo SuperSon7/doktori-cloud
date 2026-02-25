@@ -1,0 +1,1 @@
+이 문서는 [runbooks/deployment/monitoring-deploy.md](../runbooks/deployment/monitoring-deploy.md)로 이동했습니다.

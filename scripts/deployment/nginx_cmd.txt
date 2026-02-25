@@ -1,0 +1,82 @@
+# Nginx systemd 설정
+# 1. 기존 Nginx 서비스 확인
+systemctl status nginx
+
+# 2. 기존 서비스 파일 백업 (있다면)
+sudo cp /lib/systemd/system/nginx.service /lib/systemd/system/nginx.service.bak 2>/dev/null || true
+
+# 3. 새 서비스 파일 생성
+sudo vim /etc/systemd/system/nginx.service
+# (위의 프로덕션 권장 설정 붙여넣기)
+
+# 4. systemd 리로드
+sudo systemctl daemon-reload
+
+# 5. Nginx 재시작
+sudo systemctl restart nginx
+
+# 6. 부팅 시 자동 시작 활성화
+sudo systemctl enable nginx
+
+# 7. 상태 확인
+sudo systemctl status nginx
+
+### Nginx 설정 파일 적용
+# 1. 메인 설정 백업
+sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+
+# 2. 새 설정 적용
+sudo vim /etc/nginx/nginx.conf
+# (위의 최적화된 설정 적용)
+
+# 3. 사이트 설정 적용
+sudo vim /etc/nginx/sites-available/default
+# (위의 사이트 설정 적용)
+
+# 4. 심볼릭 링크 확인 (없으면 생성)
+sudo ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# 5. 설정 검증
+sudo nginx -t
+
+# 6. Nginx 리로드
+sudo systemctl reload nginx
+
+### 관리 스크립트 설치
+# 1. 스크립트 파일 생성
+sudo vim /usr/local/bin/nginx-reload
+sudo vim /usr/local/bin/nginx-status
+sudo vim /usr/local/bin/nginx-log-analyze
+
+# 2. 실행 권한 부여
+sudo chmod +x /usr/local/bin/nginx-reload
+sudo chmod +x /usr/local/bin/nginx-status
+sudo chmod +x /usr/local/bin/nginx-log-analyze
+
+# 3. 테스트
+nginx-status
+nginx-log-analyze
+```
+
+### 5.4 로그 로테이션 설정
+
+`/etc/logrotate.d/nginx`:
+```
+/var/log/nginx/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data adm
+    sharedscripts
+    prerotate
+        if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+            run-parts /etc/logrotate.d/httpd-prerotate; \
+        fi \
+    endscript
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1 || true
+    endscript
+}

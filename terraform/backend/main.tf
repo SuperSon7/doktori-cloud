@@ -25,14 +25,14 @@ provider "aws" {
 # S3 Bucket for Terraform State
 # -----------------------------------------------------------------------------
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "${var.project_name}-terraform-state"
+  bucket = "${var.project_name}-v2-terraform-state"
 
   lifecycle {
     prevent_destroy = true
   }
 
   tags = {
-    Name = "${var.project_name}-terraform-state"
+    Name = "${var.project_name}-v2-terraform-state"
   }
 }
 
@@ -66,7 +66,7 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
 # DynamoDB Table for State Locking
 # -----------------------------------------------------------------------------
 resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "${var.project_name}-terraform-locks"
+  name         = "${var.project_name}-v2-terraform-locks"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
@@ -76,6 +76,6 @@ resource "aws_dynamodb_table" "terraform_locks" {
   }
 
   tags = {
-    Name = "${var.project_name}-terraform-locks"
+    Name = "${var.project_name}-v2-terraform-locks"
   }
 }
