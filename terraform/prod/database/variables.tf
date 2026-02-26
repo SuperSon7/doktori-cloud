@@ -49,7 +49,7 @@ variable "db_max_allocated_storage" {
 variable "db_name" {
   description = "Initial database name"
   type        = string
-  default     = "doktori"
+  default     = "doktoridb"
 }
 
 variable "db_username" {

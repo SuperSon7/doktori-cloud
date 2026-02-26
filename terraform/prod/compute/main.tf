@@ -388,12 +388,30 @@ resource "aws_security_group" "rds_monitoring" {
 
 # nginx EC2 (Public Subnet - reverse proxy + Let's Encrypt)
 resource "aws_instance" "nginx" {
-  ami                    = data.aws_ami.ubuntu_x86.id
+  ami                    = local.ami_id
   instance_type          = var.nginx_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.nginx.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/nginx_user_data.sh", {
+    project_name       = var.project_name
+    environment        = var.environment
+    domain             = var.domain_name
+    nginx_conf_b64     = base64encode(file("${path.module}/../../../nginx/prod/nginx.conf"))
+    upstream_conf_b64  = base64encode(templatefile("${path.module}/../../../nginx/prod/conf.d/upstream.conf", {
+      api_ip   = aws_instance.api.private_ip
+      chat_ip  = aws_instance.chat.private_ip
+      ai_ip    = aws_instance.ai.private_ip
+      front_ip = aws_instance.front.private_ip
+    }))
+    security_conf_b64  = base64encode(file("${path.module}/../../../nginx/prod/conf.d/security.conf"))
+    metrics_conf_b64   = base64encode(file("${path.module}/../../../nginx/prod/conf.d/metrics.conf"))
+    site_conf_b64      = base64encode(templatefile("${path.module}/../../../nginx/prod/sites-available/default", {
+      domain = var.domain_name
+    }))
+  })
 
   metadata_options {
     http_tokens                 = "required"

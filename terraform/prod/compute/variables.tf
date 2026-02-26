@@ -25,7 +25,7 @@ variable "key_name" {
 variable "nginx_instance_type" {
   description = "Nginx EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t4g.micro"
 }
 
 variable "front_instance_type" {
@@ -68,6 +68,12 @@ variable "custom_ami_id" {
   description = "Custom AMI ID (pre-baked). If empty, uses latest Ubuntu 22.04 arm64 from Canonical."
   type        = string
   default     = ""
+}
+
+variable "domain_name" {
+  description = "Domain name for Nginx SSL and server_name"
+  type        = string
+  default     = "doktori.kr"
 }
 
 variable "state_bucket" {
