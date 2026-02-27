@@ -1,14 +1,14 @@
 # ===========================================================================
 # Doktori Production - Nginx Site Configuration
 # ===========================================================================
-# Rendered by Terraform templatefile() — do not edit manually
-# Upstreams are defined in /etc/nginx/conf.d/upstream.conf
+# Rendered by envsubst at container start — do not edit manually
+# Upstreams defined in /etc/nginx/conf.d/upstream.conf
 # ===========================================================================
 
 # --- HTTP -> HTTPS redirect ---
 server {
     listen 80;
-    server_name ${domain};
+    server_name $DOMAIN;
 
     # Certbot ACME challenge
     location /.well-known/acme-challenge/ {
@@ -24,11 +24,11 @@ server {
 server {
     listen 443 ssl;
     http2 on;
-    server_name ${domain};
+    server_name $DOMAIN;
 
     # SSL (Let's Encrypt)
-    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 

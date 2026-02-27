@@ -206,6 +206,21 @@ resource "aws_ecr_repository" "ai" {
   }
 }
 
+resource "aws_ecr_repository" "nginx" {
+  name                 = "${var.project_name}/nginx"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name    = "${var.project_name}/nginx"
+    Service = "nginx"
+    Part    = "cloud"
+  }
+}
+
 # ECR Lifecycle Policy - keep last 10 images
 resource "aws_ecr_lifecycle_policy" "cleanup" {
   for_each = {
@@ -213,6 +228,7 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
     backend_chat = aws_ecr_repository.backend_chat.name
     frontend     = aws_ecr_repository.frontend.name
     ai           = aws_ecr_repository.ai.name
+    nginx        = aws_ecr_repository.nginx.name
   }
 
   repository = each.value
