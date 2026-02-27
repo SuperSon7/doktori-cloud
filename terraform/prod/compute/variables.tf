@@ -81,3 +81,9 @@ variable "state_bucket" {
   type        = string
   default     = "doktori-v2-terraform-state"
 }
+
+variable "monitoring_ip" {
+  description = "Monitoring server EIP (Alloy remote_write + Loki push 대상)"
+  type        = string
+  default     = "13.125.29.187"
+}

@@ -1,0 +1,73 @@
+# =============================================================================
+# Prod 모니터링 에이전트 — 공통 (front, api, chat, ai)
+#
+# 각 인스턴스에서 Alloy + cAdvisor 2개 컨테이너로 구성
+# network_mode: host → localhost로 앱 컨테이너 메트릭 수집
+#
+# 사용법:
+#   MONITORING_IP=13.125.29.187 docker compose up -d
+# =============================================================================
+
+services:
+  alloy:
+    image: grafana/alloy:v1.9.0
+    container_name: alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    network_mode: host
+    pid: host
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - MONITORING_IP=${MONITORING_IP:-13.125.29.187}
+      - ALLOY_ENV=prod
+      - APP_PORT=${APP_PORT:-0}
+      - INSTANCE_NAME=${INSTANCE_NAME:-unknown}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:latest
+    container_name: cadvisor
+    network_mode: host
+    command: ["-port=9101"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.15'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  alloy-data:

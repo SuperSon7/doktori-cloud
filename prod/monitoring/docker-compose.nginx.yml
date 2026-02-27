@@ -1,0 +1,91 @@
+# =============================================================================
+# Prod 모니터링 에이전트 — nginx 인스턴스 전용
+#
+# Alloy + cAdvisor + nginx-exporter 3개 컨테이너
+# nginx는 --network host로 동작하므로 stub_status는 localhost:8888
+#
+# 사용법:
+#   MONITORING_IP=13.125.29.187 docker compose -f docker-compose.nginx.yml up -d
+# =============================================================================
+
+services:
+  alloy:
+    image: grafana/alloy:v1.9.0
+    container_name: alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    network_mode: host
+    pid: host
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - MONITORING_IP=${MONITORING_IP:-13.125.29.187}
+      - ALLOY_ENV=prod
+      - INSTANCE_NAME=nginx
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:latest
+    container_name: cadvisor
+    network_mode: host
+    command: ["-port=9101"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.15'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4
+    container_name: nginx-exporter
+    network_mode: host
+    command:
+      - --nginx.scrape-uri=http://localhost:8888/nginx_status
+      - --web.listen-address=:9113
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: '0.05'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  alloy-data:

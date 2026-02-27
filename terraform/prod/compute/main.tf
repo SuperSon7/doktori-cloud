@@ -276,13 +276,7 @@ resource "aws_security_group" "api" {
     security_groups = [aws_security_group.nginx.id]
   }
 
-  ingress {
-    description = "Node Exporter from VPC (monitoring)"
-    from_port   = 9100
-    to_port     = 9100
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
+  # node_exporter 9100 ingress 제거됨 — Alloy push 방식으로 전환 (모니터링 서버로 push)
 
   egress {
     description = "Allow all outbound"
@@ -396,22 +390,18 @@ resource "aws_instance" "nginx" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/nginx_user_data.sh", {
-    project_name       = var.project_name
-    environment        = var.environment
-    domain             = var.domain_name
-    nginx_conf_b64     = base64encode(file("${path.module}/../../../nginx/prod/nginx.conf"))
-    upstream_conf_b64  = base64encode(templatefile("${path.module}/../../../nginx/prod/conf.d/upstream.conf", {
-      api_ip   = aws_instance.api.private_ip
-      chat_ip  = aws_instance.chat.private_ip
-      ai_ip    = aws_instance.ai.private_ip
-      front_ip = aws_instance.front.private_ip
-    }))
-    security_conf_b64  = base64encode(file("${path.module}/../../../nginx/prod/conf.d/security.conf"))
-    metrics_conf_b64   = base64encode(file("${path.module}/../../../nginx/prod/conf.d/metrics.conf"))
-    site_conf_b64      = base64encode(templatefile("${path.module}/../../../nginx/prod/sites-available/default", {
-      domain = var.domain_name
-    }))
+    project_name  = var.project_name
+    environment   = var.environment
+    domain        = var.domain_name
+    api_ip        = aws_instance.api.private_ip
+    chat_ip       = aws_instance.chat.private_ip
+    ai_ip         = aws_instance.ai.private_ip
+    front_ip      = aws_instance.front.private_ip
+    aws_region    = var.aws_region
+    monitoring_ip = var.monitoring_ip
   })
+
+  user_data_replace_on_change = false
 
   metadata_options {
     http_tokens                 = "required"
@@ -451,6 +441,16 @@ resource "aws_instance" "front" {
   vpc_security_group_ids = [aws_security_group.front.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "front"
+    app_port      = "3000"
+    monitoring_ip = var.monitoring_ip
+  })
+
+  user_data_replace_on_change = false
+
   metadata_options {
     http_tokens                 = "required"
     http_endpoint               = "enabled"
@@ -480,9 +480,14 @@ resource "aws_instance" "api" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "api"
+    app_port      = "8080"
+    monitoring_ip = var.monitoring_ip
   })
+
+  user_data_replace_on_change = false
 
   metadata_options {
     http_tokens                 = "required"
@@ -513,9 +518,14 @@ resource "aws_instance" "chat" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "chat"
+    app_port      = "8081"
+    monitoring_ip = var.monitoring_ip
   })
+
+  user_data_replace_on_change = false
 
   metadata_options {
     http_tokens                 = "required"
@@ -544,6 +554,16 @@ resource "aws_instance" "ai" {
   subnet_id              = data.terraform_remote_state.networking.outputs.private_app_subnet_id
   vpc_security_group_ids = [aws_security_group.ai.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "ai"
+    app_port      = "8000"
+    monitoring_ip = var.monitoring_ip
+  })
+
+  user_data_replace_on_change = false
 
   metadata_options {
     http_tokens                 = "required"
