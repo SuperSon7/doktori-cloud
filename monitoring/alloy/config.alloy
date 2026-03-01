@@ -68,6 +68,16 @@ prometheus.scrape "nginx" {
   forward_to      = [prometheus.relabel.add_env.receiver]
 }
 
+// ─── cAdvisor 메트릭 (컨테이너별 CPU/Memory/Network) ──────────────────────────
+prometheus.scrape "cadvisor" {
+  targets = [
+    { "__address__" = "cadvisor:8080" },
+  ]
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
 // ─── 공통 라벨 (env, instance, job 정리) ─────────────────────────────────────
 prometheus.relabel "add_env" {
   // env 라벨
