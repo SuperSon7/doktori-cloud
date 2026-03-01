@@ -268,6 +268,24 @@ resource "aws_iam_group_policy" "be_team_ssm" {
         ]
         Resource = "*"
       },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:DeleteParameter",
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters",
+        ]
+        Resource = "*"
+      },
     ]
   })
 }

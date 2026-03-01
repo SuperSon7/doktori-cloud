@@ -62,24 +62,24 @@ resource "aws_subnet" "private_db" {
 resource "aws_subnet" "private_rds" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_rds_subnet_cidr
-  availability_zone = var.rds_availability_zone
+  availability_zone = var.secondary_availability_zone
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-rds"
-    Tier = "private-rds"
+    Tier = "private-db"
   }
 }
 
 # -----------------------------------------------------------------------------
-# NAT Instance
+# NAT Instance (t4g.nano) — 관리형 NAT Gateway 대비 비용 절감
 # -----------------------------------------------------------------------------
-data "aws_ami" "nat" {
+data "aws_ami" "nat_arm64" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"]
+    values = ["amzn2-ami-kernel-*-arm64-gp2"]
   }
 
   filter {
@@ -89,7 +89,7 @@ data "aws_ami" "nat" {
 }
 
 resource "aws_security_group" "nat" {
-  name        = "${var.project_name}-${var.environment}-nat-sg"
+  name_prefix = "${var.project_name}-${var.environment}-nat-"
   description = "NAT instance - forward traffic from private subnets"
   vpc_id      = aws_vpc.main.id
 
@@ -115,11 +115,17 @@ resource "aws_security_group" "nat" {
 }
 
 resource "aws_instance" "nat" {
-  ami                    = data.aws_ami.nat.id
-  instance_type          = var.nat_instance_type
+  ami                    = data.aws_ami.nat_arm64.id
+  instance_type          = "t4g.nano"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.nat.id]
   source_dest_check      = false
+
+  user_data = <<-EOF
+    #!/bin/bash
+    sysctl -w net.ipv4.ip_forward=1
+    iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE
+  EOF
 
   metadata_options {
     http_tokens   = "required"
@@ -132,31 +138,14 @@ resource "aws_instance" "nat" {
     encrypted   = true
   }
 
-  user_data = <<-USERDATA
-    #!/bin/bash
-    set -e
-
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-    sysctl -p
-
-    IFACE=$(ip route get 1.1.1.1 | awk '{print $5; exit}')
-    iptables -t nat -A POSTROUTING -o "$IFACE" -s ${var.vpc_cidr} -j MASQUERADE
-
-    DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent
-    netfilter-persistent save
-  USERDATA
-
   tags = {
     Name    = "${var.project_name}-${var.environment}-nat"
     Service = "nat"
   }
 
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
-
-  depends_on = [aws_internet_gateway.main]
 }
 
 resource "aws_eip" "nat" {
@@ -168,8 +157,8 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_eip_association" "nat" {
-  allocation_id = aws_eip.nat.id
   instance_id   = aws_instance.nat.id
+  allocation_id = aws_eip.nat.id
 }
 
 # -----------------------------------------------------------------------------
@@ -191,13 +180,15 @@ resource "aws_route_table" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block           = "0.0.0.0/0"
-    network_interface_id = aws_instance.nat.primary_network_interface_id
-  }
+  # 0.0.0.0/0 → NAT 인스턴스 라우팅은 Terraform 외부에서 관리
+  # (NAT 인스턴스 교체 시 수동으로 route 업데이트 필요)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-rt"
+  }
+
+  lifecycle {
+    ignore_changes = [route]
   }
 }
 

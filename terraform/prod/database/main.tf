@@ -10,21 +10,33 @@ data "terraform_remote_state" "networking" {
   }
 }
 
-data "terraform_remote_state" "compute" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "prod/compute/terraform.tfstate"
-    region = var.aws_region
-  }
-}
+# -----------------------------------------------------------------------------
+# RDS Security Group
+# -----------------------------------------------------------------------------
+resource "aws_security_group" "rds" {
+  name_prefix = "${var.project_name}-${var.environment}-rds-"
+  description = "RDS MySQL - from app instances only"
+  vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
-data "terraform_remote_state" "storage" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "prod/storage/terraform.tfstate"
-    region = var.aws_region
+  ingress {
+    description = "MySQL from VPC (api, chat)"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-rds-sg"
+    Service = "db"
   }
 }
 
@@ -37,10 +49,9 @@ resource "random_password" "db" {
 }
 
 resource "aws_ssm_parameter" "db_password" {
-  name   = "/${var.project_name}/${var.environment}/db/password"
-  type   = "SecureString"
-  value  = random_password.db.result
-  key_id = data.terraform_remote_state.storage.outputs.kms_key_arn
+  name  = "/${var.project_name}/${var.environment}/db/password"
+  type  = "SecureString"
+  value = random_password.db.result
 
   tags = {
     Name = "${var.project_name}-${var.environment}-db-password"
@@ -107,14 +118,14 @@ resource "aws_db_instance" "main" {
   password = random_password.db.result
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [data.terraform_remote_state.compute.outputs.db_sg_id]
+  vpc_security_group_ids = [aws_security_group.rds.id]
   availability_zone      = var.db_availability_zone
   publicly_accessible    = false
 
   parameter_group_name = aws_db_parameter_group.main.name
 
   backup_retention_period = var.db_backup_retention
-  backup_window           = "18:00-19:00"   # UTC (KST 03:00-04:00)
+  backup_window           = "18:00-19:00"         # UTC (KST 03:00-04:00)
   maintenance_window      = "Mon:19:00-Mon:20:00" # UTC (KST 월 04:00-05:00)
 
   auto_minor_version_upgrade = true
@@ -125,5 +136,9 @@ resource "aws_db_instance" "main" {
   tags = {
     Name    = "${var.project_name}-${var.environment}-mysql"
     Service = "db"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }

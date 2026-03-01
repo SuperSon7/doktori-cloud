@@ -1,39 +1,14 @@
 # ===========================================================================
 # Doktori Production - Nginx Site Configuration
 # ===========================================================================
-# Initial setup:
-#   sed -i 's/__API_IP__/<actual_api_ip>/g' /etc/nginx/sites-available/default
-#   sed -i 's/__CHAT_IP__/<actual_chat_ip>/g' /etc/nginx/sites-available/default
-#   sed -i 's/__AI_IP__/<actual_ai_ip>/g' /etc/nginx/sites-available/default
-#   sed -i 's/__FRONT_IP__/<actual_front_ip>/g' /etc/nginx/sites-available/default
-#   sed -i 's/__DOMAIN__/<actual_domain>/g' /etc/nginx/sites-available/default
-#
-# Blue/Green deployment (CI/CD changes ports only):
-#   API  - blue: 8080, green: 8082
-#   Chat - blue: 8081, green: 8083
+# Rendered by envsubst at container start — do not edit manually
+# Upstreams defined in /etc/nginx/conf.d/upstream.conf
 # ===========================================================================
-
-# --- Upstreams ---
-upstream backend_api {
-    server __API_IP__:8080;
-}
-
-upstream backend_chat {
-    server __CHAT_IP__:8081;
-}
-
-upstream ai {
-    server __AI_IP__:8000;
-}
-
-upstream frontend {
-    server __FRONT_IP__:3000;
-}
 
 # --- HTTP -> HTTPS redirect ---
 server {
     listen 80;
-    server_name __DOMAIN__;
+    server_name $DOMAIN;
 
     # Certbot ACME challenge
     location /.well-known/acme-challenge/ {
@@ -47,12 +22,13 @@ server {
 
 # --- HTTPS server ---
 server {
-    listen 443 ssl http2;
-    server_name __DOMAIN__;
+    listen 443 ssl;
+    http2 on;
+    server_name $DOMAIN;
 
     # SSL (Let's Encrypt)
-    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
@@ -62,20 +38,25 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-    # Block sensitive paths
+    # Bad bot blocking
+    if ($bad_bot) {
+        return 403;
+    }
+
+    # ── Security: block sensitive paths ──
     location ~ /\. { deny all; access_log off; log_not_found off; }
     location ~* \.(env|git|svn|htaccess|htpasswd|ini|log|sql|bak|old|backup|swp|yml|yaml|toml|conf|config)$ {
         deny all; access_log off; log_not_found off;
     }
 
-    # Health checks
+    # ── Health check ──
     location /nginx-health {
         access_log off;
         return 200 "healthy\n";
         add_header Content-Type text/plain;
     }
 
-    # Actuator - internal only
+    # ── Actuator - internal only ──
     location /api/actuator/ {
         allow 127.0.0.1;
         allow 10.0.0.0/8;
@@ -86,7 +67,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    # Chat (WebSocket) - must come before /api/
+    # ── Chat (WebSocket) - must come before /api/ ──
     location /api/chat/ {
         proxy_pass http://backend_chat;
         proxy_http_version 1.1;
@@ -100,7 +81,7 @@ server {
         proxy_send_timeout 3600s;
     }
 
-    # Backend API
+    # ── Backend API ──
     location /api/ {
         limit_req zone=api burst=40 nodelay;
         proxy_pass http://backend_api;
@@ -114,7 +95,14 @@ server {
         proxy_send_timeout 10s;
     }
 
-    # AI service
+    # ── AI Health (prefix 없이 /health로 전달) ──
+    location = /ai/health {
+        proxy_pass http://ai/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # ── AI Service ──
     location /ai/ {
         limit_req zone=api burst=20 nodelay;
         proxy_pass http://ai;
@@ -127,7 +115,7 @@ server {
         proxy_connect_timeout 75s;
     }
 
-    # Frontend (catch-all)
+    # ── Frontend (catch-all) ──
     location / {
         limit_req zone=general burst=100 nodelay;
         proxy_pass http://frontend;

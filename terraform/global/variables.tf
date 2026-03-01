@@ -23,6 +23,7 @@ variable "github_repos" {
     "5-team-service-be",
     "5-team-service-fe",
     "5-team-service-ai",
+    "5-team-service-cloud",
   ]
 }
 

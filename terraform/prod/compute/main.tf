@@ -28,6 +28,21 @@ data "aws_ami" "ubuntu_arm64" {
   }
 }
 
+data "aws_ami" "ubuntu_x86" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 locals {
   # custom_ami_id가 지정되면 사용, 아니면 최신 Ubuntu arm64 AMI 사용
   ami_id = var.custom_ami_id != "" ? var.custom_ami_id : data.aws_ami.ubuntu_arm64.id
@@ -100,7 +115,10 @@ resource "aws_iam_role_policy" "ec2_parameter_store" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*"
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}",
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/${var.environment}/*",
+        ]
       },
       {
         Effect = "Allow"
@@ -148,6 +166,16 @@ resource "aws_iam_role_policy" "ec2_ecr_pull" {
 resource "aws_iam_instance_profile" "ec2_ssm" {
   name = "${var.project_name}-${var.environment}-ec2-ssm"
   role = aws_iam_role.ec2_ssm.name
+}
+
+# -----------------------------------------------------------------------------
+# Data Sources - SGs managed outside this module
+# -----------------------------------------------------------------------------
+data "aws_security_group" "nat" {
+  filter {
+    name   = "tag:Name"
+    values = ["${var.project_name}-${var.environment}-nat-sg"]
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -205,11 +233,27 @@ resource "aws_security_group" "front" {
   }
 
   egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description     = "Allow all outbound via NAT SG"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [data.aws_security_group.nat.id]
+  }
+
+  egress {
+    description = "HTTPS to internet (ECR/S3 fallback)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description     = "HTTPS to VPC endpoints (SSM/ECR)"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [data.terraform_remote_state.networking.outputs.vpc_endpoint_sg_id]
   }
 
   tags = {
@@ -232,13 +276,7 @@ resource "aws_security_group" "api" {
     security_groups = [aws_security_group.nginx.id]
   }
 
-  ingress {
-    description = "Node Exporter from VPC (monitoring)"
-    from_port   = 9100
-    to_port     = 9100
-    protocol    = "tcp"
-    cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
-  }
+  # node_exporter 9100 ingress 제거됨 — Alloy push 방식으로 전환 (모니터링 서버로 push)
 
   egress {
     description = "Allow all outbound"
@@ -310,30 +348,14 @@ resource "aws_security_group" "ai" {
   }
 }
 
-# db SG - from api and chat only
-resource "aws_security_group" "db" {
-  name        = "${var.project_name}-${var.environment}-db-sg"
-  description = "MySQL DB - from api and chat only"
+# rds_monitoring SG - mysqld_exporter
+resource "aws_security_group" "rds_monitoring" {
+  name_prefix = "${var.project_name}-${var.environment}-rds-monitoring-"
+  description = "RDS monitoring collector - mysqld_exporter endpoint"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
   ingress {
-    description     = "MySQL from api"
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api.id]
-  }
-
-  ingress {
-    description     = "MySQL from chat"
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.chat.id]
-  }
-
-  ingress {
-    description = "MySQL Exporter from VPC (monitoring)"
+    description = "MySQL exporter from VPC (monitoring)"
     from_port   = 9104
     to_port     = 9104
     protocol    = "tcp"
@@ -349,8 +371,8 @@ resource "aws_security_group" "db" {
   }
 
   tags = {
-    Name    = "${var.project_name}-${var.environment}-db-sg"
-    Service = "db"
+    Name    = "${var.project_name}-${var.environment}-rds-monitoring-sg"
+    Service = "rds-monitoring"
   }
 }
 
@@ -360,16 +382,31 @@ resource "aws_security_group" "db" {
 
 # nginx EC2 (Public Subnet - reverse proxy + Let's Encrypt)
 resource "aws_instance" "nginx" {
-  ami                    = data.aws_ami.ubuntu_arm64.id
+  ami                    = local.ami_id
   instance_type          = var.nginx_instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.networking.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.nginx.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
+  user_data = templatefile("${path.module}/scripts/nginx_user_data.sh", {
+    project_name  = var.project_name
+    environment   = var.environment
+    domain        = var.domain_name
+    api_ip        = aws_instance.api.private_ip
+    chat_ip       = aws_instance.chat.private_ip
+    ai_ip         = aws_instance.ai.private_ip
+    front_ip      = aws_instance.front.private_ip
+    aws_region    = var.aws_region
+    monitoring_ip = var.monitoring_ip
+  })
+
+  user_data_replace_on_change = false
+
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -405,13 +442,19 @@ resource "aws_instance" "front" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "front"
+    app_port      = "3000"
+    monitoring_ip = var.monitoring_ip
   })
 
+  user_data_replace_on_change = false
+
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -437,13 +480,19 @@ resource "aws_instance" "api" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "api"
+    app_port      = "8080"
+    monitoring_ip = var.monitoring_ip
   })
 
+  user_data_replace_on_change = false
+
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -469,13 +518,19 @@ resource "aws_instance" "chat" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "chat"
+    app_port      = "8081"
+    monitoring_ip = var.monitoring_ip
   })
 
+  user_data_replace_on_change = false
+
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -501,13 +556,19 @@ resource "aws_instance" "ai" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    project_name = var.project_name
-    environment  = var.environment
+    project_name  = var.project_name
+    environment   = var.environment
+    service_name  = "ai"
+    app_port      = "8000"
+    monitoring_ip = var.monitoring_ip
   })
 
+  user_data_replace_on_change = false
+
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
@@ -524,30 +585,31 @@ resource "aws_instance" "ai" {
 }
 
 
-# db EC2 (Private DB Subnet)
-resource "aws_instance" "db" {
-  ami                    = data.aws_ami.ubuntu_arm64.id
-  instance_type          = var.db_instance_type
-  key_name               = var.key_name
-  subnet_id              = data.terraform_remote_state.networking.outputs.private_db_subnet_id
-  vpc_security_group_ids = [aws_security_group.db.id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+# rds_monitoring EC2 (Public Subnet - mysqld_exporter)
+resource "aws_instance" "rds_monitoring" {
+  ami                         = data.aws_ami.ubuntu_x86.id
+  instance_type               = "t3.micro"
+  key_name                    = var.key_name
+  subnet_id                   = data.terraform_remote_state.networking.outputs.public_subnet_id
+  vpc_security_group_ids      = [aws_security_group.rds_monitoring.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_ssm.name
+  associate_public_ip_address = true
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
-    volume_size = var.db_volume_size
+    volume_size = 20
     volume_type = "gp3"
     encrypted   = true
   }
 
   tags = {
-    Name    = "${var.project_name}-${var.environment}-db"
-    Service = "db"
-    Part    = "be"
-    Backup  = "daily"
+    Name    = "${var.project_name}-${var.environment}-rds-monitoring"
+    Service = "rds-monitoring"
+    Part    = "monitoring"
   }
 }

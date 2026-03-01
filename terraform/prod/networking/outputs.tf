@@ -19,23 +19,23 @@ output "private_app_subnet_id" {
 }
 
 output "private_db_subnet_id" {
-  description = "Private DB subnet ID"
+  description = "Private DB subnet ID (ap-northeast-2a)"
   value       = aws_subnet.private_db.id
 }
 
 output "private_rds_subnet_id" {
-  description = "Private RDS subnet ID"
+  description = "Private RDS subnet ID (ap-northeast-2c) - RDS subnet group용"
   value       = aws_subnet.private_rds.id
 }
 
-output "nat_gateway_ip" {
-  description = "NAT public IP"
-  value       = aws_eip.nat.public_ip
+output "nat_instance_id" {
+  description = "NAT instance ID"
+  value       = aws_instance.nat.id
 }
 
-output "nat_instance_id" {
-  description = "NAT Instance ID"
-  value       = aws_instance.nat.id
+output "nat_eip" {
+  description = "NAT instance public IP"
+  value       = aws_eip.nat.public_ip
 }
 
 output "vpc_endpoint_sg_id" {

@@ -223,6 +223,38 @@ resource "aws_security_group" "dev_app" {
     cidr_blocks = [data.terraform_remote_state.networking.outputs.vpc_cidr]
   }
 
+  ingress {
+    description = "SSH from KTB for first setting"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "MySQL from prod VPC for RDS replication"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["10.1.0.0/16"]
+  }
+
+  ingress {
+    description = "RDS replication source public IP"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["15.164.45.30/32"]
+  }
+
+  ingress {
+    description = "Wiremock temporary"
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # Alloy push 전환으로 exporter 인바운드 포트 제거 (9100/9104/9113/9080)
   # Alloy가 내부에서 수집 → 모니터링 서버로 아웃바운드 push (egress만 필요)
 

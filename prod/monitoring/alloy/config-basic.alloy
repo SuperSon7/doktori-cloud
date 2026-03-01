@@ -1,0 +1,126 @@
+// =============================================================================
+// Grafana Alloy — Prod 기본 인스턴스 (front, ai)
+//
+// 수집 항목:
+//   - 호스트 메트릭 (cpu, mem, disk, net)
+//   - cAdvisor 컨테이너 메트릭 (localhost:9101)
+//   - Docker 컨테이너 로그 (alloy, cadvisor 제외)
+//
+// 환경변수:
+//   MONITORING_IP   — 모니터링 서버 EIP (13.125.29.187)
+//   ALLOY_ENV       — prod
+//   INSTANCE_NAME   — front 또는 ai
+// =============================================================================
+
+// ─── 호스트 메트릭 ────────────────────────────────────────────────────────────
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  enable_collectors = [
+    "cpu", "meminfo", "diskstats", "filesystem",
+    "loadavg", "netdev", "uname", "time",
+  ]
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|sys|run|host)($|/)"
+  }
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.add_env.receiver]
+  scrape_interval = "15s"
+}
+
+// ─── cAdvisor 컨테이너 메트릭 ─────────────────────────────────────────────────
+prometheus.scrape "cadvisor" {
+  targets = [
+    { "__address__" = "localhost:9101", "app" = "cadvisor" },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
+// ─── 공통 라벨 (env, instance, job 정리) ─────────────────────────────────────
+prometheus.relabel "add_env" {
+  rule {
+    target_label = "env"
+    replacement  = sys.env("ALLOY_ENV")
+  }
+  rule {
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
+  }
+  rule {
+    source_labels = ["job"]
+    regex         = "prometheus\\.(?:scrape|exporter)\\.(.+?)(?:_metrics)?"
+    target_label  = "job"
+    replacement   = "$1"
+  }
+  rule {
+    source_labels = ["job"]
+    regex         = "(.+)_(.+)"
+    target_label  = "job"
+    replacement   = "$1-$2"
+  }
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+}
+
+// ─── Prometheus Remote Write ──────────────────────────────────────────────────
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://" + sys.env("MONITORING_IP") + ":9090/api/v1/write"
+  }
+}
+
+// =============================================================================
+// 로그 수집
+// =============================================================================
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  // alloy, cadvisor 컨테이너 제외
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/.*(alloy|cadvisor).*"
+    action        = "drop"
+  }
+  // 컨테이너 이름 → app 라벨
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.+)"
+    target_label  = "app"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_logs.output
+  forward_to = [loki.relabel.add_env.receiver]
+}
+
+loki.relabel "add_env" {
+  rule {
+    target_label = "env"
+    replacement  = sys.env("ALLOY_ENV")
+  }
+  rule {
+    source_labels = ["app"]
+    regex         = "(.+)"
+    target_label  = "instance"
+  }
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url = "http://" + sys.env("MONITORING_IP") + ":3100/loki/api/v1/push"
+  }
+}

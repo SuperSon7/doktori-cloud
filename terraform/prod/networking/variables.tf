@@ -47,19 +47,13 @@ variable "private_rds_subnet_cidr" {
 }
 
 variable "availability_zone" {
-  description = "Availability zone"
+  description = "Primary availability zone"
   type        = string
   default     = "ap-northeast-2a"
 }
 
-variable "rds_availability_zone" {
-  description = "Availability zone for RDS private subnet"
+variable "secondary_availability_zone" {
+  description = "Secondary availability zone (RDS subnet group requires 2 AZs)"
   type        = string
   default     = "ap-northeast-2c"
-}
-
-variable "nat_instance_type" {
-  description = "NAT instance type"
-  type        = string
-  default     = "t4g.nano"
 }

@@ -50,7 +50,7 @@ scrape_configs:
         labels:
           env: dev
       - targets:
-          - https://doktori.kr/api/health
+          - https://doktori.kr/api/actuator/health
           - https://doktori.kr/nginx-health
         labels:
           env: prod
