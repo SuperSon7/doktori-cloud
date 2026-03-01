@@ -48,16 +48,6 @@ output "ai_private_ip" {
   value       = aws_instance.ai.private_ip
 }
 
-output "db_instance_id" {
-  description = "DB EC2 instance ID"
-  value       = aws_instance.db.id
-}
-
-output "db_private_ip" {
-  description = "DB EC2 private IP"
-  value       = aws_instance.db.private_ip
-}
-
 output "nginx_sg_id" {
   description = "Nginx security group ID"
   value       = aws_security_group.nginx.id

@@ -84,7 +84,10 @@ Thumbs.db
 logs/
 
 
-.github/workflows/
+scripts/
+!terraform/**/scripts/
+.github/workflows/*
+!.github/workflows/monitoring/
 .github/dependabot.yml
 
 # =============================================================================
@@ -104,3 +107,8 @@ load-tests/result/
 Frontend/
 Backend/
 AI/
+
+# =============================================================================
+# Local Docs
+# =============================================================================
+docs/

@@ -156,7 +156,7 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 
 # nginx SG - public facing
 resource "aws_security_group" "nginx" {
-  name_prefix = "${var.project_name}-${var.environment}-nginx-"
+  name        = "${var.project_name}-${var.environment}-nginx-sg"
   description = "Nginx reverse proxy - public HTTP/HTTPS"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -192,7 +192,7 @@ resource "aws_security_group" "nginx" {
 
 # front SG - from nginx only
 resource "aws_security_group" "front" {
-  name_prefix = "${var.project_name}-${var.environment}-front-"
+  name        = "${var.project_name}-${var.environment}-front-sg"
   description = "Frontend - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -220,7 +220,7 @@ resource "aws_security_group" "front" {
 
 # api SG - from nginx only (8080=blue, 8082=green)
 resource "aws_security_group" "api" {
-  name_prefix = "${var.project_name}-${var.environment}-api-"
+  name        = "${var.project_name}-${var.environment}-api-sg"
   description = "API server - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -256,7 +256,7 @@ resource "aws_security_group" "api" {
 
 # chat SG - from nginx only (8081=blue, 8083=green)
 resource "aws_security_group" "chat" {
-  name_prefix = "${var.project_name}-${var.environment}-chat-"
+  name        = "${var.project_name}-${var.environment}-chat-sg"
   description = "Chat server - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -284,7 +284,7 @@ resource "aws_security_group" "chat" {
 
 # ai SG - from nginx only
 resource "aws_security_group" "ai" {
-  name_prefix = "${var.project_name}-${var.environment}-ai-"
+  name        = "${var.project_name}-${var.environment}-ai-sg"
   description = "AI server - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -312,7 +312,7 @@ resource "aws_security_group" "ai" {
 
 # db SG - from api and chat only
 resource "aws_security_group" "db" {
-  name_prefix = "${var.project_name}-${var.environment}-db-"
+  name        = "${var.project_name}-${var.environment}-db-sg"
   description = "MySQL DB - from api and chat only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
 
@@ -522,6 +522,7 @@ resource "aws_instance" "ai" {
     Part    = "ai"
   }
 }
+
 
 # db EC2 (Private DB Subnet)
 resource "aws_instance" "db" {

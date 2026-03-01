@@ -45,3 +45,15 @@ variable "team_members" {
   }))
   default = {}
 }
+
+variable "static_bucket_name" {
+  description = "Static bucket name for CDN deployment permissions"
+  type        = string
+  default     = null
+}
+
+variable "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID for invalidation permissions"
+  type        = string
+  default     = null
+}

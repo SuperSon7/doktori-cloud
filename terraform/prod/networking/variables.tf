@@ -40,8 +40,26 @@ variable "private_db_subnet_cidr" {
   default     = "10.1.32.0/24"
 }
 
+variable "private_rds_subnet_cidr" {
+  description = "CIDR block for private RDS subnet"
+  type        = string
+  default     = "10.1.40.0/24"
+}
+
 variable "availability_zone" {
   description = "Availability zone"
   type        = string
   default     = "ap-northeast-2a"
+}
+
+variable "rds_availability_zone" {
+  description = "Availability zone for RDS private subnet"
+  type        = string
+  default     = "ap-northeast-2c"
+}
+
+variable "nat_instance_type" {
+  description = "NAT instance type"
+  type        = string
+  default     = "t4g.nano"
 }
