@@ -310,6 +310,28 @@ resource "aws_iam_role_policy" "loki_s3" {
 }
 
 # -----------------------------------------------------------------------------
+# IAM Inline Policy - CloudWatch 읽기 (Grafana → RDS 메트릭)
+# -----------------------------------------------------------------------------
+resource "aws_iam_role_policy" "cloudwatch_read" {
+  name = "${var.project_name}-monitoring-cloudwatch-read"
+  role = aws_iam_role.monitoring.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "cloudwatch:DescribeAlarms"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+# -----------------------------------------------------------------------------
 # Elastic IP - 타겟 서버 SG/설정에서 이 IP를 참조
 # -----------------------------------------------------------------------------
 resource "aws_eip" "monitoring" {
