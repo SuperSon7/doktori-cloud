@@ -16,19 +16,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Prod System — USE",
-      "type": "link",
-      "url": "/d/prod-system/prod-system"
-    }
-  ],
+  "links": [],
   "panels": [
     {
       "collapsed": false,
@@ -53,7 +41,7 @@
       "id": 1,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(up{app=\"api\", env=\"$env\"})", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "up{app=\"api\", env=\"$env\"}", "legendFormat": "", "refId": "A" }
       ],
       "title": "API Status",
       "type": "stat"
@@ -74,7 +62,7 @@
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(up{app=\"chat\", env=\"$env\"})", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "up{app=\"chat\", env=\"$env\"}", "legendFormat": "", "refId": "A" }
       ],
       "title": "Chat Status",
       "type": "stat"
@@ -358,7 +346,7 @@
       "id": 13,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
-        "content": "### Quick Links\n\n| [JVM - API](/d/jvm-api/jvm-api) | [JVM - Chat](/d/jvm-chat/jvm-chat) | [HTTP RED](/d/http-red/http-red) | [Nginx](/d/nginx-observability/nginx-observability) | [MySQL](/d/mysql/mysql) | [System - Dev](/d/dev-ec2-resource/dev-ec2-resource) | [System - Prod](/d/prod-ec2-resource/prod-ec2-resource) | [Prod USE](/d/prod-system/prod-system) | [Logs](/d/logs/logs) |",
+        "content": "### Quick Links\n\n| [JVM - API](/d/jvm-api/jvm-api) | [JVM - Chat](/d/jvm-chat/jvm-chat) | [HTTP RED](/d/http-red/http-red) | [Nginx](/d/nginx-observability/nginx-observability) | [MySQL](/d/mysql/mysql) | [System - Dev](/d/dev-ec2-resource/dev-ec2-resource) | [System - Prod](/d/prod-ec2-resource/prod-ec2-resource) | [Logs](/d/logs/logs) |",
         "mode": "markdown"
       },
       "title": "",
