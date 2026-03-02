@@ -93,8 +93,8 @@ resource "aws_iam_role_policy" "ec2_s3_access" {
           "s3:ListBucket",
         ]
         Resource = [
-          "arn:aws:s3:::${var.project_name}-${var.environment}-*",
-          "arn:aws:s3:::${var.project_name}-${var.environment}-*/*",
+          "arn:aws:s3:::${var.project_name}-v2-${var.environment}",
+          "arn:aws:s3:::${var.project_name}-v2-${var.environment}/*",
         ]
       },
     ]
@@ -223,6 +223,14 @@ resource "aws_security_group" "front" {
   name_prefix = "${var.project_name}-${var.environment}-front-"
   description = "Frontend - from nginx only"
   vpc_id      = data.terraform_remote_state.networking.outputs.vpc_id
+
+  ingress {
+    description     = "Frontend green from prod-nginx"
+    from_port       = 3001
+    to_port         = 3001
+    protocol        = "tcp"
+    security_groups = [aws_security_group.nginx.id]
+  }
 
   ingress {
     description     = "HTTP from nginx"
@@ -444,9 +452,10 @@ resource "aws_instance" "front" {
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
     project_name  = var.project_name
     environment   = var.environment
-    service_name  = "front"
-    app_port      = "3000"
-    monitoring_ip = var.monitoring_ip
+    service_name   = "front"
+    app_port_blue  = "3000"
+    app_port_green = "3001"
+    monitoring_ip  = var.monitoring_ip
   })
 
   user_data_replace_on_change = false
@@ -482,9 +491,10 @@ resource "aws_instance" "api" {
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
     project_name  = var.project_name
     environment   = var.environment
-    service_name  = "api"
-    app_port      = "8080"
-    monitoring_ip = var.monitoring_ip
+    service_name   = "api"
+    app_port_blue  = "8080"
+    app_port_green = "8082"
+    monitoring_ip  = var.monitoring_ip
   })
 
   user_data_replace_on_change = false
@@ -520,9 +530,10 @@ resource "aws_instance" "chat" {
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
     project_name  = var.project_name
     environment   = var.environment
-    service_name  = "chat"
-    app_port      = "8081"
-    monitoring_ip = var.monitoring_ip
+    service_name   = "chat"
+    app_port_blue  = "8081"
+    app_port_green = "8083"
+    monitoring_ip  = var.monitoring_ip
   })
 
   user_data_replace_on_change = false
@@ -558,9 +569,10 @@ resource "aws_instance" "ai" {
   user_data = templatefile("${path.module}/scripts/user_data.sh", {
     project_name  = var.project_name
     environment   = var.environment
-    service_name  = "ai"
-    app_port      = "8000"
-    monitoring_ip = var.monitoring_ip
+    service_name   = "ai"
+    app_port_blue  = "8000"
+    app_port_green = "8000"
+    monitoring_ip  = var.monitoring_ip
   })
 
   user_data_replace_on_change = false

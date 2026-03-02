@@ -43,13 +43,13 @@ variable "api_instance_type" {
 variable "chat_instance_type" {
   description = "Chat EC2 instance type"
   type        = string
-  default     = "t4g.micro"
+  default     = "t4g.medium"
 }
 
 variable "ai_instance_type" {
   description = "AI EC2 instance type"
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.medium"
 }
 
 variable "db_instance_type" {

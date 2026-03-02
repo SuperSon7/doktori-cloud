@@ -124,7 +124,8 @@ services:
     environment:
       - MONITORING_IP=__MONITORING_IP__
       - ALLOY_ENV=prod
-      - APP_PORT=__APP_PORT__
+      - APP_PORT_BLUE=__APP_PORT_BLUE__
+      - APP_PORT_GREEN=__APP_PORT_GREEN__
       - INSTANCE_NAME=__INSTANCE_NAME__
     restart: unless-stopped
     logging:
@@ -160,7 +161,8 @@ MONCOMPOSEEOF
 
 # 플레이스홀더 → 실제 값 치환
 sed -i "s/__MONITORING_IP__/${monitoring_ip}/g" /home/ubuntu/monitoring/docker-compose.yml
-sed -i "s/__APP_PORT__/${app_port}/g" /home/ubuntu/monitoring/docker-compose.yml
+rsed -i "s/__APP_PORT_BLUE__/${app_port_blue}/g" /home/ubuntu/monitoring/docker-compose.yml
+sed -i "s/__APP_PORT_GREEN__/${app_port_green}/g" /home/ubuntu/monitoring/docker-compose.yml
 sed -i "s/__INSTANCE_NAME__/${service_name}/g" /home/ubuntu/monitoring/docker-compose.yml
 
 # Alloy config — service_name에 따라 spring(api/chat) 또는 basic(front/ai)
@@ -196,7 +198,8 @@ prometheus.scrape "cadvisor" {
 
 prometheus.scrape "spring_boot" {
   targets = [
-    { "__address__" = "localhost:" + sys.env("APP_PORT"), "app" = sys.env("INSTANCE_NAME") },
+    { "__address__" = "localhost:" + sys.env("APP_PORT_BLUE"),  "app" = sys.env("INSTANCE_NAME"), "slot" = "blue" },
+    { "__address__" = "localhost:" + sys.env("APP_PORT_GREEN"), "app" = sys.env("INSTANCE_NAME"), "slot" = "green" },
   ]
   metrics_path    = "/api/actuator/prometheus"
   scrape_interval = "15s"
@@ -249,6 +252,24 @@ discovery.relabel "docker_logs" {
     source_labels = ["__meta_docker_container_name"]
     regex         = "/(.+)"
     target_label  = "app"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/doktori-api-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "api"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/doktori-chat-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "chat"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/frontend-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "frontend"
   }
 }
 
@@ -353,6 +374,24 @@ discovery.relabel "docker_logs" {
     source_labels = ["__meta_docker_container_name"]
     regex         = "/(.+)"
     target_label  = "app"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/doktori-api-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "api"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/doktori-chat-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "chat"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/frontend-(?:blue|green)"
+    target_label  = "app"
+    replacement   = "frontend"
   }
 }
 
