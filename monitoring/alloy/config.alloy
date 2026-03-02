@@ -132,6 +132,13 @@ discovery.relabel "docker_logs" {
     regex         = "/[^-]+-([^-]+)-.*"
     target_label  = "app"
   }
+  // backend → api 라벨 통일 (메트릭은 이미 app=api 사용)
+  rule {
+    source_labels = ["app"]
+    regex         = "backend"
+    target_label  = "app"
+    replacement   = "api"
+  }
 }
 
 loki.source.docker "containers" {

@@ -214,14 +214,14 @@
         "name": "app",
         "options": [
           { "selected": true, "text": "All", "value": "$__all" },
-          { "selected": false, "text": "backend", "value": "backend" },
+          { "selected": false, "text": "api", "value": "api" },
           { "selected": false, "text": "chat", "value": "chat" },
           { "selected": false, "text": "ai", "value": "ai" },
           { "selected": false, "text": "frontend", "value": "frontend" },
           { "selected": false, "text": "nginx", "value": "nginx" },
           { "selected": false, "text": "mysql", "value": "mysql" }
         ],
-        "query": "backend,chat,ai,frontend,nginx,mysql",
+        "query": "api,chat,ai,frontend,nginx,mysql",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
