@@ -22,7 +22,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up
+              expr: max by (job, app, instance, env) (up{env="prod"})
               instant: true
               refId: A
           - refId: C
@@ -58,7 +58,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: probe_success
+              expr: probe_success{env="prod"}
               instant: true
               refId: A
           - refId: C
@@ -96,11 +96,11 @@ groups:
             model:
               expr: |
                 (
-                  sum by (app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  sum by (app, instance) (rate(http_server_requests_seconds_count{status=~"5..", env="prod"}[5m]))
                   /
-                  sum by (app, instance) (rate(http_server_requests_seconds_count[5m]))
+                  sum by (app, instance) (rate(http_server_requests_seconds_count{env="prod"}[5m]))
                 )
-                and on(instance) up == 1
+                and on(instance) up{env="prod"} == 1
               instant: true
               refId: A
           - refId: C
@@ -138,9 +138,9 @@ groups:
             model:
               expr: |
                 1 - (
-                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay", env="prod"}
                   /
-                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay", env="prod"}
                 )
               instant: true
               refId: A
@@ -179,7 +179,7 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+                1 - node_memory_MemAvailable_bytes{env="prod"} / node_memory_MemTotal_bytes{env="prod"}
               instant: true
               refId: A
           - refId: C
@@ -217,7 +217,7 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))
+                1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle", env="prod"}[5m]))
               instant: true
               refId: A
           - refId: C
@@ -256,9 +256,9 @@ groups:
             model:
               expr: |
                 1 - (
-                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay", env="prod"}
                   /
-                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay", env="prod"}
                 )
               instant: true
               refId: A
@@ -313,6 +313,16 @@ groups:
               region: ap-northeast-2
               statistic: Average
               type: timeSeriesQuery
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
           - refId: C
             relativeTimeRange:
               from: 0
@@ -320,7 +330,7 @@ groups:
             datasourceUid: __expr__
             model:
               type: threshold
-              expression: A
+              expression: B
               conditions:
                 - evaluator:
                     type: lt
@@ -355,6 +365,16 @@ groups:
               region: ap-northeast-2
               statistic: Average
               type: timeSeriesQuery
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
           - refId: C
             relativeTimeRange:
               from: 0
@@ -362,7 +382,7 @@ groups:
             datasourceUid: __expr__
             model:
               type: threshold
-              expression: A
+              expression: B
               conditions:
                 - evaluator:
                     type: gt
@@ -397,6 +417,16 @@ groups:
               region: ap-northeast-2
               statistic: Average
               type: timeSeriesQuery
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
           - refId: C
             relativeTimeRange:
               from: 0
@@ -404,7 +434,7 @@ groups:
             datasourceUid: __expr__
             model:
               type: threshold
-              expression: A
+              expression: B
               conditions:
                 - evaluator:
                     type: lt
@@ -439,6 +469,16 @@ groups:
               region: ap-northeast-2
               statistic: Average
               type: timeSeriesQuery
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
           - refId: C
             relativeTimeRange:
               from: 0
@@ -446,7 +486,7 @@ groups:
             datasourceUid: __expr__
             model:
               type: threshold
-              expression: A
+              expression: B
               conditions:
                 - evaluator:
                     type: lt
@@ -482,11 +522,11 @@ groups:
             model:
               expr: |
                 (
-                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{status=~"5..", env="prod"}[5m]))
                   /
-                  sum by (application, app, instance) (rate(http_server_requests_seconds_count[5m]))
+                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{env="prod"}[5m]))
                 )
-                and on(instance) up == 1
+                and on(instance) up{env="prod"} == 1
               instant: true
               refId: A
           - refId: C
@@ -525,10 +565,10 @@ groups:
               expr: |
                 histogram_quantile(0.99,
                   sum by (le, application, app, instance) (
-                    rate(http_server_requests_seconds_bucket[5m])
+                    rate(http_server_requests_seconds_bucket{env="prod"}[5m])
                   )
                 )
-                and on(instance) up == 1
+                and on(instance) up{env="prod"} == 1
               instant: true
               refId: A
           - refId: C
@@ -565,8 +605,8 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                hikaricp_connections_pending
-                and on(instance) up == 1
+                hikaricp_connections_pending{env="prod"}
+                and on(instance) up{env="prod"} == 1
               instant: true
               refId: A
           - refId: C
@@ -603,8 +643,8 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                jvm_gc_pause_seconds_max
-                and on(instance) up == 1
+                jvm_gc_pause_seconds_max{env="prod"}
+                and on(instance) up{env="prod"} == 1
               instant: true
               refId: A
           - refId: C
@@ -648,7 +688,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: changes(process_start_time_seconds[5m]) > 0
+              expr: changes(process_start_time_seconds{env="prod"}[5m]) > 0
               instant: true
               refId: A
           - refId: C
