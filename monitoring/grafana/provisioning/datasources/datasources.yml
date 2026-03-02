@@ -28,3 +28,14 @@ datasources:
       manageAlerts: true
     version: 1
     editable: false
+
+  - name: CloudWatch
+    type: cloudwatch
+    access: proxy
+    orgId: 1
+    uid: cloudwatch
+    jsonData:
+      authType: default          # EC2 인스턴스 프로필 사용
+      defaultRegion: ap-northeast-2
+    version: 1
+    editable: false

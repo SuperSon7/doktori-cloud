@@ -286,6 +286,182 @@ groups:
         execErrState: Alerting
 
   # =========================================================================
+  # RDS — CloudWatch 기반 RDS 모니터링
+  # =========================================================================
+  - orgId: 1
+    name: RDS
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      # --- RDS Storage < 20% (critical) ---
+      - uid: rds_storage_low
+        title: "RDS Storage < 20%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: cloudwatch
+            model:
+              dimensions:
+                DBInstanceIdentifier: ["doktori-prod-mysql"]
+              metricName: FreeStorageSpace
+              namespace: AWS/RDS
+              period: "300"
+              refId: A
+              region: ap-northeast-2
+              statistic: Average
+              type: timeSeriesQuery
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [4294967296]
+              refId: C
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RDS doktori-prod-mysql 스토리지 잔여 20% 미만 (< 4GB)"
+          dashboard_url: "/d/rds-cloudwatch"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- RDS CPU > 80% (warning) ---
+      - uid: rds_cpu_high
+        title: "RDS CPU > 80%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: cloudwatch
+            model:
+              dimensions:
+                DBInstanceIdentifier: ["doktori-prod-mysql"]
+              metricName: CPUUtilization
+              namespace: AWS/RDS
+              period: "300"
+              refId: A
+              region: ap-northeast-2
+              statistic: Average
+              type: timeSeriesQuery
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RDS doktori-prod-mysql CPU 80% 초과"
+          dashboard_url: "/d/rds-cloudwatch"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- RDS CPU Credits Low (warning) ---
+      - uid: rds_cpu_credits_low
+        title: "RDS CPU Credits Low"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: cloudwatch
+            model:
+              dimensions:
+                DBInstanceIdentifier: ["doktori-prod-mysql"]
+              metricName: CPUCreditBalance
+              namespace: AWS/RDS
+              period: "300"
+              refId: A
+              region: ap-northeast-2
+              statistic: Average
+              type: timeSeriesQuery
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [30]
+              refId: C
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RDS doktori-prod-mysql CPU 크레딧 잔량 30 미만"
+          dashboard_url: "/d/rds-cloudwatch"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- RDS FreeableMemory Low (high) ---
+      - uid: rds_memory_low
+        title: "RDS FreeableMemory Low"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: cloudwatch
+            model:
+              dimensions:
+                DBInstanceIdentifier: ["doktori-prod-mysql"]
+              metricName: FreeableMemory
+              namespace: AWS/RDS
+              period: "300"
+              refId: A
+              region: ap-northeast-2
+              statistic: Average
+              type: timeSeriesQuery
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [209715200]
+              refId: C
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "RDS doktori-prod-mysql 가용 메모리 200MB 미만"
+          dashboard_url: "/d/rds-cloudwatch"
+        noDataState: OK
+        execErrState: Alerting
+
+  # =========================================================================
   # Application — 앱 레벨 이상 감지
   # =========================================================================
   - orgId: 1
