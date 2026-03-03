@@ -688,7 +688,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: changes(process_start_time_seconds{env="prod"}[5m]) > 0
+              expr: changes(process_start_time_seconds{env="prod", app=~"api|chat|ai"}[5m]) > 0
               instant: true
               refId: A
           - refId: C
