@@ -27,6 +27,15 @@ scrape_configs:
       - targets: ["prometheus:9090"]
 
   # ──────────────────────────────────────────────
+  # cAdvisor — 모니터링 서버 컨테이너 리소스 메트릭
+  # ──────────────────────────────────────────────
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          env: monitoring
+
+  # ──────────────────────────────────────────────
   # Blackbox Exporter — 외부 엔드포인트 가용성 프로빙
   # 유일하게 Pull 유지: 모니터링 서버 → HTTPS URL
   # ──────────────────────────────────────────────

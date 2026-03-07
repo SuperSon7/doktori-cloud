@@ -1,0 +1,361 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Memory",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "컨테이너별 실제 메모리 사용량 (Working Set). OOM Kill 판단 기준이 되는 메트릭.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "Container Memory Usage (Working Set)",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "container_memory_working_set_bytes{env=~\"$env\", name=~\"$container\", name!=\"\"}",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "메모리 사용률 = Working Set / Limit. 100%에 가까우면 OOM Kill 위험.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "orange", "value": 85 },
+              { "color": "red", "value": 95 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": {
+        "displayMode": "basic",
+        "maxVizHeight": 50,
+        "minVizHeight": 20,
+        "minVizWidth": 0,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "title": "Memory Usage vs Limit (%)",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "100 * container_memory_working_set_bytes{env=~\"$env\", name=~\"$container\", name!=\"\"} / container_spec_memory_limit_bytes{env=~\"$env\", name=~\"$container\", name!=\"\"} > 0",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 101,
+      "title": "CPU",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "컨테이너별 CPU 사용률. 코어 수 기준 (1.0 = 1 vCPU 100%).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "cores",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "Container CPU Usage (cores)",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(container_cpu_usage_seconds_total{env=~\"$env\", name=~\"$container\", name!=\"\"}[1m])",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "CPU 스로틀링 비율. 높으면 CPU limit이 부족하다는 의미.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "CPU Throttling Rate",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(container_cpu_cfs_throttled_seconds_total{env=~\"$env\", name=~\"$container\", name!=\"\"}[1m]) / rate(container_cpu_usage_seconds_total{env=~\"$env\", name=~\"$container\", name!=\"\"}[1m])",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 102,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "컨테이너별 네트워크 수신 속도.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 23 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "Network Receive Rate",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(container_network_receive_bytes_total{env=~\"$env\", name=~\"$container\", name!=\"\"}[1m])",
+          "legendFormat": "{{name}} rx",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "컨테이너별 네트워크 송신 속도.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 23 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "Network Transmit Rate",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(container_network_transmit_bytes_total{env=~\"$env\", name=~\"$container\", name!=\"\"}[1m])",
+          "legendFormat": "{{name}} tx",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["docker", "containers", "resources"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "dev", "value": "dev" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Environment",
+        "multi": true,
+        "name": "env",
+        "options": [
+          { "selected": true, "text": "dev", "value": "dev" },
+          { "selected": false, "text": "prod", "value": "prod" },
+          { "selected": false, "text": "monitoring", "value": "monitoring" }
+        ],
+        "query": "dev,prod,monitoring",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(container_memory_working_set_bytes{env=~\"$env\", name!=\"\"}, name)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Container",
+        "multi": true,
+        "name": "container",
+        "query": { "qryType": 1, "query": "label_values(container_memory_working_set_bytes{env=~\"$env\", name!=\"\"}, name)" },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Seoul",
+  "title": "Docker Container Resources",
+  "uid": "container-resources",
+  "version": 1
+}

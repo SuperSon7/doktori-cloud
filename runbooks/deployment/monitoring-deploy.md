@@ -245,6 +245,61 @@ sudo systemctl start node_exporter mysqld_exporter nginx-exporter promtail
 | Grafana 접속 불가 | admin CIDR 미등록 | `allowed_admin_cidrs` 업데이트 |
 | 메트릭에 `env` 라벨 없음 | `ALLOY_ENV` 환경변수 누락 | docker-compose.dev.yml의 alloy environment 확인 |
 
+## CI/CD 자동 배포
+
+`monitoring/` 하위 파일을 `main` 브랜치에 push하면 GitHub Actions가 자동으로 배포한다.
+
+워크플로우: `.github/workflows/monitoring/monitoring-cd.yaml`
+
+### 동작 방식
+
+1. 변경된 파일을 감지하여 SCP로 모니터링 서버에 전송
+2. 변경 영역에 따라 최소한의 서비스만 재시작:
+
+| 변경 영역 | 동작 |
+|-----------|------|
+| `docker-compose.yml` | `docker compose up -d` (전체 재생성) |
+| `prometheus/**` | `curl -X POST localhost:9090/-/reload` (hot reload) |
+| `loki/**` | `docker compose restart loki` |
+| `grafana/provisioning/alerting/**` | `docker compose restart grafana` |
+| `grafana/dashboards/**` | 재시작 불필요 (30초 자동 반영) |
+
+3. Discord로 배포 결과 알림
+
+### 필요 Secrets
+
+| Secret | 설명 |
+|--------|------|
+| `MONITORING_EC2_HOST` | 모니터링 서버 EIP |
+| `MONITORING_SSH_KEY` | SSH 키 (doktori-monitoring.pem 내용) |
+| `EC2_USERNAME` | ubuntu (기존 재사용) |
+| `DISCORD_WEBHOOK_URL` | 기존 재사용 |
+
+### CI/CD 불가 시 수동 배포
+
+CI/CD가 동작하지 않거나 긴급 수정이 필요한 경우:
+
+```bash
+# 1. 파일 전송
+scp -i ~/.ssh/doktori-monitoring.pem -r \
+  Cloud/monitoring/ ubuntu@<MONITORING_EIP>:~/
+
+# 2. 서비스 재시작 (변경 내용에 따라 선택)
+ssh -i ~/.ssh/doktori-monitoring.pem ubuntu@<MONITORING_EIP>
+
+# Prometheus hot reload
+curl -X POST http://localhost:9090/-/reload
+
+# Loki 재시작
+cd ~/monitoring && docker compose restart loki
+
+# Grafana 재시작 (alerting 변경 시)
+cd ~/monitoring && docker compose restart grafana
+
+# 전체 재생성 (docker-compose.yml 변경 시)
+cd ~/monitoring && docker compose up -d
+```
+
 ## What's next
 
 - [Instance setup guide](../compute/instance-setup.md)

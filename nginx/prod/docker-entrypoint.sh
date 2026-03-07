@@ -1,10 +1,22 @@
 #!/bin/sh
 set -e
 
-# upstream.conf — IP 변수만 치환 (nginx $host 등은 보존)
-envsubst '$API_IP $CHAT_IP $AI_IP $FRONT_IP' \
-  < /etc/nginx/templates/upstream.conf.template \
-  > /etc/nginx/conf.d/upstream.conf
+# Upstream templates — 서비스별 분리, 각각 필요한 변수만 치환
+envsubst '$API_IP' \
+  < /etc/nginx/templates/upstream-api.conf.template \
+  > /etc/nginx/conf.d/upstream-api.conf
+
+envsubst '$CHAT_IP' \
+  < /etc/nginx/templates/upstream-chat.conf.template \
+  > /etc/nginx/conf.d/upstream-chat.conf
+
+envsubst '$AI_IP' \
+  < /etc/nginx/templates/upstream-ai.conf.template \
+  > /etc/nginx/conf.d/upstream-ai.conf
+
+envsubst '$FRONT_IP' \
+  < /etc/nginx/templates/upstream-frontend.conf.template \
+  > /etc/nginx/conf.d/upstream-frontend.conf
 
 # default site — DOMAIN만 치환
 envsubst '$DOMAIN' \
