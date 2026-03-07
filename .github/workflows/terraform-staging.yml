@@ -60,7 +60,7 @@ jobs:
       - name: Terraform Init & Apply — staging/base
         working-directory: terraform/environments/staging/base
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
           terraform plan -out=tfplan
           terraform apply tfplan
 
@@ -100,7 +100,7 @@ jobs:
       - name: Terraform Init & Apply — staging/${{ matrix.layer }}
         working-directory: terraform/environments/staging/${{ matrix.layer }}
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
           terraform plan -out=tfplan
           terraform apply tfplan
 
@@ -330,7 +330,7 @@ jobs:
       - name: "Scale staging/app → ${{ inputs.scale_profile }}"
         working-directory: terraform/environments/staging/app
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
           VARFILE=""
           if [ "${{ inputs.scale_profile }}" = "prod" ]; then
             VARFILE="-var-file=../prod-spec.tfvars"
@@ -375,7 +375,7 @@ jobs:
       - name: Terraform Destroy — staging/data
         working-directory: terraform/environments/staging/data
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
 
           # Remove RDS from state to bypass prevent_destroy lifecycle
           terraform state rm 'module.database.aws_db_instance.main' || true
@@ -414,7 +414,7 @@ jobs:
       - name: Terraform Destroy — staging/app
         working-directory: terraform/environments/staging/app
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
           terraform destroy -auto-approve
 
       - name: Notify Discord
@@ -449,7 +449,7 @@ jobs:
       - name: Terraform Destroy — staging/base
         working-directory: terraform/environments/staging/base
         run: |
-          terraform init -backend-config=../../backend.hcl
+          terraform init -backend-config=../../../backend.hcl
           terraform destroy -auto-approve
 
       - name: Notify Discord

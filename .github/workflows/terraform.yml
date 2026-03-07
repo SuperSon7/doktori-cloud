@@ -98,7 +98,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform init -backend-config=../../backend.hcl
+        run: terraform init -backend-config=../../../backend.hcl
 
       - name: Terraform Plan
         id: plan
@@ -249,7 +249,7 @@ jobs:
       - name: Terraform Init
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform init -backend-config=../../backend.hcl
+        run: terraform init -backend-config=../../../backend.hcl
 
       - name: Terraform Plan
         id: plan
@@ -332,7 +332,7 @@ jobs:
       - name: Terraform Init
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform init -backend-config=../../backend.hcl
+        run: terraform init -backend-config=../../../backend.hcl
 
       - name: Terraform Plan
         id: plan
@@ -414,7 +414,7 @@ jobs:
       - name: Terraform Init
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform init -backend-config=../../backend.hcl
+        run: terraform init -backend-config=../../../backend.hcl
 
       - name: Terraform Plan
         id: plan
