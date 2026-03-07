@@ -122,9 +122,9 @@ resource "aws_db_instance" "main" {
   maintenance_window      = "Mon:19:00-Mon:20:00" # UTC (KST 월 04:00-05:00)
 
   auto_minor_version_upgrade = true
-  deletion_protection        = true
-  skip_final_snapshot        = false
-  final_snapshot_identifier  = "${var.project_name}-${var.environment}-mysql-final"
+  deletion_protection        = var.deletion_protection
+  skip_final_snapshot        = var.skip_final_snapshot
+  final_snapshot_identifier  = var.skip_final_snapshot ? null : "${var.project_name}-${var.environment}-mysql-final"
 
   tags = {
     Name    = "${var.project_name}-${var.environment}-mysql"

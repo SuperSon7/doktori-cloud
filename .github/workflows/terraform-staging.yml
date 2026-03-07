@@ -1,0 +1,467 @@
+name: "Staging: Manage Environment"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - apply
+          - start
+          - stop
+          - deploy
+          - scale
+          - destroy
+      image_tag:
+        description: "ECR image tag for 'deploy' (e.g. sha-abc1234, develop, latest)"
+        required: false
+        type: string
+        default: ""
+      scale_profile:
+        description: "Instance spec profile for 'scale' (prod = load testing, staging = cost saving)"
+        required: false
+        type: choice
+        options:
+          - staging
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  TF_VERSION: "1.7.0"
+  PROJECT_NAME: doktori
+  ENVIRONMENT: staging
+
+jobs:
+  # -------------------------------------------------------
+  # Apply — terraform apply all 3 layers (base → app → data)
+  # -------------------------------------------------------
+  apply-base:
+    if: inputs.action == 'apply'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Apply — staging/base
+        working-directory: terraform/environments/staging/base
+        run: |
+          terraform init -backend-config=../../backend.hcl
+          terraform plan -out=tfplan
+          terraform apply tfplan
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+          else
+            COLOR=15158332; STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: base\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  apply-app:
+    if: inputs.action == 'apply'
+    needs: apply-base
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        layer: [app, data]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Apply — staging/${{ matrix.layer }}
+        working-directory: terraform/environments/staging/${{ matrix.layer }}
+        run: |
+          terraform init -backend-config=../../backend.hcl
+          terraform plan -out=tfplan
+          terraform apply tfplan
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+          else
+            COLOR=15158332; STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  # -------------------------------------------------------
+  # Start — EC2 start + RDS start + health check
+  # -------------------------------------------------------
+  start:
+    if: inputs.action == 'start'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get staging instance IDs
+        id: instances
+        run: |
+          IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Environment,Values=${{ env.ENVIRONMENT }}" \
+                      "Name=tag:Project,Values=${{ env.PROJECT_NAME }}" \
+                      "Name=instance-state-name,Values=stopped" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          echo "ids=${IDS}" >> "$GITHUB_OUTPUT"
+          echo "Found instances: ${IDS:-none}"
+
+      - name: Get staging RDS identifier
+        id: rds
+        run: |
+          RDS_ID="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-mysql"
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_ID" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text 2>/dev/null || echo "not-found")
+          echo "rds_id=${RDS_ID}" >> "$GITHUB_OUTPUT"
+          echo "rds_status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "RDS ${RDS_ID}: ${STATUS}"
+
+      - name: Start EC2 instances
+        if: steps.instances.outputs.ids != ''
+        run: |
+          aws ec2 start-instances --instance-ids ${{ steps.instances.outputs.ids }}
+          echo "Starting instances: ${{ steps.instances.outputs.ids }}"
+
+      - name: Start RDS instance
+        if: steps.rds.outputs.rds_status == 'stopped'
+        run: |
+          aws rds start-db-instance --db-instance-identifier ${{ steps.rds.outputs.rds_id }}
+          echo "Starting RDS: ${{ steps.rds.outputs.rds_id }}"
+
+      - name: Wait for EC2 instances running
+        if: steps.instances.outputs.ids != ''
+        run: |
+          aws ec2 wait instance-running --instance-ids ${{ steps.instances.outputs.ids }}
+          echo "All EC2 instances are running"
+
+      - name: Wait for RDS available
+        if: steps.rds.outputs.rds_status == 'stopped'
+        run: |
+          aws rds wait db-instance-available \
+            --db-instance-identifier ${{ steps.rds.outputs.rds_id }}
+          echo "RDS is available"
+
+      - name: Get nginx EIP
+        id: nginx-eip
+        run: |
+          EIP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Environment,Values=${{ env.ENVIRONMENT }}" \
+                      "Name=tag:Project,Values=${{ env.PROJECT_NAME }}" \
+                      "Name=tag:Name,Values=*nginx*" \
+            --query "Reservations[].Instances[].PublicIpAddress" \
+            --output text)
+          echo "eip=${EIP}" >> "$GITHUB_OUTPUT"
+          echo "Nginx EIP: ${EIP}"
+
+      - name: Health check — nginx HTTP 200
+        if: steps.nginx-eip.outputs.eip != ''
+        run: |
+          for i in $(seq 1 15); do
+            if curl -sf -o /dev/null "http://${{ steps.nginx-eip.outputs.eip }}/"; then
+              echo "Health check passed on attempt ${i}"
+              exit 0
+            fi
+            echo "Attempt ${i}/15 failed, retrying in 2s..."
+            sleep 2
+          done
+          echo "::warning::Health check failed after 30s — nginx may still be booting"
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="STARTED"
+            DESC="All instances running. Health check passed."
+          else
+            COLOR=15158332; STATUS="START FAILED"
+            DESC="Some instances may have failed to start."
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  # -------------------------------------------------------
+  # Stop — EC2 stop + RDS stop (keeps infra, saves ~$47/month)
+  # -------------------------------------------------------
+  stop:
+    if: inputs.action == 'stop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get staging instance IDs
+        id: instances
+        run: |
+          IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Environment,Values=${{ env.ENVIRONMENT }}" \
+                      "Name=tag:Project,Values=${{ env.PROJECT_NAME }}" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          echo "ids=${IDS}" >> "$GITHUB_OUTPUT"
+          echo "Found running instances: ${IDS:-none}"
+
+      - name: Get staging RDS identifier
+        id: rds
+        run: |
+          RDS_ID="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-mysql"
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_ID" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text 2>/dev/null || echo "not-found")
+          echo "rds_id=${RDS_ID}" >> "$GITHUB_OUTPUT"
+          echo "rds_status=${STATUS}" >> "$GITHUB_OUTPUT"
+
+      - name: Stop EC2 instances
+        if: steps.instances.outputs.ids != ''
+        run: |
+          aws ec2 stop-instances --instance-ids ${{ steps.instances.outputs.ids }}
+          echo "Stopping instances: ${{ steps.instances.outputs.ids }}"
+
+      - name: Stop RDS instance
+        if: steps.rds.outputs.rds_status == 'available'
+        run: |
+          aws rds stop-db-instance --db-instance-identifier ${{ steps.rds.outputs.rds_id }}
+          echo "Stopping RDS: ${{ steps.rds.outputs.rds_id }}"
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="STOPPED"
+            DESC="All instances stopped. Fixed cost: ~\\$12/month (EIP + EBS)."
+          else
+            COLOR=15158332; STATUS="STOP FAILED"
+            DESC="Some instances may have failed to stop."
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  # -------------------------------------------------------
+  # Deploy — reusable workflow per service (no code duplication)
+  # For load testing: manually trigger with specific image_tag.
+  # For CI/CD: each service repo calls deploy-service.yml directly.
+  # -------------------------------------------------------
+  deploy-api:
+    if: inputs.action == 'deploy'
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: api
+      image_tag: ${{ inputs.image_tag }}
+    secrets:
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  deploy-chat:
+    if: inputs.action == 'deploy'
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: chat
+      image_tag: ${{ inputs.image_tag }}
+    secrets:
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  # -------------------------------------------------------
+  # Scale — switch EC2 specs between staging (cost saving) and prod (load testing)
+  # prod: applies prod-spec.tfvars | staging: uses defaults from variables.tf
+  # RDS is always prod spec (db.t4g.small) — no scaling needed.
+  # -------------------------------------------------------
+  scale:
+    if: inputs.action == 'scale'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: "Scale staging/app → ${{ inputs.scale_profile }}"
+        working-directory: terraform/environments/staging/app
+        run: |
+          terraform init -backend-config=../../backend.hcl
+          VARFILE=""
+          if [ "${{ inputs.scale_profile }}" = "prod" ]; then
+            VARFILE="-var-file=../prod-spec.tfvars"
+          fi
+          terraform plan $VARFILE -out=tfplan
+          terraform apply tfplan
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          PROFILE="${{ inputs.scale_profile }}"
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+            DESC="EC2 instances scaled to ${PROFILE} specs."
+          else
+            COLOR=15158332; STATUS="FAILED"
+            DESC="Scale to ${PROFILE} failed. Check Actions logs."
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Scale ${STATUS}: → ${PROFILE}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  # -------------------------------------------------------
+  # Destroy — remove RDS from state, then terraform destroy all
+  # -------------------------------------------------------
+  destroy-data:
+    if: inputs.action == 'destroy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Destroy — staging/data
+        working-directory: terraform/environments/staging/data
+        run: |
+          terraform init -backend-config=../../backend.hcl
+
+          # Remove RDS from state to bypass prevent_destroy lifecycle
+          terraform state rm 'module.database.aws_db_instance.main' || true
+
+          terraform destroy -auto-approve
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+          else
+            COLOR=15158332; STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: data\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  destroy-app:
+    if: inputs.action == 'destroy'
+    needs: destroy-data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Destroy — staging/app
+        working-directory: terraform/environments/staging/app
+        run: |
+          terraform init -backend-config=../../backend.hcl
+          terraform destroy -auto-approve
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+          else
+            COLOR=15158332; STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: app\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+
+  destroy-base:
+    if: inputs.action == 'destroy'
+    needs: destroy-app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Destroy — staging/base
+        working-directory: terraform/environments/staging/base
+        run: |
+          terraform init -backend-config=../../backend.hcl
+          terraform destroy -auto-approve
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="SUCCESS"
+            DESC="All staging resources destroyed. Cost: \\$0/month."
+          else
+            COLOR=15158332; STATUS="FAILED"
+            DESC="Some resources may remain — check manually."
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: base\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}

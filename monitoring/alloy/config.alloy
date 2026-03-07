@@ -58,6 +58,15 @@ prometheus.scrape "spring_boot" {
   forward_to      = [prometheus.relabel.add_env.receiver]
 }
 
+// ─── RabbitMQ 메트릭 (built-in prometheus plugin, port 15692) ────────────────
+prometheus.scrape "rabbitmq" {
+  targets = [
+    { "__address__" = "rabbitmq:15692", "app" = "rabbitmq" },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.add_env.receiver]
+}
+
 // ─── Nginx 메트릭 (nginx-exporter 사이드카 scrape) ──────────────────────────
 // nginx stub_status → nginx-exporter가 Prometheus 포맷 변환 → Alloy가 수집
 prometheus.scrape "nginx" {
@@ -123,7 +132,7 @@ discovery.relabel "docker_logs" {
   // 로그가 있는 컨테이너만 필터
   rule {
     source_labels = ["__meta_docker_container_name"]
-    regex         = "/.*(backend|chat|ai|frontend|nginx|mysql).*"
+    regex         = "/.*(backend|chat|ai|frontend|nginx|mysql|rabbitmq).*"
     action        = "keep"
   }
   // 컨테이너 이름 → app 라벨 ({project}-{service}-{replica} → service)

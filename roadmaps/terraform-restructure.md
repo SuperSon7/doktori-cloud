@@ -21,7 +21,8 @@
 | 7 | [State 마이그레이션 — dev](#phase-7-state-마이그레이션--dev) | ✅ Done | 2026-03-06 | dev-base + dev-app 완료, No changes 확인 |
 | 8 | [State 마이그레이션 — prod](#phase-8-state-마이그레이션--prod) | ✅ Done | 2026-03-06 | prod-base + prod-app + prod-data 완료 |
 | 9 | [CI/CD 파이프라인](#phase-9-cicd-파이프라인) | ✅ Done | 2026-03-06 | .github/workflows/terraform.yml 작성 완료 |
-| 10 | [정리 & 문서화](#phase-10-정리--문서화) | 🔄 In Progress | - | Phase 2: storage import + 구 폴더 삭제 |
+| 10 | [정리 & 문서화](#phase-10-정리--문서화) | 🔄 In Progress | - | storage import + 구 폴더 삭제 남음 |
+| 11 | [Staging 환경 + Infracost](#phase-11-staging-환경--infracost) | 🔄 In Progress | - | staging 환경 + infracost CI + staging workflow |
 
 ---
 
@@ -79,9 +80,9 @@ State: 환경당 5개 = 13+개              State: 환경당 3개 = 10개
 - [x] State 분리 전략 결정 (환경당 base/app/data 3개)
 - [x] 모듈 구조 설계 (networking, compute, storage, database)
 - [x] 환경 구성 설계 (prod, staging, dev)
-- [ ] `terraform/s3/` 디렉토리 삭제 (state 없는 잔존물) — Phase 2
-- [ ] `terraform/iam/` → `terraform/global/` 통합 — Phase 2
-- [ ] `terraform/parameter-store/` KMS → storage 모듈로 통합 — Phase 2
+- [x] `terraform/s3/` 디렉토리 삭제 (state 없는 잔존물) ✅
+- [x] `terraform/iam/` → `terraform/global/` 통합 완료, 레거시 삭제 ✅
+- [x] `terraform/parameter-store/` KMS → storage 모듈로 통합 완료, 레거시 삭제 ✅
 
 ### 산출물 (예상)
 - (삭제/통합만 수행)
@@ -295,11 +296,37 @@ module "compute" {
 - [ ] Storage import (S3, ECR, KMS) → base layer에 추가
 - [ ] 구 state key S3에서 삭제
 - [ ] 구 디렉토리 삭제: `terraform/prod/`, `terraform/nonprod/`
-- [ ] staging 환경 구성 작성
+- [x] staging 환경 구성 작성 ✅ → Phase 11로 이동
+- [x] `terraform/iam/` 레거시 삭제 ✅
+- [x] `terraform/parameter-store/` 레거시 삭제 ✅
 
 ### 산출물 (예상)
 - `terraform/ARCHITECTURE.md`
-- `terraform/environments/staging/{base,app,data}/`
+
+---
+
+## Phase 11: Staging 환경 + Infracost
+
+**목표:** Staging 환경 (prod 배포 전 게이트 + 부하테스트), Infracost PR 비용 코멘트
+
+### Checklist
+- [x] Database 모듈 수정 (deletion_protection, skip_final_snapshot 변수화)
+- [x] `environments/staging/base/` — VPC 10.2.0.0/16, VPC endpoint 없음
+- [x] `environments/staging/app/` — 다운사이즈 인스턴스, scale 지원 (instance_types 변수)
+- [x] `environments/staging/data/` — RDS prod 스펙 고정 (db.t4g.small), disposable
+- [x] `prod-spec.tfvars` — EC2 부하테스트용 prod 스펙 오버라이드
+- [x] `infracost.yml` — 전체 환경 레이어 등록
+- [x] `.github/workflows/terraform.yml` — infracost job + staging apply 추가
+- [x] `.github/workflows/terraform-staging.yml` — apply/start/stop/deploy/scale/destroy
+- [x] `terraform validate` 통과 (staging 3 레이어)
+- [ ] PR 올려서 Infracost 비용 코멘트 확인
+- [ ] staging apply 테스트
+
+### 산출물
+- `terraform/environments/staging/{base,app,data}/{main,variables,outputs,providers}.tf`
+- `terraform/environments/staging/prod-spec.tfvars`
+- `infracost.yml`
+- `.github/workflows/terraform-staging.yml`
 
 ---
 

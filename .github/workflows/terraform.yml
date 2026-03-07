@@ -5,6 +5,7 @@ on:
     paths:
       - 'terraform/modules/**'
       - 'terraform/environments/**'
+      - 'infracost.yml'
   push:
     branches: [main]
     paths:
@@ -48,11 +49,14 @@ jobs:
               "prod/base"
               "prod/app"
               "prod/data"
+              "staging/base"
+              "staging/app"
+              "staging/data"
               "dev/base"
               "dev/app"
             )
           else
-            for layer in prod/base prod/app prod/data dev/base dev/app; do
+            for layer in prod/base prod/app prod/data staging/base staging/app staging/data dev/base dev/app; do
               if echo "$CHANGED" | grep -q "^terraform/environments/${layer}/"; then
                 LAYERS+=("$layer")
               fi
@@ -84,6 +88,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -139,7 +144,69 @@ jobs:
             });
 
   # -------------------------------------------------------
-  # Apply (on merge to main) — order: base → app/data
+  # Infracost (on PR) — cost diff comment
+  # -------------------------------------------------------
+  infracost:
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      # --- Base branch breakdown ---
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      - name: Infracost baseline
+        run: |
+          infracost breakdown \
+            --config-file=base/infracost.yml \
+            --format=json \
+            --out-file=/tmp/infracost-base.json
+        continue-on-error: true
+
+      # --- PR branch breakdown ---
+      - uses: actions/checkout@v4
+
+      - name: Infracost diff
+        run: |
+          infracost diff \
+            --config-file=infracost.yml \
+            --format=json \
+            --compare-to=/tmp/infracost-base.json \
+            --out-file=/tmp/infracost-diff.json
+
+      - name: Post PR comment
+        run: |
+          infracost comment github \
+            --path=/tmp/infracost-diff.json \
+            --repo=${{ github.repository }} \
+            --github-token=${{ github.token }} \
+            --pull-request=${{ github.event.pull_request.number }} \
+            --behavior=update
+
+  # -------------------------------------------------------
+  # Apply (on merge to main) — base → app → data
+  # All environments (staging, prod, dev) auto-apply with default specs.
+  # Scale profile is a temporary override for load testing only.
   # -------------------------------------------------------
   apply-base:
     needs: detect-changes
@@ -149,6 +216,7 @@ jobs:
       fail-fast: true
       matrix:
         layer:
+          - staging/base
           - prod/base
           - dev/base
     steps:
@@ -182,27 +250,28 @@ jobs:
         run: terraform init -backend-config=../../backend.hcl
 
       - name: Terraform Plan
+        id: plan
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: |
+          set +e
           terraform plan -detailed-exitcode -out=tfplan
           EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
           if [ $EXITCODE -eq 1 ]; then
-            echo "Plan failed"
+            echo "::error::Terraform plan failed"
             exit 1
           fi
-          # exitcode 0 = no changes, 2 = changes present
-          # Check for destroy
           if [ $EXITCODE -eq 2 ]; then
             if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
               echo "::error::Plan contains resource destruction — aborting auto-apply"
               exit 1
             fi
           fi
-        continue-on-error: false
 
       - name: Terraform Apply
-        if: steps.check.outputs.should_apply == 'true'
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: terraform apply tfplan
 
@@ -228,6 +297,7 @@ jobs:
       fail-fast: true
       matrix:
         layer:
+          - staging/app
           - prod/app
           - dev/app
     steps:
@@ -261,22 +331,28 @@ jobs:
         run: terraform init -backend-config=../../backend.hcl
 
       - name: Terraform Plan
+        id: plan
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: |
+          set +e
           terraform plan -detailed-exitcode -out=tfplan
           EXITCODE=$?
-          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi
           if [ $EXITCODE -eq 2 ]; then
             if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
               echo "::error::Plan contains resource destruction — aborting auto-apply"
               exit 1
             fi
           fi
-        continue-on-error: false
 
       - name: Terraform Apply
-        if: steps.check.outputs.should_apply == 'true'
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: terraform apply tfplan
 
@@ -302,6 +378,7 @@ jobs:
       fail-fast: true
       matrix:
         layer:
+          - staging/data
           - prod/data
     steps:
       - uses: actions/checkout@v4
@@ -334,22 +411,28 @@ jobs:
         run: terraform init -backend-config=../../backend.hcl
 
       - name: Terraform Plan
+        id: plan
         if: steps.check.outputs.should_apply == 'true'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: |
+          set +e
           terraform plan -detailed-exitcode -out=tfplan
           EXITCODE=$?
-          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi
           if [ $EXITCODE -eq 2 ]; then
             if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
               echo "::error::Plan contains resource destruction — aborting auto-apply"
               exit 1
             fi
           fi
-        continue-on-error: false
 
       - name: Terraform Apply
-        if: steps.check.outputs.should_apply == 'true'
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
         working-directory: terraform/environments/${{ matrix.layer }}
         run: terraform apply tfplan
 

@@ -63,6 +63,18 @@ variable "db_availability_zone" {
   default = "ap-northeast-2a"
 }
 
+variable "deletion_protection" {
+  description = "If true, prevents accidental DB deletion"
+  type        = bool
+  default     = true
+}
+
+variable "skip_final_snapshot" {
+  description = "If true, no final snapshot on deletion"
+  type        = bool
+  default     = false
+}
+
 variable "db_extra_parameters" {
   description = "Additional DB parameter group parameters"
   type = list(object({

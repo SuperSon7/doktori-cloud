@@ -28,3 +28,48 @@ datasources:
       manageAlerts: true
     version: 1
     editable: false
+
+  - name: CloudWatch
+    type: cloudwatch
+    access: proxy
+    orgId: 1
+    uid: cloudwatch
+    isDefault: false
+    jsonData:
+      authType: keys
+      defaultRegion: ap-northeast-2
+    secureJsonData:
+      accessKey: $AWS_ACCOUNT1_ACCESS_KEY_ID
+      secretKey: $AWS_ACCOUNT1_SECRET_ACCESS_KEY
+    version: 1
+    editable: false
+
+  - name: CloudWatch-Account1
+    type: cloudwatch
+    access: proxy
+    orgId: 1
+    uid: cloudwatch-account1
+    isDefault: false
+    jsonData:
+      authType: keys
+      defaultRegion: us-east-1
+    secureJsonData:
+      accessKey: $AWS_ACCOUNT1_ACCESS_KEY_ID
+      secretKey: $AWS_ACCOUNT1_SECRET_ACCESS_KEY
+    version: 1
+    editable: false
+
+  - name: CloudWatch-Account2
+    type: cloudwatch
+    access: proxy
+    orgId: 1
+    uid: cloudwatch-account2
+    isDefault: false
+    jsonData:
+      authType: keys
+      defaultRegion: us-east-1
+    secureJsonData:
+      accessKey: $AWS_ACCOUNT2_ACCESS_KEY_ID
+      secretKey: $AWS_ACCOUNT2_SECRET_ACCESS_KEY
+    version: 1
+    editable: false

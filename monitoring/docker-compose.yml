@@ -46,6 +46,10 @@ services:
       - DISCORD_HIGH_WEBHOOK=${DISCORD_HIGH_WEBHOOK:-}
       - DISCORD_WARNING_WEBHOOK=${DISCORD_WARNING_WEBHOOK:-}
       - DISCORD_INFO_WEBHOOK=${DISCORD_INFO_WEBHOOK:-}
+      - AWS_ACCOUNT1_ACCESS_KEY_ID=${AWS_ACCOUNT1_ACCESS_KEY_ID:-}
+      - AWS_ACCOUNT1_SECRET_ACCESS_KEY=${AWS_ACCOUNT1_SECRET_ACCESS_KEY:-}
+      - AWS_ACCOUNT2_ACCESS_KEY_ID=${AWS_ACCOUNT2_ACCESS_KEY_ID:-}
+      - AWS_ACCOUNT2_SECRET_ACCESS_KEY=${AWS_ACCOUNT2_SECRET_ACCESS_KEY:-}
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
