@@ -17,7 +17,7 @@ variable "github_org" {
 }
 
 variable "github_repos" {
-  description = "GitHub repository names for OIDC"
+  description = "GitHub repository names for deploy OIDC"
   type        = list(string)
   default = [
     "5-team-service-be",
@@ -25,6 +25,12 @@ variable "github_repos" {
     "5-team-service-ai",
     "5-team-service-cloud",
   ]
+}
+
+variable "cloud_repo" {
+  description = "Cloud repo name (for Terraform OIDC role)"
+  type        = string
+  default     = "5-team-service-cloud"
 }
 
 variable "budget_limit_amount" {
@@ -44,17 +50,20 @@ variable "team_members" {
   type = map(object({
     groups = list(string)
   }))
-  default = {}
+  default = {
+    ella  = { groups = ["be"] }
+    bruni = { groups = ["be"] }
+  }
 }
 
 variable "static_bucket_name" {
   description = "Static bucket name for CDN deployment permissions"
   type        = string
-  default     = null
+  default     = "doktori-prod-frontend-static"
 }
 
 variable "cloudfront_distribution_id" {
   description = "CloudFront distribution ID for invalidation permissions"
   type        = string
-  default     = null
+  default     = "EN4J9BGDSE4G0"
 }

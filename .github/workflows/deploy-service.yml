@@ -1,0 +1,273 @@
+name: "Deploy Service"
+
+# Reusable workflow — deploy a single service to any environment via SSM.
+# Caller passes service_name + image_tag. All config (port, image path, etc.)
+# is resolved internally from service_name.
+#
+# Usage from same repo (terraform-staging.yml):
+#   uses: ./.github/workflows/deploy-service.yml
+#
+# Usage from service repos (cross-repo):
+#   uses: 100-hours-a-week/5-team-service-cloud/.github/workflows/deploy-service.yml@main
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "Service to deploy (api, chat, front, ai)"
+        required: true
+        type: string
+      image_tag:
+        description: "ECR image tag (e.g. sha-abc1234, develop)"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: false
+        type: string
+        default: staging
+    secrets:
+      AWS_DEPLOY_ROLE_ARN:
+        required: true
+      ECR_REGISTRY:
+        required: true
+      DISCORD_WEBHOOK_URL:
+        required: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  PROJECT_NAME: doktori
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Validate inputs
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            echo "::error::image_tag is required"
+            exit 1
+          fi
+
+      - name: Resolve service config
+        id: config
+        run: |
+          case "${{ inputs.service_name }}" in
+            api)
+              PORT=8080; IMAGE="doktori/backend-api"
+              HEALTH="/api/actuator/health"; NEEDS_FIREBASE=true ;;
+            chat)
+              PORT=8081; IMAGE="doktori/backend-chat"
+              HEALTH="/api/actuator/health"; NEEDS_FIREBASE=true ;;
+            front)
+              PORT=3000; IMAGE="doktori/frontend"
+              HEALTH="/"; NEEDS_FIREBASE=false ;;
+            ai)
+              PORT=8000; IMAGE="doktori/ai-server"
+              HEALTH="/health"; NEEDS_FIREBASE=false ;;
+            *)
+              echo "::error::Unknown service: ${{ inputs.service_name }}"
+              exit 1 ;;
+          esac
+
+          echo "port=${PORT}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "health_path=${HEALTH}" >> "$GITHUB_OUTPUT"
+          echo "needs_firebase=${NEEDS_FIREBASE}" >> "$GITHUB_OUTPUT"
+          echo "container=${{ env.PROJECT_NAME }}-${{ inputs.service_name }}" >> "$GITHUB_OUTPUT"
+          echo "ec2_tag=${{ env.PROJECT_NAME }}-${{ inputs.environment }}-${{ inputs.service_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure EC2 is running
+        run: |
+          EC2_TAG="${{ steps.config.outputs.ec2_tag }}"
+
+          RESULT=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$EC2_TAG" \
+            --query "Reservations[0].Instances[0].[InstanceId,State.Name]" \
+            --output text 2>/dev/null || echo "None None")
+
+          INSTANCE_ID=$(echo "$RESULT" | awk '{print $1}')
+          STATE=$(echo "$RESULT" | awk '{print $2}')
+          echo "Instance: $INSTANCE_ID, State: $STATE"
+
+          if [ "$INSTANCE_ID" = "None" ]; then
+            echo "::error::Instance $EC2_TAG not found. Run staging 'apply' in Cloud repo first."
+            exit 1
+          fi
+
+          if [ "$STATE" = "running" ]; then
+            echo "Instance already running"
+          elif [ "$STATE" = "stopped" ]; then
+            echo "Starting instance..."
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID"
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+            echo "Instance started"
+          else
+            echo "::error::Instance is in unexpected state: $STATE"
+            exit 1
+          fi
+
+      - name: Ensure RDS is available
+        run: |
+          RDS_ID="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-mysql"
+
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_ID" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text 2>/dev/null || echo "not-found")
+          echo "RDS $RDS_ID: $STATUS"
+
+          if [ "$STATUS" = "not-found" ]; then
+            echo "::error::RDS $RDS_ID not found. Run staging 'apply' in Cloud repo first."
+            exit 1
+          fi
+
+          if [ "$STATUS" = "available" ]; then
+            echo "RDS already available"
+          elif [ "$STATUS" = "stopped" ]; then
+            echo "Starting RDS... (this may take a few minutes)"
+            # || true: parallel deploys may race — second call errors if already starting
+            aws rds start-db-instance --db-instance-identifier "$RDS_ID" 2>/dev/null || true
+            aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
+            echo "RDS started"
+          else
+            echo "RDS is in state: $STATUS — waiting for available..."
+            aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
+            echo "RDS available"
+          fi
+
+      - name: Deploy via SSM
+        run: |
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          TAG="${{ inputs.image_tag }}"
+          IMAGE="${{ steps.config.outputs.image }}"
+          PORT="${{ steps.config.outputs.port }}"
+          CONTAINER="${{ steps.config.outputs.container }}"
+          EC2_TAG="${{ steps.config.outputs.ec2_tag }}"
+          ENV="${{ inputs.environment }}"
+
+          if [ "${{ steps.config.outputs.needs_firebase }}" = "true" ]; then
+            COMMANDS=$(jq -n \
+              --arg r "$REGISTRY" --arg img "$IMAGE" --arg tag "$TAG" \
+              --arg c "$CONTAINER" --arg p "$PORT" --arg env "$ENV" \
+              --arg proj "${{ env.PROJECT_NAME }}" \
+              '[
+                "set -e",
+                ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+                ("docker pull " + $r + "/" + $img + ":" + $tag),
+                "mkdir -p /home/ubuntu/app/secrets",
+                ("aws ssm get-parameter --name /" + $proj + "/" + $env + "/FIREBASE_SERVICE_ACCOUNT --with-decryption --query Parameter.Value --output text > /home/ubuntu/app/secrets/firebase-service-account.json"),
+                ("docker stop " + $c + " 2>/dev/null || true"),
+                ("docker rm " + $c + " 2>/dev/null || true"),
+                ("docker run -d --name " + $c + " --restart unless-stopped -e SPRING_PROFILES_ACTIVE=" + $env + " -e FIREBASE_CREDENTIALS_PATH=file:/app/secrets/firebase-service-account.json -v /home/ubuntu/app/secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro -p " + $p + ":" + $p + " " + $r + "/" + $img + ":" + $tag)
+              ]')
+          else
+            COMMANDS=$(jq -n \
+              --arg r "$REGISTRY" --arg img "$IMAGE" --arg tag "$TAG" \
+              --arg c "$CONTAINER" --arg p "$PORT" \
+              '[
+                "set -e",
+                ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+                ("docker pull " + $r + "/" + $img + ":" + $tag),
+                ("docker stop " + $c + " 2>/dev/null || true"),
+                ("docker rm " + $c + " 2>/dev/null || true"),
+                ("docker run -d --name " + $c + " --restart unless-stopped -p " + $p + ":" + $p + " " + $r + "/" + $img + ":" + $tag)
+              ]')
+          fi
+
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=$EC2_TAG" \
+            --parameters "{\"commands\": $COMMANDS}" \
+            --timeout-seconds 300 \
+            --comment "$ENV deploy ${{ inputs.service_name }} $TAG" \
+            --query "Command.CommandId" --output text)
+
+          echo "SSM Command: $CMD_ID"
+
+          for i in $(seq 1 60); do
+            sleep 5
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$CMD_ID" \
+              --query "CommandInvocations[0].Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "[$i/60] $STATUS"
+            case "$STATUS" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut)
+                aws ssm list-command-invocations --command-id "$CMD_ID" --details \
+                  --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
+                echo "::error::Deploy failed"
+                exit 1 ;;
+              None)
+                if [ "$i" -ge 3 ]; then
+                  echo "::error::No instance matched SSM target"
+                  exit 1
+                fi ;;
+            esac
+          done
+
+      - name: Health check
+        run: |
+          PORT="${{ steps.config.outputs.port }}"
+          HEALTH="${{ steps.config.outputs.health_path }}"
+          EC2_TAG="${{ steps.config.outputs.ec2_tag }}"
+
+          COMMANDS=$(jq -n --arg port "$PORT" --arg path "$HEALTH" '[
+            "for i in $(seq 1 30); do",
+            ("  if curl -sf http://localhost:" + $port + $path + " > /dev/null 2>&1; then echo \"HEALTHY\"; exit 0; fi"),
+            "  echo \"Waiting... ($i/30)\"; sleep 10",
+            "done",
+            "echo \"UNHEALTHY\"; exit 1"
+          ]')
+
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=$EC2_TAG" \
+            --parameters "{\"commands\": $COMMANDS}" \
+            --timeout-seconds 360 \
+            --comment "${{ inputs.environment }} health check ${{ inputs.service_name }}" \
+            --query "Command.CommandId" --output text)
+
+          for i in $(seq 1 75); do
+            sleep 5
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$CMD_ID" \
+              --query "CommandInvocations[0].Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "[$i/75] $STATUS"
+            case "$STATUS" in
+              Success) echo "Health check passed"; exit 0 ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut)
+                echo "::error::Health check failed"
+                exit 1 ;;
+            esac
+          done
+
+      - name: Notify Discord
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          [ -z "$WEBHOOK" ] && exit 0
+
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993; STATUS="DEPLOYED"
+            DESC="${{ inputs.service_name }} deployed with tag \`${{ inputs.image_tag }}\` to ${{ inputs.environment }}."
+          else
+            COLOR=15158332; STATUS="DEPLOY FAILED"
+            DESC="${{ inputs.service_name }} deploy failed for tag \`${{ inputs.image_tag }}\` on ${{ inputs.environment }}."
+          fi
+
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"${{ inputs.environment }} ${STATUS}: ${{ inputs.service_name }}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "$WEBHOOK"

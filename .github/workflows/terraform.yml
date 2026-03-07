@@ -1,0 +1,451 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - 'terraform/modules/**'
+      - 'terraform/environments/**'
+      - 'infracost.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/modules/**'
+      - 'terraform/environments/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  TF_VERSION: "1.7.0"
+
+jobs:
+  # -------------------------------------------------------
+  # Detect which layers changed
+  # -------------------------------------------------------
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+
+          LAYERS=()
+
+          if echo "$CHANGED" | grep -q '^terraform/modules/'; then
+            LAYERS=(
+              "prod/base"
+              "prod/app"
+              "prod/data"
+              "staging/base"
+              "staging/app"
+              "staging/data"
+              "dev/base"
+              "dev/app"
+            )
+          else
+            for layer in prod/base prod/app prod/data staging/base staging/app staging/data dev/base dev/app; do
+              if echo "$CHANGED" | grep -q "^terraform/environments/${layer}/"; then
+                LAYERS+=("$layer")
+              fi
+            done
+          fi
+
+          if [ ${#LAYERS[@]} -eq 0 ]; then
+            echo "matrix={\"layer\":[]}" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(printf '%s\n' "${LAYERS[@]}" | jq -R . | jq -sc '{"layer": .}')
+            echo "matrix=${JSON}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Changed layers: ${LAYERS[*]:-none}"
+
+  # -------------------------------------------------------
+  # Plan (on PR)
+  # -------------------------------------------------------
+  plan:
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set -o pipefail
+          terraform plan -no-color -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Detect destroy
+        id: destroy-check
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
+            echo "has_destroy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_destroy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/environments/${{ matrix.layer }}/plan.txt', 'utf8');
+            const truncated = plan.length > 60000
+              ? plan.substring(0, 60000) + '\n... (truncated)'
+              : plan;
+            const hasDestroy = '${{ steps.destroy-check.outputs.has_destroy }}' === 'true';
+            const warning = hasDestroy ? '\n\n> **Warning: This plan contains resource destruction!**' : '';
+
+            const body = `### Terraform Plan: \`${{ matrix.layer }}\`${warning}
+            \`\`\`
+            ${truncated}
+            \`\`\``;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            });
+
+  # -------------------------------------------------------
+  # Infracost (on PR) — cost diff comment
+  # -------------------------------------------------------
+  infracost:
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      # --- Base branch breakdown ---
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      - name: Infracost baseline
+        run: |
+          infracost breakdown \
+            --config-file=base/infracost.yml \
+            --format=json \
+            --out-file=/tmp/infracost-base.json
+        continue-on-error: true
+
+      # --- PR branch breakdown ---
+      - uses: actions/checkout@v4
+
+      - name: Infracost diff
+        run: |
+          infracost diff \
+            --config-file=infracost.yml \
+            --format=json \
+            --compare-to=/tmp/infracost-base.json \
+            --out-file=/tmp/infracost-diff.json
+
+      - name: Post PR comment
+        run: |
+          infracost comment github \
+            --path=/tmp/infracost-diff.json \
+            --repo=${{ github.repository }} \
+            --github-token=${{ github.token }} \
+            --pull-request=${{ github.event.pull_request.number }} \
+            --behavior=update
+
+  # -------------------------------------------------------
+  # Apply (on merge to main) — base → app → data
+  # All environments (staging, prod, dev) auto-apply with default specs.
+  # Scale profile is a temporary override for load testing only.
+  # -------------------------------------------------------
+  apply-base:
+    needs: detect-changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        layer:
+          - staging/base
+          - prod/base
+          - dev/base
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1)
+          MODULES_CHANGED=$(echo "$CHANGED" | grep -c '^terraform/modules/' || true)
+          LAYER_CHANGED=$(echo "$CHANGED" | grep -c "^terraform/environments/${{ matrix.layer }}/" || true)
+          if [ "$MODULES_CHANGED" -gt 0 ] || [ "$LAYER_CHANGED" -gt 0 ]; then
+            echo "should_apply=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_apply=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
+              echo "::error::Plan contains resource destruction — aborting auto-apply"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform apply tfplan
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993
+            STATUS="SUCCESS"
+          else
+            COLOR=15158332
+            STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  apply-app:
+    needs: [detect-changes, apply-base]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        layer:
+          - staging/app
+          - prod/app
+          - dev/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1)
+          MODULES_CHANGED=$(echo "$CHANGED" | grep -c '^terraform/modules/' || true)
+          LAYER_CHANGED=$(echo "$CHANGED" | grep -c "^terraform/environments/${{ matrix.layer }}/" || true)
+          if [ "$MODULES_CHANGED" -gt 0 ] || [ "$LAYER_CHANGED" -gt 0 ]; then
+            echo "should_apply=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_apply=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
+              echo "::error::Plan contains resource destruction — aborting auto-apply"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform apply tfplan
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993
+            STATUS="SUCCESS"
+          else
+            COLOR=15158332
+            STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  apply-data:
+    needs: [detect-changes, apply-base]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        layer:
+          - staging/data
+          - prod/data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1)
+          MODULES_CHANGED=$(echo "$CHANGED" | grep -c '^terraform/modules/' || true)
+          LAYER_CHANGED=$(echo "$CHANGED" | grep -c "^terraform/environments/${{ matrix.layer }}/" || true)
+          if [ "$MODULES_CHANGED" -gt 0 ] || [ "$LAYER_CHANGED" -gt 0 ]; then
+            echo "should_apply=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_apply=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
+              echo "::error::Plan contains resource destruction — aborting auto-apply"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform apply tfplan
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993
+            STATUS="SUCCESS"
+          else
+            COLOR=15158332
+            STATUS="FAILED"
+          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}

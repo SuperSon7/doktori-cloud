@@ -21,6 +21,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # GitHub Actions Deploy Role (OIDC)
 # -----------------------------------------------------------------------------
 locals {
+  # Deploy role: 모든 서비스 레포 + Cloud 레포 (main, develop, staging, feature/*)
   github_oidc_subjects = concat(
     flatten([
       for repo in var.github_repos : [
@@ -29,12 +30,23 @@ locals {
         "repo:${var.github_org}/${repo}:ref:refs/heads/staging",
       ]
     ]),
+    [
+      "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/feature/*",
+      "repo:${var.github_org}/5-team-service-fe:ref:refs/heads/feature/s3-CDN",
+    ],
     # TODO: 테스트 후 제거
     [
       "repo:SuperSon7/5-team-service-be:ref:refs/heads/main",
       "repo:SuperSon7/5-team-service-be:ref:refs/heads/develop",
     ],
   )
+
+  # Terraform role: Cloud 레포 전용 (main, feature/*, PR)
+  terraform_oidc_subjects = [
+    "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/main",
+    "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/feature/*",
+    "repo:${var.github_org}/${var.cloud_repo}:pull_request",
+  ]
 }
 
 resource "aws_iam_role" "github_actions_deploy" {
@@ -120,40 +132,172 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
 resource "aws_iam_role_policy" "github_actions_cdn" {
   count = var.static_bucket_name != null && var.cloudfront_distribution_id != null ? 1 : 0
 
-  name = "${var.project_name}-gha-cdn"
+  name = "${var.project_name}-gha-fe-cdn-prod"
   role = aws_iam_role.github_actions_deploy.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "StaticBucketList"
+        Sid    = "S3BucketMeta"
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
           "s3:GetBucketLocation",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"
+        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"]
       },
       {
-        Sid    = "StaticBucketObjectRW"
+        Sid    = "S3ObjectWriteDelete"
         Effect = "Allow"
         Action = [
-          "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"
+        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"]
       },
       {
         Sid    = "CloudFrontInvalidation"
         Effect = "Allow"
         Action = [
           "cloudfront:CreateInvalidation",
-          "cloudfront:GetDistribution",
-          "cloudfront:GetDistributionConfig",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"
+        Resource = ["arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"]
+      },
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# GitHub Actions Terraform Role (OIDC) — Cloud repo only
+# -----------------------------------------------------------------------------
+resource "aws_iam_role" "github_actions_terraform" {
+  name        = "${var.project_name}-gha-terraform"
+  description = "GitHub Actions Terraform plan/apply role (Cloud repo only)"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = local.terraform_oidc_subjects
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-gha-terraform"
+  }
+}
+
+resource "aws_iam_role_policy" "terraform_infra" {
+  name = "${var.project_name}-terraform-permissions"
+  role = aws_iam_role.github_actions_terraform.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "EC2Full"
+        Effect   = "Allow"
+        Action   = ["ec2:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "RDS"
+        Effect   = "Allow"
+        Action   = ["rds:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "S3"
+        Effect   = "Allow"
+        Action   = ["s3:*"]
+        Resource = "*"
+      },
+      {
+        Sid    = "IAM"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole", "iam:GetPolicy", "iam:GetPolicyVersion",
+          "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
+          "iam:GetRolePolicy", "iam:GetInstanceProfile",
+          "iam:ListInstanceProfilesForRole",
+          "iam:CreateRole", "iam:DeleteRole",
+          "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+          "iam:PutRolePolicy", "iam:DeleteRolePolicy",
+          "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+          "iam:PassRole", "iam:TagRole", "iam:UntagRole",
+          "iam:CreatePolicy", "iam:DeletePolicy",
+          "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
+          "iam:ListPolicyVersions", "iam:UpdateAssumeRolePolicy",
+          "iam:GetOpenIDConnectProvider", "iam:TagPolicy", "iam:UntagPolicy",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SSMParameters"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter", "ssm:GetParameters",
+          "ssm:PutParameter", "ssm:DeleteParameter",
+          "ssm:DescribeParameters",
+          "ssm:AddTagsToResource", "ssm:RemoveTagsFromResource",
+          "ssm:ListTagsForResource",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "KMS"
+        Effect = "Allow"
+        Action = [
+          "kms:CreateKey", "kms:DescribeKey",
+          "kms:GetKeyPolicy", "kms:GetKeyRotationStatus",
+          "kms:ListResourceTags", "kms:CreateAlias", "kms:DeleteAlias",
+          "kms:ListAliases", "kms:TagResource", "kms:UntagResource",
+          "kms:EnableKeyRotation", "kms:ScheduleKeyDeletion",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "ECR"
+        Effect   = "Allow"
+        Action   = ["ecr:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "Route53"
+        Effect   = "Allow"
+        Action   = ["route53:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "CloudWatch"
+        Effect   = "Allow"
+        Action   = ["cloudwatch:*", "logs:*"]
+        Resource = "*"
+      },
+      {
+        Sid    = "TerraformStateLock"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/*terraform*"
       },
     ]
   })

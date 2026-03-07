@@ -113,13 +113,68 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 106,
+      "title": "Warn Focus",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": {
+            "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
+            "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "bars", "fillOpacity": 30, "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "smooth",
+            "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" }
+          },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "orange", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 27 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (app) (count_over_time({app=~\"$app\", env=\"$env\"} | detected_level = `warn` [5m]))", "legendFormat": "{{app}}", "refId": "A" }
+      ],
+      "title": "Warn Rate Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 33 },
+      "id": 12,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=~\"$app\", env=\"$env\"} | detected_level = `warn`", "legendFormat": "", "refId": "A" }
+      ],
+      "title": "Warn Logs",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "id": 102,
       "title": "All Logs",
       "type": "row"
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 27 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 46 },
       "id": 4,
       "options": {
         "dedupStrategy": "none",
@@ -139,14 +194,14 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
       "id": 104,
       "title": "Backend API Logs",
       "type": "row"
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 59 },
       "id": 7,
       "options": {
         "dedupStrategy": "none",
@@ -159,14 +214,14 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"backend\", env=\"$env\"} | detected_level != `error`", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"api\", env=\"$env\"} | detected_level != `error`", "legendFormat": "", "refId": "A" }
       ],
       "title": "Backend API Log Stream",
       "type": "logs"
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 50 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 69 },
       "id": 8,
       "options": {
         "dedupStrategy": "none",
@@ -179,21 +234,21 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"backend\", env=\"$env\"} | detected_level = `error`", "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"api\", env=\"$env\"} | detected_level = `error`", "legendFormat": "", "refId": "A" }
       ],
       "title": "Backend API Error Log",
       "type": "logs"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 79 },
       "id": 105,
       "title": "Backend Chat Logs",
       "type": "row"
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 61 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 80 },
       "id": 9,
       "options": {
         "dedupStrategy": "none",
@@ -213,7 +268,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 71 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 90 },
       "id": 10,
       "options": {
         "dedupStrategy": "none",
@@ -233,14 +288,14 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 81 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 100 },
       "id": 103,
       "title": "Nginx Logs",
       "type": "row"
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 82 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 101 },
       "id": 5,
       "options": {
         "dedupStrategy": "none",
@@ -260,7 +315,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 92 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 111 },
       "id": 6,
       "options": {
         "dedupStrategy": "none",
@@ -308,14 +363,15 @@
         "name": "app",
         "options": [
           { "selected": true, "text": "All", "value": "$__all" },
-          { "selected": false, "text": "backend", "value": "backend" },
+          { "selected": false, "text": "api", "value": "api" },
           { "selected": false, "text": "chat", "value": "chat" },
           { "selected": false, "text": "ai", "value": "ai" },
           { "selected": false, "text": "frontend", "value": "frontend" },
           { "selected": false, "text": "nginx", "value": "nginx" },
-          { "selected": false, "text": "mysql", "value": "mysql" }
+          { "selected": false, "text": "mysql", "value": "mysql" },
+          { "selected": false, "text": "rabbitmq", "value": "rabbitmq" }
         ],
-        "query": "backend,chat,ai,frontend,nginx,mysql",
+        "query": "api,chat,ai,frontend,nginx,mysql,rabbitmq",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
