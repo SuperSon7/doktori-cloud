@@ -221,6 +221,8 @@ jobs:
           - dev/base
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -302,6 +304,8 @@ jobs:
           - dev/app
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -382,6 +386,8 @@ jobs:
           - prod/data
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: hashicorp/setup-terraform@v3
         with:
