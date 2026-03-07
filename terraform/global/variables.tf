@@ -50,17 +50,20 @@ variable "team_members" {
   type = map(object({
     groups = list(string)
   }))
-  default = {}
+  default = {
+    ella  = { groups = ["be"] }
+    bruni = { groups = ["be"] }
+  }
 }
 
 variable "static_bucket_name" {
   description = "Static bucket name for CDN deployment permissions"
   type        = string
-  default     = null
+  default     = "doktori-prod-frontend-static"
 }
 
 variable "cloudfront_distribution_id" {
   description = "CloudFront distribution ID for invalidation permissions"
   type        = string
-  default     = null
+  default     = "EN4J9BGDSE4G0"
 }

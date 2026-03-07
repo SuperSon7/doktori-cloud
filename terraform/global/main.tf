@@ -32,6 +32,7 @@ locals {
     ]),
     [
       "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/feature/*",
+      "repo:${var.github_org}/5-team-service-fe:ref:refs/heads/feature/s3-CDN",
     ],
     # TODO: 테스트 후 제거
     [
@@ -131,40 +132,37 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
 resource "aws_iam_role_policy" "github_actions_cdn" {
   count = var.static_bucket_name != null && var.cloudfront_distribution_id != null ? 1 : 0
 
-  name = "${var.project_name}-gha-cdn"
+  name = "${var.project_name}-gha-fe-cdn-prod"
   role = aws_iam_role.github_actions_deploy.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "StaticBucketList"
+        Sid    = "S3BucketMeta"
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
           "s3:GetBucketLocation",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"
+        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"]
       },
       {
-        Sid    = "StaticBucketObjectRW"
+        Sid    = "S3ObjectWriteDelete"
         Effect = "Allow"
         Action = [
-          "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"
+        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"]
       },
       {
         Sid    = "CloudFrontInvalidation"
         Effect = "Allow"
         Action = [
           "cloudfront:CreateInvalidation",
-          "cloudfront:GetDistribution",
-          "cloudfront:GetDistributionConfig",
         ]
-        Resource = "arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"
+        Resource = ["arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"]
       },
     ]
   })
