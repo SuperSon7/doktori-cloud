@@ -3,6 +3,11 @@ output "github_actions_role_arn" {
   value       = aws_iam_role.github_actions_deploy.arn
 }
 
+output "github_actions_terraform_role_arn" {
+  description = "GitHub Actions Terraform role ARN"
+  value       = aws_iam_role.github_actions_terraform.arn
+}
+
 output "cloud_team_group_name" {
   description = "Cloud team IAM group name"
   value       = aws_iam_group.cloud_team.name

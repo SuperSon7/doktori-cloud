@@ -17,7 +17,7 @@ variable "github_org" {
 }
 
 variable "github_repos" {
-  description = "GitHub repository names for OIDC"
+  description = "GitHub repository names for deploy OIDC"
   type        = list(string)
   default = [
     "5-team-service-be",
@@ -25,6 +25,12 @@ variable "github_repos" {
     "5-team-service-ai",
     "5-team-service-cloud",
   ]
+}
+
+variable "cloud_repo" {
+  description = "Cloud repo name (for Terraform OIDC role)"
+  type        = string
+  default     = "5-team-service-cloud"
 }
 
 variable "budget_limit_amount" {
