@@ -74,7 +74,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: base\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   apply-app:
     if: inputs.action == 'apply'
@@ -114,7 +114,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
   # Start — EC2 start + RDS start + health check
@@ -215,7 +215,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
   # Stop — EC2 stop + RDS stop (keeps infra, saves ~$47/month)
@@ -277,7 +277,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
   # Deploy — reusable workflow per service (no code duplication)
@@ -293,7 +293,7 @@ jobs:
     secrets:
       AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   deploy-chat:
     if: inputs.action == 'deploy'
@@ -304,7 +304,7 @@ jobs:
     secrets:
       AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
   # Scale — switch EC2 specs between staging (cost saving) and prod (load testing)
@@ -351,7 +351,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Scale ${STATUS}: → ${PROFILE}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
   # Destroy — remove RDS from state, then terraform destroy all
@@ -392,7 +392,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: data\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   destroy-app:
     if: inputs.action == 'destroy'
@@ -427,7 +427,7 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: app\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   destroy-base:
     if: inputs.action == 'destroy'
@@ -464,4 +464,4 @@ jobs:
           fi
           curl -s -H "Content-Type: application/json" \
             -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: base\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_TERRAFORM_WEBHOOK }}
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
