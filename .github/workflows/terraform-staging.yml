@@ -81,7 +81,7 @@ jobs:
     needs: apply-base
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         layer: [app, data]
     steps:
