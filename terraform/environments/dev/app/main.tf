@@ -66,6 +66,7 @@ module "compute" {
       tags = {
         Part        = "cloud"
         Environment = "dev"
+        Service     = "app"
         AutoStop    = "true"
       }
       sg_ingress = [
