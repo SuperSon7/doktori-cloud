@@ -27,6 +27,10 @@ on:
           - staging
           - prod
 
+concurrency:
+  group: terraform-staging
+  cancel-in-progress: false
+
 permissions:
   contents: read
   id-token: write
@@ -56,6 +60,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
 
       - name: Terraform Init & Apply — staging/base
         working-directory: terraform/environments/staging/base
@@ -96,6 +103,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
 
       - name: Terraform Init & Apply — staging/${{ matrix.layer }}
         working-directory: terraform/environments/staging/${{ matrix.layer }}
@@ -327,6 +337,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
+
       - name: "Scale staging/app → ${{ inputs.scale_profile }}"
         working-directory: terraform/environments/staging/app
         run: |
@@ -372,6 +385,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
+
       - name: Terraform Destroy — staging/data
         working-directory: terraform/environments/staging/data
         run: |
@@ -411,6 +427,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
+
       - name: Terraform Destroy — staging/app
         working-directory: terraform/environments/staging/app
         run: |
@@ -445,6 +464,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set traceable hostname for Terraform lock
+        run: sudo hostname "gha-staging-${{ github.run_id }}"
 
       - name: Terraform Destroy — staging/base
         working-directory: terraform/environments/staging/base
