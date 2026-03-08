@@ -19,6 +19,8 @@ module "networking" {
     private_rds = { cidr = "10.1.40.0/24", tier = "private-db", az_key = "secondary" }
   }
 
+  internal_domain = "${var.environment}.doktori.internal"
+
   vpc_interface_endpoints = ["ssm", "ssmmessages", "ec2messages", "ecr.api", "ecr.dkr", "logs"]
   vpc_endpoint_subnet_key = "private_app"
 }

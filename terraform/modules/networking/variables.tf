@@ -68,6 +68,13 @@ variable "nat_extra_tags" {
   default     = {}
 }
 
+# --- Route53 Private Hosted Zone ---
+
+variable "internal_domain" {
+  description = "Private hosted zone domain (e.g. prod.doktori.internal)"
+  type        = string
+}
+
 # --- VPC Endpoints ---
 
 variable "vpc_interface_endpoints" {

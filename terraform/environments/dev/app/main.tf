@@ -15,6 +15,26 @@ locals {
   net = data.terraform_remote_state.base.outputs.networking
 }
 
+# -----------------------------------------------------------------------------
+# Route53 — Internal DNS records
+# -----------------------------------------------------------------------------
+locals {
+  dns_name_map = {
+    dev_app = "app"
+    dev_ai  = "ai"
+  }
+}
+
+resource "aws_route53_record" "service" {
+  for_each = local.dns_name_map
+
+  zone_id = local.net.internal_zone_id
+  name    = "${each.value}.${local.net.internal_zone_name}"
+  type    = "A"
+  ttl     = 300
+  records = [module.compute.private_ips[each.key]]
+}
+
 module "compute" {
   source = "../../../modules/compute"
 
@@ -63,7 +83,7 @@ module "compute" {
       ]
     }
     dev_ai = {
-      instance_type = "t4g.small"
+      instance_type = "t4g.medium"
       architecture  = "arm64"
       subnet_key    = "public"
       volume_size   = 30
