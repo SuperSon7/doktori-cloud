@@ -23,13 +23,71 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     image: ${ECR_REGISTRY}/doktori/backend-api:develop
     init: true
     environment:
       SPRING_PROFILES_ACTIVE: dev
       FIREBASE_CREDENTIALS_PATH: file:/app/secrets/firebase-service-account.json
-      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC"
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -Duser.timezone=Asia/Seoul"
+      TZ: Asia/Seoul
+      SPRING_REDIS_HOST: redis
     volumes:
       - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     ports:
@@ -38,6 +96,10 @@ services:
       - app-net
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
@@ -64,12 +126,17 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC"
+      SPRING_REDIS_HOST: redis
     ports:
       - "8081:8081"
     networks:
       - app-net
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/health || exit 1"]
@@ -264,5 +331,7 @@ networks:
 
 volumes:
   mysql-data:
+  redis-data:
+  rabbitmq-data:
   nginx-logs:
   alloy-data:
