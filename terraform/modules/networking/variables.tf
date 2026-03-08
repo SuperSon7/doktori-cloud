@@ -62,8 +62,14 @@ variable "nat_subnet_key" {
   default     = "public"
 }
 
+variable "nat_volume_size" {
+  description = "Root volume size for NAT instance (GB)"
+  type        = number
+  default     = 8
+}
+
 variable "nat_extra_tags" {
-  description = "Additional tags for the NAT instance"
+  description = "Additional tags for the NAT instance (overrides default Name/Service)"
   type        = map(string)
   default     = {}
 }

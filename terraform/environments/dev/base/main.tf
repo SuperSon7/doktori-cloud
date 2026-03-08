@@ -33,9 +33,11 @@ module "networking" {
     private_db  = { cidr = "10.0.32.0/24", tier = "private-db", az_key = "primary" }
   }
 
-  nat_ami_id   = data.aws_ami.nat_ubuntu.id
-  nat_key_name = var.nat_key_name
-  nat_user_data = <<-USERDATA
+  nat_ami_id        = data.aws_ami.nat_ubuntu.id
+  nat_instance_type = "t4g.micro"
+  nat_volume_size   = 10
+  nat_key_name      = var.nat_key_name
+  nat_user_data     = <<-USERDATA
     #!/bin/bash
     set -e
 
@@ -54,6 +56,8 @@ module "networking" {
   USERDATA
 
   nat_extra_tags = {
+    Name     = "doktori-nonprod-nat-vpn"
+    Service  = "nat-vpn"
     AutoStop = "false"
   }
 
@@ -61,6 +65,19 @@ module "networking" {
 
   # dev는 Interface Endpoint 미사용 (비용 절감 — NAT 경유로 AWS API 접근)
   vpc_interface_endpoints = []
+}
+
+# -----------------------------------------------------------------------------
+# WireGuard VPN — dev NAT 인스턴스에서 VPN 서버 운용
+# -----------------------------------------------------------------------------
+resource "aws_security_group_rule" "nat_wireguard" {
+  type              = "ingress"
+  from_port         = 51820
+  to_port           = 51820
+  protocol          = "udp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "WireGuard VPN"
+  security_group_id = module.networking.nat_sg_id
 }
 
 # NOTE: storage module は Phase 2 で追加予定 (S3/ECR import 後)
