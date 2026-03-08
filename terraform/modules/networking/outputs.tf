@@ -28,6 +28,16 @@ output "nat_sg_id" {
   value       = aws_security_group.nat.id
 }
 
+output "internal_zone_id" {
+  description = "Route53 private hosted zone ID"
+  value       = aws_route53_zone.internal.zone_id
+}
+
+output "internal_zone_name" {
+  description = "Route53 private hosted zone name"
+  value       = aws_route53_zone.internal.name
+}
+
 output "vpc_endpoint_sg_id" {
   description = "VPC Endpoints security group ID (empty string if no interface endpoints)"
   value       = length(aws_security_group.vpc_endpoints) > 0 ? aws_security_group.vpc_endpoints[0].id : ""
