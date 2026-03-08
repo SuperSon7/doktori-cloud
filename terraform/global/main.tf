@@ -240,6 +240,7 @@ resource "aws_iam_role_policy" "terraform_infra" {
           "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
           "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
           "iam:PassRole", "iam:TagRole", "iam:UntagRole",
+          "iam:TagInstanceProfile", "iam:UntagInstanceProfile",
           "iam:CreatePolicy", "iam:DeletePolicy",
           "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
           "iam:ListPolicyVersions", "iam:UpdateAssumeRolePolicy",
