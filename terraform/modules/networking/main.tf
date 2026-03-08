@@ -103,7 +103,7 @@ resource "aws_instance" "nat" {
   }
 
   root_block_device {
-    volume_size = 8
+    volume_size = var.nat_volume_size
     volume_type = "gp3"
     encrypted   = true
   }
