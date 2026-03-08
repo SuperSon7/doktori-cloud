@@ -18,6 +18,13 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 }
 
 # -----------------------------------------------------------------------------
+# SSM Service-Linked Role (태그 기반 타겟팅에 필요)
+# -----------------------------------------------------------------------------
+resource "aws_iam_service_linked_role" "ssm" {
+  aws_service_name = "ssm.amazonaws.com"
+}
+
+# -----------------------------------------------------------------------------
 # GitHub Actions Deploy Role (OIDC)
 # -----------------------------------------------------------------------------
 locals {
