@@ -19,6 +19,8 @@ module "networking" {
     private_rds = { cidr = "10.2.40.0/24", tier = "private-db", az_key = "secondary" }
   }
 
+  internal_domain = "${var.environment}.doktori.internal"
+
   # No VPC endpoints — routes through NAT (saves ~$60/month)
   vpc_interface_endpoints = []
 }

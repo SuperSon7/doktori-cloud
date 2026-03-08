@@ -57,6 +57,8 @@ module "networking" {
     AutoStop = "false"
   }
 
+  internal_domain = "dev.doktori.internal"
+
   # dev는 Interface Endpoint 미사용 (비용 절감 — NAT 경유로 AWS API 접근)
   vpc_interface_endpoints = []
 }
