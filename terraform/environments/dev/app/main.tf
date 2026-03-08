@@ -60,9 +60,9 @@ module "compute" {
     dev_app = {
       instance_type = "t4g.medium"
       architecture  = "arm64"
-      subnet_key    = "public"
+      subnet_key    = "private_app"
       volume_size   = 60
-      associate_eip = true
+      associate_eip = false
       tags = {
         Part        = "cloud"
         Environment = "dev"
@@ -86,7 +86,7 @@ module "compute" {
     dev_ai = {
       instance_type = "t4g.medium"
       architecture  = "arm64"
-      subnet_key    = "public"
+      subnet_key    = "private_app"
       volume_size   = 30
       tags = {
         Part        = "ai"
