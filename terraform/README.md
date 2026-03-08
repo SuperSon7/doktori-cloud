@@ -94,6 +94,22 @@ backend → global → base → app → data
 
 `base` must complete before `app`/`data` — they reference base outputs via `terraform_remote_state`.
 
+### Base 변경 시 PR 분리 (필수)
+
+`base` 레이어에 **새 output이 추가**되는 변경이 있으면 반드시 PR을 분리한다:
+
+```
+1. PR #1: base 변경만 (modules/ + base layers + outputs)
+   → merge → CI가 base apply → remote state에 새 output 반영
+
+2. PR #2: app/data 변경 (새 output을 참조하는 리소스)
+   → 이제 plan이 정상 동작 → 리뷰에서 실제 변경 확인 가능
+```
+
+**이유**: app/data는 `terraform_remote_state`로 base output을 읽는다. base가 apply되기 전에는 새 output이 state에 없으므로 app/data plan이 실패한다. 한 PR에 합치면 CI plan에서 app/data 검증이 불가능하다.
+
+`plan-all.sh`도 이 의존성을 인식하여, base에 changes가 있으면 하위 레이어를 자동으로 skip한다.
+
 ## State Management
 
 | Item | Value |

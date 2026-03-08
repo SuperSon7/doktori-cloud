@@ -54,10 +54,12 @@ echo ""
 # ── 결과 저장 ────────────────────────────────────────────────────────────────
 declare -a RESULTS=()
 declare -a DURATIONS=()
+BASE_CHANGED_LIST=""   # 환경별 base 변경 추적 (space-separated: "prod staging")
 PASS=0
 FAIL=0
 NOCHANGE=0
 CHANGES=0
+SKIP=0
 LOG_DIR=$(mktemp -d)
 
 for layer in "${LAYERS[@]}"; do
@@ -70,7 +72,22 @@ for layer in "${LAYERS[@]}"; do
   if [ ! -d "$WORK_DIR" ]; then
     echo "⚠  SKIP  ${layer} — directory not found"
     RESULTS+=("SKIP|${layer}|directory not found")
+    SKIP=$((SKIP + 1))
     continue
+  fi
+
+  # base 변경이 있으면 하위 레이어(app/data) skip
+  ENV_NAME="${layer%%/*}"
+  LAYER_TYPE="${layer#*/}"
+  if [[ "$layer" != "global" && "$LAYER_TYPE" != "base" ]]; then
+    if [[ " $BASE_CHANGED_LIST " == *" $ENV_NAME "* ]]; then
+      echo "── ${layer} ──────────────────────────────────"
+      echo "  ⚠ SKIP — ${ENV_NAME}/base has pending changes (apply base first)"
+      echo ""
+      RESULTS+=("SKIP|${layer}|base changes pending — apply base first")
+      SKIP=$((SKIP + 1))
+      continue
+    fi
   fi
 
   echo "── ${layer} ──────────────────────────────────"
@@ -121,6 +138,11 @@ for layer in "${LAYERS[@]}"; do
       RESULTS+=("CHANGE|${layer}|${SUMMARY}")
       PASS=$((PASS + 1))
       CHANGES=$((CHANGES + 1))
+
+      # base 변경 기록 — 하위 레이어 skip 판단용
+      if [[ "$layer" != "global" && "$LAYER_TYPE" == "base" ]]; then
+        BASE_CHANGED_LIST="$BASE_CHANGED_LIST $ENV_NAME"
+      fi
       ;;
     *)
       echo "UNKNOWN EXIT $EXIT_CODE (${DURATION}s)"
@@ -153,7 +175,7 @@ for result in "${RESULTS[@]}"; do
 done
 
 echo ""
-echo "Total: ${#LAYERS[@]} layers | ✓ No change: $NOCHANGE | △ Changes: $CHANGES | ✗ Failed: $FAIL"
+echo "Total: ${#LAYERS[@]} layers | ✓ No change: $NOCHANGE | △ Changes: $CHANGES | ⚠ Skip: $SKIP | ✗ Failed: $FAIL"
 echo "Logs: $LOG_DIR"
 
 if [ $FAIL -gt 0 ]; then
