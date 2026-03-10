@@ -151,6 +151,36 @@ resource "aws_iam_role_policy" "ec2_ecr_pull" {
   })
 }
 
+resource "aws_iam_role_policy" "ec2_self_stop" {
+  name = "${var.project_name}-${var.environment}-ec2-self-stop"
+  role = aws_iam_role.ec2_ssm.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:StopInstances",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "ec2:ResourceTag/Role" = "batch-weekly"
+          }
+        }
+      },
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_ssm" {
   name = "${var.project_name}-${var.environment}-ec2-ssm"
   role = aws_iam_role.ec2_ssm.name
