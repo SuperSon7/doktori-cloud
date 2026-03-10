@@ -1,0 +1,103 @@
+#!/bin/bash
+set -euxo pipefail
+
+exec > >(tee -a /var/log/doktori-weekly-batch-bootstrap.log) 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+export AWS_REGION="${aws_region}"
+
+LOG_DIR="/var/log/doktori"
+APP_LOG="${log_file}"
+ENV_FILE="/opt/doktori/weekly-batch.env"
+RUNNER_SCRIPT="/usr/local/bin/run-weekly-batch.sh"
+ECR_REGISTRY="${ecr_registry}"
+IMAGE_URI="${image_uri}"
+PARAMETER_PATH="${ssm_parameter_path}"
+
+mkdir -p "$LOG_DIR" /opt/doktori
+touch "$APP_LOG"
+chmod 644 "$APP_LOG"
+
+apt-get update -y
+apt-get install -y ca-certificates curl gnupg lsb-release unzip jq
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable docker
+systemctl start docker
+
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install --update
+rm -rf /tmp/aws /tmp/awscliv2.zip
+
+systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+aws ssm get-parameters-by-path \
+  --region "$AWS_REGION" \
+  --path "$PARAMETER_PATH" \
+  --with-decryption \
+  --recursive \
+  --output json \
+  --no-cli-pager \
+| jq -r '.Parameters[] | "\(.Name | split("/") | last)=\(.Value)"' > "$ENV_FILE"
+
+cat <<'SCRIPT' > "$RUNNER_SCRIPT"
+#!/bin/bash
+set -euxo pipefail
+
+APP_LOG="${log_file}"
+ENV_FILE="/opt/doktori/weekly-batch.env"
+IMAGE_URI="${image_uri}"
+AWS_REGION="${aws_region}"
+INSTANCE_ID="$${INSTANCE_ID}"
+
+{
+  echo "=== Weekly batch start $(date -Is) ==="
+  docker pull "$IMAGE_URI"
+  docker run --rm \
+    --name dev-ai-weekly-batch \
+    --env-file "$ENV_FILE" \
+    -e AWS_REGION="$AWS_REGION" \
+    -e TZ="Asia/Seoul" \
+    "$IMAGE_URI" \
+    ${batch_command}
+  echo "=== Weekly batch done $(date -Is) ==="
+} >> "$APP_LOG" 2>&1
+
+aws ec2 stop-instances \
+  --region "$AWS_REGION" \
+  --instance-ids "$INSTANCE_ID" \
+  >> "$APP_LOG" 2>&1 || true
+SCRIPT
+
+chmod +x "$RUNNER_SCRIPT"
+
+cat <<'SERVICE' > /etc/systemd/system/doktori-weekly-batch.service
+[Unit]
+Description=Doktori weekly batch runner
+After=network-online.target docker.service snap.amazon-ssm-agent.amazon-ssm-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/run-weekly-batch.sh
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable doktori-weekly-batch.service
+systemctl start doktori-weekly-batch.service
