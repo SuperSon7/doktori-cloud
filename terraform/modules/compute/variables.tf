@@ -79,3 +79,9 @@ variable "ssm_parameter_paths" {
   type        = list(string)
   default     = []
 }
+
+variable "enable_batch_self_stop" {
+  description = "Whether to create ec2:StopInstances IAM policy for batch instances"
+  type        = bool
+  default     = false
+}

@@ -65,20 +65,40 @@ module "networking" {
 
   # dev는 Interface Endpoint 미사용 (비용 절감 — NAT 경유로 AWS API 접근)
   vpc_interface_endpoints = []
+
+  # WireGuard VPN — dev NAT 인스턴스에서 VPN 서버 운용
+  nat_extra_ingress = [
+    { description = "WireGuard VPN", from_port = 51820, to_port = 51820, protocol = "udp", cidr_blocks = ["0.0.0.0/0"] },
+  ]
 }
 
 # -----------------------------------------------------------------------------
-# WireGuard VPN — dev NAT 인스턴스에서 VPN 서버 운용
+# Storage — S3 buckets
 # -----------------------------------------------------------------------------
-resource "aws_security_group_rule" "nat_wireguard" {
-  type              = "ingress"
-  from_port         = 51820
-  to_port           = 51820
-  protocol          = "udp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  description       = "WireGuard VPN"
-  security_group_id = module.networking.nat_sg_id
-}
+module "storage" {
+  source = "../../../modules/storage"
 
-# NOTE: storage module は Phase 2 で追加予定 (S3/ECR import 後)
-# S3: doktori-v2-dev, ECR: doktori/backend-api 等は現在 Terraform 未管理
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  create_kms_and_iam = false # 기존 수동 생성 KMS/IAM 유지 — Phase 1에서 import 예정
+
+  s3_buckets = {
+    app = {
+      bucket_name        = "doktori-v2-dev"
+      public_read        = true
+      public_read_prefix = "/images/*"
+      versioning         = false
+      enable_cors        = true
+      encryption         = true
+      bucket_key_enabled = true
+      folders = [
+        "backup/",
+        "images/chats/",
+        "images/meetings/",
+        "images/profiles/",
+        "images/reviews/",
+      ]
+    }
+  }
+}

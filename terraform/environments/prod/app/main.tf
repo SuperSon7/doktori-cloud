@@ -42,10 +42,11 @@ resource "aws_route53_record" "service" {
 module "compute" {
   source = "../../../modules/compute"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-  vpc_id       = local.net.vpc_id
+  project_name           = var.project_name
+  environment            = var.environment
+  aws_region             = var.aws_region
+  vpc_id                 = local.net.vpc_id
+  enable_batch_self_stop = true
   vpc_cidr     = local.net.vpc_cidr
   subnet_ids   = local.net.subnet_ids
   key_name     = var.key_name

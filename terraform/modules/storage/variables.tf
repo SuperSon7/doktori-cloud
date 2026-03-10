@@ -25,6 +25,12 @@ variable "s3_buckets" {
   default = {}
 }
 
+variable "create_kms_and_iam" {
+  description = "Whether to create KMS key and IAM policy for Parameter Store"
+  type        = bool
+  default     = true
+}
+
 variable "ecr_repositories" {
   description = "Map of ECR repositories to create"
   type = map(object({

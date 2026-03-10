@@ -41,7 +41,7 @@ resource "aws_s3_bucket_policy" "this" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadGetObject"
+        Sid       = "PublicReadImages"
         Effect    = "Allow"
         Principal = "*"
         Action    = "s3:GetObject"
@@ -142,6 +142,8 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
 # KMS Key for Parameter Store
 # -----------------------------------------------------------------------------
 resource "aws_kms_key" "parameter_store" {
+  count = var.create_kms_and_iam ? 1 : 0
+
   description             = "KMS key for ${var.environment} Parameter Store secrets"
   deletion_window_in_days = 7
   enable_key_rotation     = true
@@ -153,14 +155,18 @@ resource "aws_kms_key" "parameter_store" {
 }
 
 resource "aws_kms_alias" "parameter_store" {
+  count = var.create_kms_and_iam ? 1 : 0
+
   name          = "alias/${var.project_name}-${var.environment}-parameter-store"
-  target_key_id = aws_kms_key.parameter_store.key_id
+  target_key_id = aws_kms_key.parameter_store[0].key_id
 }
 
 # -----------------------------------------------------------------------------
 # IAM Policy for Parameter Store access
 # -----------------------------------------------------------------------------
 resource "aws_iam_policy" "parameter_store_read" {
+  count = var.create_kms_and_iam ? 1 : 0
+
   name        = "${var.project_name}-${var.environment}-parameter-store-read"
   description = "Policy to read ${var.environment} Parameter Store secrets"
 
@@ -179,7 +185,7 @@ resource "aws_iam_policy" "parameter_store_read" {
       {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
-        Resource = aws_kms_key.parameter_store.arn
+        Resource = aws_kms_key.parameter_store[0].arn
       },
     ]
   })
