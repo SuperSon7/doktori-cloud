@@ -152,6 +152,8 @@ resource "aws_iam_role_policy" "ec2_ecr_pull" {
 }
 
 resource "aws_iam_role_policy" "ec2_self_stop" {
+  count = var.enable_batch_self_stop ? 1 : 0
+
   name = "${var.project_name}-${var.environment}-ec2-self-stop"
   role = aws_iam_role.ec2_ssm.id
 

@@ -15,15 +15,15 @@ output "ecr_repository_urls" {
 
 output "kms_key_arn" {
   description = "Parameter Store KMS key ARN"
-  value       = aws_kms_key.parameter_store.arn
+  value       = var.create_kms_and_iam ? aws_kms_key.parameter_store[0].arn : null
 }
 
 output "kms_key_id" {
   description = "Parameter Store KMS key ID"
-  value       = aws_kms_key.parameter_store.key_id
+  value       = var.create_kms_and_iam ? aws_kms_key.parameter_store[0].key_id : null
 }
 
 output "parameter_store_read_policy_arn" {
   description = "Parameter Store read IAM policy ARN"
-  value       = aws_iam_policy.parameter_store_read.arn
+  value       = var.create_kms_and_iam ? aws_iam_policy.parameter_store_read[0].arn : null
 }

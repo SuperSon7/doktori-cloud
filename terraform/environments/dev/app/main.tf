@@ -62,11 +62,12 @@ resource "aws_route53_record" "service" {
 module "compute" {
   source = "../../../modules/compute"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-  vpc_id       = local.net.vpc_id
-  vpc_cidr     = local.net.vpc_cidr
+  project_name          = var.project_name
+  environment           = var.environment
+  aws_region            = var.aws_region
+  vpc_id                = local.net.vpc_id
+  vpc_cidr              = local.net.vpc_cidr
+  enable_batch_self_stop = true
   subnet_ids   = local.net.subnet_ids
   key_name     = var.key_name
 
@@ -105,6 +106,7 @@ module "compute" {
         { description = "RDS replication source", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = ["15.164.45.30/32"] },
         { description = "Wiremock", from_port = 9090, to_port = 9090, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "RabbitMQ Management", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
+        { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
     }
     dev_ai = {

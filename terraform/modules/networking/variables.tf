@@ -74,6 +74,18 @@ variable "nat_extra_tags" {
   default     = {}
 }
 
+variable "nat_extra_ingress" {
+  description = "Additional ingress rules for NAT SG (e.g. WireGuard)"
+  type = list(object({
+    description = string
+    from_port   = number
+    to_port     = number
+    protocol    = string
+    cidr_blocks = list(string)
+  }))
+  default = []
+}
+
 # --- Route53 Private Hosted Zone ---
 
 variable "internal_domain" {

@@ -25,5 +25,32 @@ module "networking" {
   vpc_endpoint_subnet_key = "private_app"
 }
 
-# NOTE: storage module は Phase 2 で追加予定
-# S3: doktori-v2-prod (import 필요), ECR: prod/ecr state から移行予定
+# -----------------------------------------------------------------------------
+# Storage — S3 buckets
+# -----------------------------------------------------------------------------
+module "storage" {
+  source = "../../../modules/storage"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  create_kms_and_iam = false # 기존 수동 생성 KMS/IAM 유지 — Phase 1에서 import 예정
+
+  s3_buckets = {
+    app = {
+      bucket_name        = "doktori-v2-prod"
+      public_read        = true
+      public_read_prefix = "/images/*"
+      versioning         = true
+      enable_cors        = true
+      encryption         = true
+      bucket_key_enabled = true
+      folders = [
+        "backup/",
+        "images/meetings/",
+        "images/profiles/",
+        "images/reviews/",
+      ]
+    }
+  }
+}
