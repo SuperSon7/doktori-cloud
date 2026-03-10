@@ -286,6 +286,18 @@ resource "aws_iam_role_policy" "terraform_infra" {
         Resource = "*"
       },
       {
+        Sid      = "Lambda"
+        Effect   = "Allow"
+        Action   = ["lambda:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "Scheduler"
+        Effect   = "Allow"
+        Action   = ["scheduler:*"]
+        Resource = "*"
+      },
+      {
         Sid      = "Route53"
         Effect   = "Allow"
         Action   = ["route53:*"]
@@ -387,7 +399,7 @@ resource "aws_iam_group_policy" "be_team_ssm" {
         Condition = {
           StringEquals = {
             "ssm:resourceTag/Service"     = ["app"]
-            "ssm:resourceTag/Environment" = ["dev"]
+            "ssm:resourceTag/Environment" = ["dev", "nonprod"]
             "ssm:resourceTag/Project"     = var.project_name
           }
         }
