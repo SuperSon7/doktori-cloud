@@ -43,3 +43,29 @@ variable "default_volume_size" {
   type        = number
   default     = 8
 }
+
+variable "create_h_k8s_nodes" {
+  description = "Whether to create the learning-purpose h-k8s kubeadm nodes in staging"
+  type        = bool
+  default     = true
+}
+
+variable "h_k8s_instance_types" {
+  description = "Instance type per h-k8s node"
+  type        = map(string)
+  default = {
+    master   = "t4g.medium"
+    worker_1 = "t4g.large"
+    worker_2 = "t4g.large"
+  }
+}
+
+variable "h_k8s_volume_sizes" {
+  description = "Root volume size per h-k8s node in GB"
+  type        = map(number)
+  default = {
+    master   = 30
+    worker_1 = 50
+    worker_2 = 50
+  }
+}
