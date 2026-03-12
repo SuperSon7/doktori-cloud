@@ -32,3 +32,15 @@ variable "monitoring_ip" {
   type    = string
   default = "13.125.29.187"
 }
+
+variable "chat_observer_allowed_cidrs" {
+  description = "CIDR blocks allowed to access the chat observer over HTTPS"
+  type        = list(string)
+  default     = []
+}
+
+variable "chat_observer_instance_type" {
+  description = "Instance type for the public chat observer host"
+  type        = string
+  default     = "t3.small"
+}
