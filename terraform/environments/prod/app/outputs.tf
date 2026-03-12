@@ -7,3 +7,8 @@ output "compute" {
     eip_public_ips     = module.compute.eip_public_ips
   }
 }
+
+output "chat_observer_public_ip" {
+  description = "Public IP for the doktori-chat-observer instance"
+  value       = try(module.compute.eip_public_ips["chat_observer"], null)
+}

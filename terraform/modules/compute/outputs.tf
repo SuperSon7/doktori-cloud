@@ -15,7 +15,10 @@ output "security_group_ids" {
 
 output "eip_public_ips" {
   description = "Map of service key to EIP public IP (only for services with associate_eip)"
-  value       = { for k, v in aws_eip.this : k => v.public_ip }
+  value = merge(
+    { for k, v in aws_eip.this : k => v.public_ip },
+    { for k, v in data.aws_eip.existing : k => v.public_ip },
+  )
 }
 
 output "iam_role_name" {

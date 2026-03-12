@@ -38,14 +38,15 @@ variable "custom_ami_id" {
 variable "services" {
   description = "Map of services to deploy"
   type = map(object({
-    instance_type = string
-    architecture  = string                    # "arm64" | "x86"
-    subnet_key    = string                    # key into subnet_ids map
-    volume_size   = optional(number, 20)
-    associate_eip = optional(bool, false)
-    user_data     = optional(string, "")
-    ami_id        = optional(string, "")      # per-service AMI override
-    tags          = optional(map(string), {})
+    instance_type              = string
+    architecture               = string # "arm64" | "x86"
+    subnet_key                 = string # key into subnet_ids map
+    volume_size                = optional(number, 20)
+    associate_eip              = optional(bool, false)
+    existing_eip_allocation_id = optional(string, "")
+    user_data                  = optional(string, "")
+    ami_id                     = optional(string, "") # per-service AMI override
+    tags                       = optional(map(string), {})
     sg_ingress = list(object({
       description = string
       from_port   = number

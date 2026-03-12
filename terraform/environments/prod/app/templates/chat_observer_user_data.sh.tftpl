@@ -1,0 +1,91 @@
+#!/bin/bash
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y nginx python3 ssl-cert
+
+install -d -m 0755 /opt/doktori-chat-observer/current
+install -d -m 0750 /etc/doktori-chat-observer
+
+cat >/opt/doktori-chat-observer/current/index.html <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>doktori-chat-observer</title>
+  </head>
+  <body>
+    <h1>doktori-chat-observer</h1>
+    <p>Placeholder observer endpoint is running behind nginx.</p>
+  </body>
+</html>
+EOF
+
+cat >/etc/doktori-chat-observer/observer.env <<'EOF'
+# Replace these values before deploying the real observer application.
+OBSERVER_TOKEN=
+TARGET_CHAT_BASE_URL=
+EOF
+
+chmod 0640 /etc/doktori-chat-observer/observer.env
+
+cat >/usr/local/bin/doktori-chat-observer <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+exec /usr/bin/python3 -m http.server 7070 \
+  --bind 127.0.0.1 \
+  --directory /opt/doktori-chat-observer/current
+EOF
+
+chmod 0755 /usr/local/bin/doktori-chat-observer
+
+cat >/etc/systemd/system/doktori-chat-observer.service <<'EOF'
+[Unit]
+Description=Doktori Chat Observer placeholder service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/doktori-chat-observer/current
+EnvironmentFile=-/etc/doktori-chat-observer/observer.env
+ExecStart=/usr/local/bin/doktori-chat-observer
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+rm -f /etc/nginx/sites-enabled/default
+
+cat >/etc/nginx/sites-available/doktori-chat-observer <<'EOF'
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name _;
+
+    ssl_certificate     /etc/ssl/certs/ssl-cert-snakeoil.pem;
+    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:7070;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/doktori-chat-observer /etc/nginx/sites-enabled/doktori-chat-observer
+
+systemctl daemon-reload
+systemctl enable --now doktori-chat-observer.service
+nginx -t
+systemctl enable --now nginx

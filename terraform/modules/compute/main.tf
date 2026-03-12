@@ -286,9 +286,21 @@ resource "aws_instance" "this" {
 # -----------------------------------------------------------------------------
 # Elastic IPs (conditional)
 # -----------------------------------------------------------------------------
+data "aws_eip" "existing" {
+  for_each = {
+    for k, v in var.services : k => v
+    if v.associate_eip && v.existing_eip_allocation_id != ""
+  }
+
+  id = each.value.existing_eip_allocation_id
+}
+
 resource "aws_eip" "this" {
-  for_each = { for k, v in var.services : k => v if v.associate_eip }
-  domain   = "vpc"
+  for_each = {
+    for k, v in var.services : k => v
+    if v.associate_eip && v.existing_eip_allocation_id == ""
+  }
+  domain = "vpc"
 
   tags = {
     Name    = "${var.project_name}-${var.environment}-${replace(each.key, "_", "-")}-eip"
@@ -298,6 +310,13 @@ resource "aws_eip" "this" {
 
 resource "aws_eip_association" "this" {
   for_each = aws_eip.this
+
+  allocation_id = each.value.id
+  instance_id   = aws_instance.this[each.key].id
+}
+
+resource "aws_eip_association" "existing" {
+  for_each = data.aws_eip.existing
 
   allocation_id = each.value.id
   instance_id   = aws_instance.this[each.key].id

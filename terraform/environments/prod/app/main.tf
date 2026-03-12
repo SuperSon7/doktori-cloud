@@ -15,6 +15,10 @@ locals {
   net = data.terraform_remote_state.base.outputs.networking
 }
 
+locals {
+  chat_observer_user_data = templatefile("${path.module}/templates/chat_observer_user_data.sh.tftpl", {})
+}
+
 # -----------------------------------------------------------------------------
 # Route53 — Internal DNS records
 # -----------------------------------------------------------------------------
@@ -47,9 +51,9 @@ module "compute" {
   aws_region             = var.aws_region
   vpc_id                 = local.net.vpc_id
   enable_batch_self_stop = true
-  vpc_cidr     = local.net.vpc_cidr
-  subnet_ids   = local.net.subnet_ids
-  key_name     = var.key_name
+  vpc_cidr               = local.net.vpc_cidr
+  subnet_ids             = local.net.subnet_ids
+  key_name               = var.key_name
 
   s3_bucket_arns = [
     "arn:aws:s3:::${var.project_name}-v2-${var.environment}",
@@ -107,6 +111,18 @@ module "compute" {
       sg_ingress = [
         { description = "MySQL exporter from VPC", from_port = 9104, to_port = 9104, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
+    }
+    chat_observer = {
+      instance_type              = var.chat_observer_instance_type
+      architecture               = "x86"
+      subnet_key                 = "public"
+      associate_eip              = true
+      existing_eip_allocation_id = "eipalloc-04097640dbc0bc426"
+      user_data                  = local.chat_observer_user_data
+      tags                       = { Part = "loadtest-observer" }
+      sg_ingress = length(var.chat_observer_allowed_cidrs) > 0 ? [
+        { description = "HTTPS from allowed observer CIDRs", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = var.chat_observer_allowed_cidrs },
+      ] : []
     }
   }
 
