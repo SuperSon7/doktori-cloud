@@ -23,12 +23,17 @@ variable "secondary_availability_zone" {
   default = ""
 }
 
+variable "tertiary_availability_zone" {
+  type    = string
+  default = ""
+}
+
 variable "subnets" {
   description = "Map of subnets to create"
   type = map(object({
     cidr   = string
     tier   = string # "public" | "private-app" | "private-db"
-    az_key = string # "primary" | "secondary"
+    az_key = string # "primary" | "secondary" | "tertiary"
   }))
 }
 

@@ -30,6 +30,8 @@ locals {
     chat           = "chat"
     ai             = "ai"
     rds_monitoring = "rds-exporter"
+    redis          = "redis"
+    rabbitmq       = "rabbitmq"
   }
 }
 
@@ -112,12 +114,31 @@ module "compute" {
         { description = "MySQL exporter from VPC", from_port = 9104, to_port = 9104, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
     }
+    redis = {
+      instance_type = "t4g.micro"
+      architecture  = "arm64"
+      subnet_key    = "private_app"
+      tags          = { Part = "data" }
+      sg_ingress = [
+        { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
+      ]
+    }
+    rabbitmq = {
+      instance_type = "t4g.micro"
+      architecture  = "arm64"
+      subnet_key    = "private_app"
+      tags          = { Part = "data" }
+      sg_ingress = [
+        { description = "RabbitMQ AMQP from VPC", from_port = 5672, to_port = 5672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
+        { description = "RabbitMQ mgmt from VPC", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
+      ]
+    }
     chat_observer = {
       instance_type              = var.chat_observer_instance_type
       architecture               = "x86"
       subnet_key                 = "public"
       associate_eip              = true
-      existing_eip_allocation_id = "eipalloc-04097640dbc0bc426"
+      existing_eip_allocation_id = ""
       user_data                  = local.chat_observer_user_data
       tags                       = { Part = "loadtest-observer" }
       sg_ingress = length(var.chat_observer_allowed_cidrs) > 0 ? [

@@ -28,11 +28,6 @@ variable "domain_name" {
   default = "doktori.kr"
 }
 
-variable "monitoring_ip" {
-  type    = string
-  default = "13.125.29.187"
-}
-
 variable "chat_observer_allowed_cidrs" {
   description = "CIDR blocks allowed to access the chat observer over HTTPS"
   type        = list(string)

@@ -30,11 +30,13 @@ variable "instance_types" {
   type        = map(string)
   default = {
     nginx          = "t4g.nano"
-    front          = "t4g.nano"
-    api            = "t4g.nano"
-    chat           = "t4g.micro"
+    front          = "t4g.small"
+    api            = "t4g.medium"
+    chat           = "t4g.medium"
     ai             = "t4g.micro"
     rds_monitoring = "t3.micro"
+    redis          = "t4g.micro"
+    rabbitmq       = "t4g.micro"
   }
 }
 

@@ -144,7 +144,7 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
 resource "aws_kms_key" "parameter_store" {
   count = var.create_kms_and_iam ? 1 : 0
 
-  description             = "KMS key for ${var.environment} Parameter Store secrets"
+  description             = "KMS key for Parameter Store secrets"
   deletion_window_in_days = 7
   enable_key_rotation     = true
 
@@ -168,7 +168,7 @@ resource "aws_iam_policy" "parameter_store_read" {
   count = var.create_kms_and_iam ? 1 : 0
 
   name        = "${var.project_name}-${var.environment}-parameter-store-read"
-  description = "Policy to read ${var.environment} Parameter Store secrets"
+  description = "Policy to read Parameter Store secrets"
 
   policy = jsonencode({
     Version = "2012-10-17"
