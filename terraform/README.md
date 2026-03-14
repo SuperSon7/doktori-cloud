@@ -44,7 +44,8 @@ terraform/
 │   ├── networking/                # VPC, Subnet, NAT Instance, VPC Endpoint
 │   ├── compute/                   # EC2, SG, IAM Role, EIP
 │   ├── database/                  # RDS, Parameter Group, DB Password (SSM)
-│   └── storage/                   # S3, ECR, KMS
+│   └── storage/                   # S3, KMS, IAM (per-env)
+├── ecr/                              # ECR repositories (cross-env)
 ├── environments/
 │   ├── dev/
 │   │   ├── base/                  # VPC (10.0.0.0/16)
@@ -129,6 +130,7 @@ global/terraform.tfstate
 {env}/data/terraform.tfstate
 monitoring/terraform.tfstate
 dns-zone/terraform.tfstate
+ecr/terraform.tfstate
 prod/cdn/terraform.tfstate
 ```
 
@@ -204,7 +206,8 @@ S3, ECR, KMS.
 - **Deploy IAM Role** — ECR push + SSM SendCommand (전체 서비스 레포)
 - **Terraform IAM Role** — 인프라 변경 (Cloud 레포 전용)
 - **CDN Deploy Policy** — S3 upload + CloudFront invalidation
-- **IAM Groups** — 팀별 SSM 접근 제어 (cloud/be/fe/ai)
+- **IAM Groups** — Admin (AdministratorAccess), 팀별 SSM 접근 제어 (cloud/be/fe/ai)
+- **IAM Users** — Admin users, 팀 members, 서비스 계정 (grafana-billing-reader)
 - **Budget Alert** — 50% / 80% / 100% threshold
 
 ## CI/CD
@@ -268,12 +271,12 @@ staging 환경 수명주기 관리. 위 [Staging Lifecycle](#staging-lifecycle) 
 {project}-{environment}-{resource}
 ```
 
-예: `doktori-prod-vpc`, `doktori-staging-nginx-sg`, `doktori-nonprod-ec2-ssm`
+예: `doktori-prod-vpc`, `doktori-staging-nginx-sg`, `doktori-dev-ec2-ssm`
 
 ## Known Limitations
 
 - **Single AZ**: NAT Instance + RDS 모두 단일 AZ 배치 (비용 우선)
-- **storage 모듈 미연동**: 일부 S3/ECR이 Terraform 외부 관리 (Phase 2 예정)
+- **ECR prod-* repo 중복**: prod 전용 ECR repo가 별도로 존재 — 태그 기반 분리로 통합 예정
 - **Terraform state 내 DB 비밀번호**: S3 암호화로 보완하나 완전한 해결은 아님
 - **Terraform Role 권한**: EC2/RDS/S3에 `*` resource 사용 — 리소스 수준 제한 필요
 - **모니터링 서버 네트워크**: dev/prod CIDR 충돌로 default VPC에 배치 (VPC 피어링 불가)

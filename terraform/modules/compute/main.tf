@@ -223,7 +223,8 @@ resource "aws_security_group" "this" {
   }
 
   lifecycle {
-    ignore_changes = [description]
+    create_before_destroy = true
+    ignore_changes        = [description]
   }
 }
 
@@ -316,8 +317,11 @@ resource "aws_eip_association" "this" {
 }
 
 resource "aws_eip_association" "existing" {
-  for_each = data.aws_eip.existing
+  for_each = {
+    for k, v in var.services : k => v
+    if v.associate_eip && v.existing_eip_allocation_id != ""
+  }
 
-  allocation_id = each.value.id
+  allocation_id = data.aws_eip.existing[each.key].id
   instance_id   = aws_instance.this[each.key].id
 }

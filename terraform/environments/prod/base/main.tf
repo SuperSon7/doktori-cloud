@@ -34,7 +34,7 @@ module "storage" {
   project_name       = var.project_name
   environment        = var.environment
   aws_region         = var.aws_region
-  create_kms_and_iam = false # 기존 수동 생성 KMS/IAM 유지 — Phase 1에서 import 예정
+  create_kms_and_iam = true
 
   s3_buckets = {
     app = {
@@ -52,5 +52,23 @@ module "storage" {
         "images/reviews/",
       ]
     }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# SSM Parameter Store
+# -----------------------------------------------------------------------------
+module "ssm_parameters" {
+  source = "../../../modules/ssm-parameters"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # prod 전용 파라미터 (공통 파라미터는 모듈 default로 포함)
+  extra_parameters = {
+    "DB_URL"                        = { type = "SecureString" }  # dev는 String
+    "RUNPOD_POLL_TIMEOUT_SECONDS"   = { type = "SecureString" }  # dev는 String
+    "NEXT_PUBLIC_API_BASE_URL_PROD" = { type = "String" }
+    "NEXT_PUBLIC_CHAT_BASE_URL_PROD" = { type = "String" }
   }
 }
