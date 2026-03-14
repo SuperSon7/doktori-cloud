@@ -3,17 +3,7 @@ variable "project_name" {
   default = "doktori"
 }
 
-variable "environment" {
-  type    = string
-  default = "dev"
-}
-
 variable "aws_region" {
   type    = string
   default = "ap-northeast-2"
-}
-
-variable "nat_key_name" {
-  type    = string
-  default = "doktori-dev"
 }

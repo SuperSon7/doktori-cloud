@@ -3,10 +3,9 @@ variable "project_name" {
   default = "doktori"
 }
 
-# NOTE: "nonprod" — 기존 리소스 이름과 일치하도록 유지
 variable "environment" {
   type    = string
-  default = "nonprod"
+  default = "dev"
 }
 
 variable "aws_region" {

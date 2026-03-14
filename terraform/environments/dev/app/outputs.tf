@@ -11,7 +11,7 @@ output "compute" {
 output "weekly_batch" {
   description = "Weekly batch automation outputs"
   value = {
-    instance_id        = module.compute.instance_ids["dev_ai_batch"]
+    instance_id        = module.compute.instance_ids[local.batch_instance_key]
     log_file           = "/var/log/doktori/weekly-batch.log"
     image_uri          = local.batch_image_uri
     scheduler_name     = aws_scheduler_schedule.weekly_batch_start.name
