@@ -263,7 +263,7 @@ resource "aws_iam_role_policy" "terraform_infra" {
         Resource = "*"
       },
       {
-        Sid    = "KMS"
+        Sid    = "KMSManagement"
         Effect = "Allow"
         Action = [
           "kms:CreateKey", "kms:DescribeKey",
@@ -273,6 +273,16 @@ resource "aws_iam_role_policy" "terraform_infra" {
           "kms:EnableKeyRotation", "kms:ScheduleKeyDeletion",
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "KMSDecryptParameterStore"
+        Effect = "Allow"
+        Action = ["kms:Decrypt", "kms:Encrypt"]
+        Resource = [
+          "arn:aws:kms:ap-northeast-2:250857930609:key/2ddbf5d2-3960-4d7c-97cd-45e7cd7fa2e6",
+          "arn:aws:kms:ap-northeast-2:250857930609:key/e30d6af4-88ef-420a-b1ef-9d43d1ef8010",
+          "arn:aws:kms:ap-northeast-2:250857930609:key/709fb125-d24d-4365-a33d-ebbeb9a4ec39",
+        ]
       },
       {
         Sid      = "ECR"
