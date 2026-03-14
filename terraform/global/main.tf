@@ -41,11 +41,6 @@ locals {
       "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/feature/*",
       "repo:${var.github_org}/5-team-service-fe:ref:refs/heads/feature/s3-CDN",
     ],
-    # TODO: 테스트 후 제거
-    [
-      "repo:SuperSon7/5-team-service-be:ref:refs/heads/main",
-      "repo:SuperSon7/5-team-service-be:ref:refs/heads/develop",
-    ],
   )
 
   # Terraform role: Cloud 레포 전용 (main, feature/*, PR)
@@ -399,7 +394,7 @@ resource "aws_iam_group_policy" "be_team_ssm" {
         Condition = {
           StringEquals = {
             "ssm:resourceTag/Service"     = ["app"]
-            "ssm:resourceTag/Environment" = ["dev", "nonprod"]
+            "ssm:resourceTag/Environment" = ["dev"]
             "ssm:resourceTag/Project"     = var.project_name
           }
         }
@@ -582,6 +577,59 @@ resource "aws_iam_user_group_membership" "team_member" {
     aws_iam_group.fe_team,
     aws_iam_group.ai_team,
   ]
+}
+
+# -----------------------------------------------------------------------------
+# Admin Group + Admin Users
+# -----------------------------------------------------------------------------
+resource "aws_iam_group" "admin" {
+  name = "Admin"
+}
+
+resource "aws_iam_group_policy_attachment" "admin_access" {
+  group      = aws_iam_group.admin.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+resource "aws_iam_group_policy_attachment" "admin_billing" {
+  group      = aws_iam_group.admin.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSBillingConductorFullAccess"
+}
+
+resource "aws_iam_user" "admin" {
+  for_each = var.admin_users
+
+  name          = each.key
+  force_destroy = true
+
+  tags = {
+    Name = each.key
+  }
+}
+
+resource "aws_iam_user_group_membership" "admin" {
+  for_each = var.admin_users
+
+  user   = aws_iam_user.admin[each.key].name
+  groups = [aws_iam_group.admin.name]
+}
+
+# -----------------------------------------------------------------------------
+# Service Accounts
+# -----------------------------------------------------------------------------
+resource "aws_iam_user" "grafana_billing_reader" {
+  name          = "grafana-billing-reader"
+  force_destroy = true
+
+  tags = {
+    Name    = "grafana-billing-reader"
+    Service = "monitoring"
+  }
+}
+
+resource "aws_iam_user_policy_attachment" "grafana_cloudwatch" {
+  user       = aws_iam_user.grafana_billing_reader.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
 }
 
 # -----------------------------------------------------------------------------

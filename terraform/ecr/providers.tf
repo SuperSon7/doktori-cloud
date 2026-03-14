@@ -6,14 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.4"
-    }
   }
 
   backend "s3" {
-    key = "dev/app/terraform.tfstate"
+    key = "ecr/terraform.tfstate"
   }
 }
 
@@ -22,9 +18,8 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "Terraform"
+      Project   = var.project_name
+      ManagedBy = "Terraform"
     }
   }
 }

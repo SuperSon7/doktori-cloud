@@ -56,6 +56,15 @@ variable "team_members" {
   }
 }
 
+variable "admin_users" {
+  description = "Admin users (assigned to Admin group with AdministratorAccess)"
+  type        = map(object({}))
+  default = {
+    doktori-admin   = {}
+    doktori-cloud-h = {}
+  }
+}
+
 variable "static_bucket_name" {
   description = "Static bucket name for CDN deployment permissions"
   type        = string
