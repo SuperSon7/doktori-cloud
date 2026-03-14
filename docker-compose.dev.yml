@@ -2,6 +2,7 @@ services:
   mysql:
     image: mysql:8.0.44
     environment:
+      TZ: Asia/Seoul
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: doktoridb
     ports:
@@ -17,6 +18,11 @@ services:
       retries: 20
       start_period: 30s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
     logging:
       driver: "json-file"
       options:
@@ -87,7 +93,7 @@ services:
       FIREBASE_CREDENTIALS_PATH: file:/app/secrets/firebase-service-account.json
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -Duser.timezone=Asia/Seoul"
       TZ: Asia/Seoul
-      SPRING_REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: redis
     volumes:
       - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     ports:
@@ -126,7 +132,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC"
-      SPRING_REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: redis
     ports:
       - "8081:8081"
     networks:
@@ -157,37 +163,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  ai:
-    image: ${ECR_REGISTRY}/doktori/ai:develop
-    environment:
-      USE_PARAMETER_STORE: "true"
-      SPRING_PROFILES_ACTIVE: dev
-    ports:
-      - "8000:8000"
-    networks:
-      - app-net
-    depends_on:
-      mysql:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-    stop_grace_period: 15s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   frontend:
     image: ${ECR_REGISTRY}/doktori/frontend:develop
     environment:
@@ -206,8 +181,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 1G
+          cpus: '0.75'
     stop_grace_period: 10s
     logging:
       driver: "json-file"
@@ -233,7 +208,64 @@ services:
       chat:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
     stop_grace_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  wiremock:
+    image: wiremock/wiremock:3.5.4
+    container_name: wiremock
+    command: ["--verbose"]
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+      - ./wiremock/files:/home/wiremock/__files
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  mongodb:
+    image: mongo:8.0
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-doktori}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-doktori1234}
+      MONGO_INITDB_DATABASE: doktoridb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
     logging:
       driver: "json-file"
       options:
@@ -269,8 +301,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: '0.25'
+          memory: 128M
+          cpus: '0.15'
     logging:
       driver: "json-file"
       options:
@@ -281,7 +313,7 @@ services:
   # cAdvisor — 컨테이너별 리소스 메트릭 (CPU, Memory, Network, Disk I/O)
   # ---------------------------------------------------------------------------
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.56.2
+    image: ghcr.io/google/cadvisor:latest
     container_name: cadvisor
     privileged: true
     volumes:
@@ -333,5 +365,6 @@ volumes:
   mysql-data:
   redis-data:
   rabbitmq-data:
+  mongodb-data:
   nginx-logs:
   alloy-data:
