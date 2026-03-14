@@ -37,12 +37,16 @@ resource "random_password" "db" {
 }
 
 resource "aws_ssm_parameter" "db_password" {
-  name  = "/${var.project_name}/${var.environment}/db/password"
+  name  = "/${var.project_name}/${var.environment}/DB_PASSWORD"
   type  = "SecureString"
   value = random_password.db.result
 
   tags = {
     Name = "${var.project_name}-${var.environment}-db-password"
+  }
+
+  lifecycle {
+    ignore_changes = [value]
   }
 }
 
