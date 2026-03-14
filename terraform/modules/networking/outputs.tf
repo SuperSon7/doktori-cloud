@@ -14,13 +14,23 @@ output "subnet_ids" {
 }
 
 output "nat_instance_id" {
-  description = "NAT instance ID"
-  value       = aws_instance.nat.id
+  description = "Primary NAT instance ID (backwards compat)"
+  value       = aws_instance.nat["primary"].id
 }
 
 output "nat_eip" {
-  description = "NAT instance public IP"
-  value       = aws_eip.nat.public_ip
+  description = "Primary NAT instance public IP (backwards compat)"
+  value       = aws_eip.nat["primary"].public_ip
+}
+
+output "nat_instance_ids" {
+  description = "Map of NAT instance IDs per AZ key"
+  value       = { for k, v in aws_instance.nat : k => v.id }
+}
+
+output "nat_eips" {
+  description = "Map of NAT EIPs per AZ key"
+  value       = { for k, v in aws_eip.nat : k => v.public_ip }
 }
 
 output "nat_sg_id" {
