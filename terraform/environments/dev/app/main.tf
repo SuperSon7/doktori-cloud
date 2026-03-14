@@ -1,5 +1,5 @@
 # =============================================================================
-# Dev App Layer — compute (dev-app + dev-ai 인스턴스)
+# Dev App Layer — compute (dev-app(data포함) + dev-ai 인스턴스)
 # =============================================================================
 
 data "terraform_remote_state" "base" {
