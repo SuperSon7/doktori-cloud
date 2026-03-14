@@ -102,11 +102,27 @@ resource "aws_security_group" "nat" {
   }
 }
 
+locals {
+  nat_instances = var.nat_instances != null ? var.nat_instances : {
+    primary = { subnet_key = var.nat_subnet_key }
+  }
+
+  # Map each private subnet to its NAT key based on az_key
+  # Falls back to "primary" if no NAT exists for that AZ
+  subnet_nat_key = {
+    for k, v in var.subnets : k =>
+    v.tier == "public" ? null :
+    contains(keys(local.nat_instances), v.az_key) ? v.az_key : "primary"
+  }
+}
+
 resource "aws_instance" "nat" {
+  for_each = local.nat_instances
+
   ami                    = var.nat_ami_id != "" ? var.nat_ami_id : data.aws_ami.nat_amazon_linux.id
   instance_type          = var.nat_instance_type
   key_name               = var.nat_key_name != "" ? var.nat_key_name : null
-  subnet_id              = aws_subnet.this[var.nat_subnet_key].id
+  subnet_id              = aws_subnet.this[each.value.subnet_key].id
   vpc_security_group_ids = [aws_security_group.nat.id]
   source_dest_check      = false
 
@@ -129,7 +145,7 @@ resource "aws_instance" "nat" {
 
   tags = merge(
     {
-      Name    = "${var.project_name}-${var.environment}-nat"
+      Name    = "${var.project_name}-${var.environment}-nat-${each.key}"
       Service = "nat"
     },
     var.nat_extra_tags,
@@ -143,16 +159,36 @@ resource "aws_instance" "nat" {
 }
 
 resource "aws_eip" "nat" {
+  for_each = local.nat_instances
+
   domain = "vpc"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
+    Name = "${var.project_name}-${var.environment}-nat-${each.key}-eip"
   }
 }
 
 resource "aws_eip_association" "nat" {
-  allocation_id = aws_eip.nat.id
-  instance_id   = aws_instance.nat.id
+  for_each = local.nat_instances
+
+  allocation_id = aws_eip.nat[each.key].id
+  instance_id   = aws_instance.nat[each.key].id
+}
+
+# --- moved blocks: 기존 단일 NAT → for_each["primary"]로 무중단 전환 ---
+moved {
+  from = aws_instance.nat
+  to   = aws_instance.nat["primary"]
+}
+
+moved {
+  from = aws_eip.nat
+  to   = aws_eip.nat["primary"]
+}
+
+moved {
+  from = aws_eip_association.nat
+  to   = aws_eip_association.nat["primary"]
 }
 
 # -----------------------------------------------------------------------------
@@ -172,10 +208,12 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table" "private" {
+  for_each = local.nat_instances
+
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-rt"
+    Name = "${var.project_name}-${var.environment}-private-${each.key}-rt"
   }
 
   lifecycle {
@@ -183,11 +221,13 @@ resource "aws_route_table" "private" {
   }
 }
 
-# NAT route for private subnets (separate resource to avoid inline conflict)
+# NAT route for private subnets (per AZ)
 resource "aws_route" "private_nat" {
-  route_table_id         = aws_route_table.private.id
+  for_each = local.nat_instances
+
+  route_table_id         = aws_route_table.private[each.key].id
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_instance.nat.primary_network_interface_id
+  network_interface_id   = aws_instance.nat[each.key].primary_network_interface_id
 }
 
 # Route Table Associations
@@ -195,7 +235,22 @@ resource "aws_route_table_association" "this" {
   for_each = var.subnets
 
   subnet_id      = aws_subnet.this[each.key].id
-  route_table_id = each.value.tier == "public" ? aws_route_table.public.id : aws_route_table.private.id
+  route_table_id = (
+    each.value.tier == "public"
+    ? aws_route_table.public.id
+    : aws_route_table.private[local.subnet_nat_key[each.key]].id
+  )
+}
+
+# --- moved blocks: 기존 단일 route table → for_each["primary"] ---
+moved {
+  from = aws_route_table.private
+  to   = aws_route_table.private["primary"]
+}
+
+moved {
+  from = aws_route.private_nat
+  to   = aws_route.private_nat["primary"]
 }
 
 # -----------------------------------------------------------------------------
@@ -259,10 +314,10 @@ resource "aws_vpc_endpoint" "s3" {
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
 
-  route_table_ids = [
-    aws_route_table.public.id,
-    aws_route_table.private.id,
-  ]
+  route_table_ids = concat(
+    [aws_route_table.public.id],
+    [for k, v in aws_route_table.private : v.id],
+  )
 
   tags = {
     Name = "${var.project_name}-${var.environment}-vpce-s3"

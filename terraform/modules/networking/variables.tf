@@ -62,9 +62,17 @@ variable "nat_user_data" {
 }
 
 variable "nat_subnet_key" {
-  description = "Key of the subnet to place the NAT instance in"
+  description = "Key of the subnet to place the NAT instance in (used when nat_instances is not set)"
   type        = string
   default     = "public"
+}
+
+variable "nat_instances" {
+  description = "NAT instances per AZ. Key = identifier, value = { subnet_key }. If null, creates single NAT using nat_subnet_key."
+  type = map(object({
+    subnet_key = string
+  }))
+  default = null
 }
 
 variable "nat_volume_size" {
