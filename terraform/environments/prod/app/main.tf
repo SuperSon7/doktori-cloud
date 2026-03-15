@@ -154,3 +154,89 @@ module "compute" {
     { service_key = "ai", source_key = "nginx", from_port = 8000, to_port = 8000, protocol = "tcp" },
   ]
 }
+
+# =============================================================================
+# Frontend — ALB + ASG (Multi-AZ)
+# =============================================================================
+module "frontend" {
+  source = "../../../modules/frontend"
+
+  project_name = var.project_name
+  environment  = var.environment
+  vpc_id       = local.net.vpc_id
+  vpc_cidr     = local.net.vpc_cidr
+  key_name     = var.key_name
+
+  public_subnet_ids = [
+    local.net.subnet_ids["public"],
+    local.net.subnet_ids["public_c"],
+  ]
+  private_subnet_ids = [
+    local.net.subnet_ids["private_app"],
+    local.net.subnet_ids["private_app_c"],
+  ]
+
+  instance_type             = "t4g.small"
+  iam_instance_profile_name = module.compute.iam_instance_profile_name
+  desired_capacity          = 2
+  min_size                  = 2
+  max_size                  = 4
+}
+
+# =============================================================================
+# K8s Cluster — Master ASG + Worker ASG + Internal NLB (Multi-AZ)
+# =============================================================================
+module "k8s_cluster" {
+  source = "../../../modules/k8s-cluster"
+
+  project_name = var.project_name
+  environment  = var.environment
+  vpc_id       = local.net.vpc_id
+  vpc_cidr     = local.net.vpc_cidr
+  key_name     = var.key_name
+
+  public_subnet_ids = [
+    local.net.subnet_ids["public"],
+    local.net.subnet_ids["public_c"],
+  ]
+  private_subnet_ids = [
+    local.net.subnet_ids["private_app"],
+    local.net.subnet_ids["private_app_c"],
+  ]
+
+  iam_instance_profile_name = module.compute.iam_instance_profile_name
+
+  master_instance_type = "t4g.medium"
+  master_desired       = 2
+
+  worker_instance_type = "t4g.large"
+  worker_desired       = 4
+  worker_min           = 2
+  worker_max           = 6
+}
+
+# =============================================================================
+# DNS — ALB / NLB alias records
+# =============================================================================
+
+# Frontend ALB → front-alb.prod.doktori.internal
+resource "aws_route53_record" "frontend_alb" {
+  zone_id = local.net.internal_zone_id
+  name    = "front-alb.${local.net.internal_zone_name}"
+  type    = "A"
+
+  alias {
+    name                   = module.frontend.alb_dns_name
+    zone_id                = module.frontend.alb_zone_id
+    evaluate_target_health = true
+  }
+}
+
+# K8s Internal NLB → k8s.prod.doktori.internal
+resource "aws_route53_record" "k8s_nlb" {
+  zone_id = local.net.internal_zone_id
+  name    = "k8s.${local.net.internal_zone_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [module.k8s_cluster.nlb_dns_name]
+}
