@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# =============================================================================
+# K8s Master Node — user_data (ASG boot script)
+#
+# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
+# 이 스크립트는 동적 설정만 수행:
+#   - 첫 번째 마스터: kubeadm init → SSM에 join 정보 저장 → CNI/Helm/NGF 설치
+#   - 추가 마스터: SSM에서 join 정보 조회 → kubeadm join --control-plane
+# =============================================================================
+set -euo pipefail
+exec > >(tee /var/log/k8s-master-init.log) 2>&1
+
+# --- 변수 (Terraform templatefile 주입) ---
+REGION="${region}"
+PROJECT="${project_name}"
+ENV="${environment}"
+CONTROL_PLANE_ENDPOINT="${control_plane_endpoint}"
+POD_CIDR="${pod_cidr}"
+SERVICE_CIDR="${service_cidr}"
+CALICO_VERSION="${calico_version}"
+GATEWAY_API_VERSION="${gateway_api_version}"
+NGF_VERSION="${ngf_version}"
+
+SSM_PREFIX="/$${PROJECT}/$${ENV}/k8s"
+LOCK_PARAM="$${SSM_PREFIX}/init-lock"
+JOIN_PARAM="$${SSM_PREFIX}/join-command"
+MASTER_JOIN_PARAM="$${SSM_PREFIX}/master-join-command"
+CERT_KEY_PARAM="$${SSM_PREFIX}/certificate-key"
+
+MASTER_IP=$(hostname -I | awk '{print $1}')
+
+echo "============================================="
+echo " K8s Master Bootstrap"
+echo " IP:       $${MASTER_IP}"
+echo " Endpoint: $${CONTROL_PLANE_ENDPOINT}:6443"
+echo " Pod CIDR: $${POD_CIDR}"
+echo " Svc CIDR: $${SERVICE_CIDR}"
+echo "============================================="
+
+# -----------------------------------------------------------------------------
+# SSM 헬퍼 함수
+# -----------------------------------------------------------------------------
+ssm_get() {
+  aws ssm get-parameter \
+    --name "$1" \
+    --with-decryption \
+    --query "Parameter.Value" \
+    --output text \
+    --region "$${REGION}" 2>/dev/null
+}
+
+ssm_put() {
+  aws ssm put-parameter \
+    --name "$1" \
+    --value "$2" \
+    --type SecureString \
+    --overwrite \
+    --region "$${REGION}"
+}
+
+# -----------------------------------------------------------------------------
+# 리더 선출 — SSM init-lock 존재 여부로 판단
+# -----------------------------------------------------------------------------
+echo "[1/2] 리더 선출 확인..."
+
+IS_FIRST=false
+if ! ssm_get "$${LOCK_PARAM}" > /dev/null 2>&1; then
+  # init-lock 없음 → 첫 번째 마스터 시도
+  # 경합 방지: PutParameter로 선점 (기존 값 없을 때만 성공하도록 시도)
+  if aws ssm put-parameter \
+    --name "$${LOCK_PARAM}" \
+    --value "$${MASTER_IP}" \
+    --type String \
+    --region "$${REGION}" 2>/dev/null; then
+    IS_FIRST=true
+    echo "  → 이 노드가 첫 번째 마스터 (init 수행)"
+  else
+    echo "  → 다른 노드가 먼저 init-lock 선점"
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# 첫 번째 마스터: kubeadm init
+# -----------------------------------------------------------------------------
+if [ "$${IS_FIRST}" = true ]; then
+  echo "[2/2] kubeadm init..."
+
+  kubeadm init \
+    --control-plane-endpoint="$${CONTROL_PLANE_ENDPOINT}:6443" \
+    --upload-certs \
+    --apiserver-advertise-address="$${MASTER_IP}" \
+    --pod-network-cidr="$${POD_CIDR}" \
+    --service-cidr="$${SERVICE_CIDR}" \
+    --cri-socket=unix:///run/containerd/containerd.sock \
+    2>&1 | tee /tmp/kubeadm-init.log
+
+  # kubectl 설정
+  mkdir -p /home/ubuntu/.kube
+  cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+  chown ubuntu:ubuntu /home/ubuntu/.kube/config
+  export KUBECONFIG=/home/ubuntu/.kube/config
+
+  # join 명령 저장 → SSM
+  WORKER_JOIN=$(kubeadm token create --print-join-command)
+  CERT_KEY=$(kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1)
+
+  ssm_put "$${JOIN_PARAM}" "$${WORKER_JOIN}"
+  ssm_put "$${CERT_KEY_PARAM}" "$${CERT_KEY}"
+  ssm_put "$${MASTER_JOIN_PARAM}" "$${WORKER_JOIN} --control-plane --certificate-key $${CERT_KEY}"
+
+  echo "  → join 정보 SSM 저장 완료"
+
+  # --- Calico CNI ---
+  echo "[CNI] Calico $${CALICO_VERSION} 설치..."
+  su - ubuntu -c "kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/tigera-operator.yaml"
+
+  curl -sO "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/custom-resources.yaml"
+  sed -i 's/encapsulation: .*/encapsulation: VXLAN/' custom-resources.yaml
+  sed -i '/calicoNetwork:/a\    bgp: Disabled' custom-resources.yaml
+  su - ubuntu -c "kubectl create -f $(pwd)/custom-resources.yaml"
+  rm -f custom-resources.yaml
+
+  echo "  → Calico 설치 완료 (VXLAN, BGP Disabled)"
+
+  # Calico Ready 대기
+  su - ubuntu -c "kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n calico-system --timeout=300s" || \
+    echo "  ⚠ Calico Pod 아직 Ready 아님"
+
+  # --- Helm ---
+  echo "[Helm] 설치..."
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+  # --- Gateway API CRD ---
+  echo "[Gateway API] CRD $${GATEWAY_API_VERSION} 설치..."
+  su - ubuntu -c "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
+
+  # --- NGINX Gateway Fabric ---
+  echo "[NGF] $${NGF_VERSION} 설치..."
+  su - ubuntu -c "helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
+    --version $${NGF_VERSION} \
+    --namespace nginx-gateway \
+    --create-namespace \
+    --set service.type=NodePort \
+    --set 'service.ports[0].port=80,service.ports[0].targetPort=80,service.ports[0].nodePort=30080,service.ports[0].protocol=TCP,service.ports[0].name=http' \
+    --set 'service.ports[1].port=443,service.ports[1].targetPort=443,service.ports[1].nodePort=30443,service.ports[1].protocol=TCP,service.ports[1].name=https'"
+
+  echo "  → 클러스터 초기화 완료"
+
+# -----------------------------------------------------------------------------
+# 추가 마스터: kubeadm join --control-plane
+# -----------------------------------------------------------------------------
+else
+  echo "[2/2] 추가 마스터 — SSM에서 join 정보 대기..."
+
+  # 최대 10분 대기 (첫 번째 마스터 init 완료까지)
+  for i in $(seq 1 60); do
+    MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
+    if [ -n "$${MASTER_JOIN}" ]; then
+      break
+    fi
+    echo "  → 대기 중... ($${i}/60)"
+    sleep 10
+  done
+
+  if [ -z "$${MASTER_JOIN}" ]; then
+    echo "ERROR: 10분 초과 — master join 정보를 찾을 수 없음"
+    exit 1
+  fi
+
+  echo "  → join 정보 수신. kubeadm join 실행..."
+  eval "$${MASTER_JOIN}" \
+    --apiserver-advertise-address="$${MASTER_IP}" \
+    --cri-socket=unix:///run/containerd/containerd.sock
+
+  # kubectl 설정
+  mkdir -p /home/ubuntu/.kube
+  cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+  chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+  echo "  → 추가 마스터 join 완료"
+fi
+
+echo ""
+echo "============================================="
+echo " K8s Master Bootstrap 완료"
+echo " $(hostname) — $${MASTER_IP}"
+echo "============================================="
