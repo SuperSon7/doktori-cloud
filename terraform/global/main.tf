@@ -285,6 +285,18 @@ resource "aws_iam_role_policy" "terraform_infra" {
         ]
       },
       {
+        Sid      = "ELB"
+        Effect   = "Allow"
+        Action   = ["elasticloadbalancing:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "AutoScaling"
+        Effect   = "Allow"
+        Action   = ["autoscaling:*"]
+        Resource = "*"
+      },
+      {
         Sid      = "ECR"
         Effect   = "Allow"
         Action   = ["ecr:*"]
