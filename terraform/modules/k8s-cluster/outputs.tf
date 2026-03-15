@@ -25,3 +25,12 @@ output "nlb_arn" {
 output "worker_target_group_arn" {
   value = aws_lb_target_group.worker_http.arn
 }
+
+output "master_api_target_group_arn" {
+  value = aws_lb_target_group.master_api.arn
+}
+
+output "control_plane_endpoint" {
+  description = "NLB DNS for kubeadm --control-plane-endpoint"
+  value       = aws_lb.nlb.dns_name
+}

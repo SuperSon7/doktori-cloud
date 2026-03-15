@@ -17,6 +17,26 @@ locals {
 
 locals {
   chat_observer_user_data = templatefile("${path.module}/templates/chat_observer_user_data.sh.tftpl", {})
+
+  # control_plane_endpoint는 Route53 CNAME (k8s.prod.doktori.internal → NLB)
+  # 모듈 output 참조 시 순환참조 발생하므로 DNS 이름 직접 사용
+  k8s_master_user_data = templatefile("${path.module}/templates/k8s_master_user_data.sh.tftpl", {
+    region                 = var.aws_region
+    project_name           = var.project_name
+    environment            = var.environment
+    control_plane_endpoint = "k8s.${var.environment}.doktori.internal"
+    pod_cidr               = "192.168.0.0/16"
+    service_cidr           = "172.16.0.0/16"
+    calico_version         = "v3.29.3"
+    gateway_api_version    = "v1.4.1"
+    ngf_version            = "1.6.2"
+  })
+
+  k8s_worker_user_data = templatefile("${path.module}/templates/k8s_worker_user_data.sh.tftpl", {
+    region       = var.aws_region
+    project_name = var.project_name
+    environment  = var.environment
+  })
 }
 
 # -----------------------------------------------------------------------------
@@ -210,11 +230,13 @@ module "k8s_cluster" {
 
   master_instance_type = "t4g.medium"
   master_desired       = 2
+  user_data_master     = local.k8s_master_user_data
 
   worker_instance_type = "t4g.large"
   worker_desired       = 4
   worker_min           = 2
   worker_max           = 6
+  user_data_worker     = local.k8s_worker_user_data
 }
 
 # =============================================================================

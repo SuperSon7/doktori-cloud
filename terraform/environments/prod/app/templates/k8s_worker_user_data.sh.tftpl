@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# =============================================================================
+# K8s Worker Node — user_data (ASG boot script)
+#
+# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
+# 이 스크립트는 동적 설정만 수행:
+#   - SSM에서 worker join 명령 조회 → kubeadm join
+#   - worker 라벨 자동 부여
+# =============================================================================
+set -euo pipefail
+exec > >(tee /var/log/k8s-worker-init.log) 2>&1
+
+# --- 변수 (Terraform templatefile 주입) ---
+REGION="${region}"
+PROJECT="${project_name}"
+ENV="${environment}"
+
+SSM_PREFIX="/$${PROJECT}/$${ENV}/k8s"
+JOIN_PARAM="$${SSM_PREFIX}/join-command"
+
+WORKER_IP=$(hostname -I | awk '{print $1}')
+
+echo "============================================="
+echo " K8s Worker Bootstrap"
+echo " IP: $${WORKER_IP}"
+echo "============================================="
+
+# -----------------------------------------------------------------------------
+# 1. SSM에서 join 명령 조회 (마스터 init 완료 대기)
+# -----------------------------------------------------------------------------
+echo "[1/2] SSM에서 join 명령 대기..."
+
+JOIN_CMD=""
+for i in $(seq 1 90); do
+  JOIN_CMD=$(aws ssm get-parameter \
+    --name "$${JOIN_PARAM}" \
+    --with-decryption \
+    --query "Parameter.Value" \
+    --output text \
+    --region "$${REGION}" 2>/dev/null || true)
+
+  if [ -n "$${JOIN_CMD}" ]; then
+    echo "  → join 명령 수신"
+    break
+  fi
+  echo "  → 대기 중... ($${i}/90)"
+  sleep 10
+done
+
+if [ -z "$${JOIN_CMD}" ]; then
+  echo "ERROR: 15분 초과 — join 명령을 찾을 수 없음"
+  exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# 2. kubeadm join
+# -----------------------------------------------------------------------------
+echo "[2/2] kubeadm join..."
+
+eval "$${JOIN_CMD}" \
+  --cri-socket=unix:///run/containerd/containerd.sock
+
+echo ""
+echo "============================================="
+echo " K8s Worker Bootstrap 완료"
+echo " $(hostname) — $${WORKER_IP}"
+echo "============================================="

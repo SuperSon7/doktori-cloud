@@ -295,6 +295,36 @@ resource "aws_lb_listener" "nlb_http" {
   }
 }
 
+# --- Control-plane target group + listener (kubeadm HA endpoint) ---
+resource "aws_lb_target_group" "master_api" {
+  name        = "${var.project_name}-${var.environment}-k8s-api-tg"
+  port        = 6443
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "instance"
+
+  health_check {
+    protocol            = "TCP"
+    port                = "6443"
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+  }
+
+  tags = { Name = "${var.project_name}-${var.environment}-k8s-api-tg" }
+}
+
+resource "aws_lb_listener" "nlb_api" {
+  load_balancer_arn = aws_lb.nlb.arn
+  port              = 6443
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.master_api.arn
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Launch Templates
 # -----------------------------------------------------------------------------
@@ -392,6 +422,7 @@ resource "aws_autoscaling_group" "master" {
   max_size            = var.master_desired
   vpc_zone_identifier = var.private_subnet_ids
 
+  target_group_arns         = [aws_lb_target_group.master_api.arn]
   health_check_type         = "EC2"
   health_check_grace_period = 300
 

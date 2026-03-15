@@ -104,6 +104,7 @@ resource "aws_iam_role_policy" "ec2_parameter_store" {
           "ssm:GetParameter",
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
+          "ssm:PutParameter",
         ]
         Resource = flatten([
           for path in var.ssm_parameter_paths : [
@@ -114,7 +115,7 @@ resource "aws_iam_role_policy" "ec2_parameter_store" {
       },
       {
         Effect   = "Allow"
-        Action   = ["kms:Decrypt"]
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = "arn:aws:kms:${var.aws_region}:*:key/*"
         Condition = {
           StringEquals = {
