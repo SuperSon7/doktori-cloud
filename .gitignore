@@ -28,6 +28,9 @@ override.tf.json
 *.plan
 plan.out
 
+# Packer
+packer/manifest-*.json
+
 # State backups (local only)
 state-backup/
 **/state-backup/

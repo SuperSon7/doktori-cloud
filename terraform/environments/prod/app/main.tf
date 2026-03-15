@@ -176,6 +176,7 @@ module "frontend" {
     local.net.subnet_ids["private_app_c"],
   ]
 
+  ami_id                    = "ami-062480ce1fc9b3271"
   instance_type             = "t4g.small"
   iam_instance_profile_name = module.compute.iam_instance_profile_name
   desired_capacity          = 2
@@ -204,6 +205,7 @@ module "k8s_cluster" {
     local.net.subnet_ids["private_app_c"],
   ]
 
+  ami_id                    = "ami-08742cb548ead4d5d"
   iam_instance_profile_name = module.compute.iam_instance_profile_name
 
   master_instance_type = "t4g.medium"
