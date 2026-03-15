@@ -48,6 +48,11 @@ output "internal_zone_name" {
   value       = aws_route53_zone.internal.name
 }
 
+output "private_route_table_ids" {
+  description = "Map of private route table IDs per AZ key"
+  value       = { for k, v in aws_route_table.private : k => v.id }
+}
+
 output "vpc_endpoint_sg_id" {
   description = "VPC Endpoints security group ID (empty string if no interface endpoints)"
   value       = length(aws_security_group.vpc_endpoints) > 0 ? aws_security_group.vpc_endpoints[0].id : ""

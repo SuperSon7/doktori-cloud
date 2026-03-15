@@ -24,6 +24,11 @@ resource "aws_iam_service_linked_role" "ssm" {
   aws_service_name = "ssm.amazonaws.com"
 }
 
+resource "aws_iam_service_linked_role" "autoscaling" {
+  aws_service_name = "autoscaling.amazonaws.com"
+}
+
+
 # -----------------------------------------------------------------------------
 # GitHub Actions Deploy Role (OIDC)
 # -----------------------------------------------------------------------------
@@ -283,6 +288,18 @@ resource "aws_iam_role_policy" "terraform_infra" {
           "arn:aws:kms:ap-northeast-2:250857930609:key/e30d6af4-88ef-420a-b1ef-9d43d1ef8010",
           "arn:aws:kms:ap-northeast-2:250857930609:key/709fb125-d24d-4365-a33d-ebbeb9a4ec39",
         ]
+      },
+      {
+        Sid      = "ELB"
+        Effect   = "Allow"
+        Action   = ["elasticloadbalancing:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "AutoScaling"
+        Effect   = "Allow"
+        Action   = ["autoscaling:*"]
+        Resource = "*"
       },
       {
         Sid      = "ECR"

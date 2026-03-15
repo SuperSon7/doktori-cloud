@@ -34,14 +34,6 @@ data "aws_iam_instance_profile" "staging_ec2_ssm" {
   name = "${var.project_name}-${var.environment}-ec2-ssm"
 }
 
-data "aws_route_table" "private" {
-  vpc_id = local.net.vpc_id
-
-  filter {
-    name   = "tag:Name"
-    values = ["${var.project_name}-${var.environment}-private-rt"]
-  }
-}
 
 # -----------------------------------------------------------------------------
 # Route53 — Internal DNS records
@@ -227,7 +219,7 @@ resource "aws_route_table_association" "h_k8s" {
   for_each = aws_subnet.h_k8s
 
   subnet_id      = each.value.id
-  route_table_id = data.aws_route_table.private.id
+  route_table_id = local.net.private_route_table_ids["primary"]
 }
 
 resource "aws_security_group" "h_k8s_master" {
