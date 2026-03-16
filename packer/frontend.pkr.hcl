@@ -1,5 +1,5 @@
 # =============================================================================
-# Frontend AMI — Docker CE + Compose + ECR login
+# Frontend AMI — Docker CE + Compose + AWS CLI + SSM + CodeDeploy
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 source "amazon-ebs" "frontend" {
   ami_name      = "${var.project_name}-frontend-arm64-${local.timestamp}"
-  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent"
+  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent, CodeDeploy Agent"
   instance_type = "t4g.small"
   region        = var.aws_region
 
@@ -58,6 +58,7 @@ build {
     script = "scripts/frontend-setup.sh"
     environment_vars = [
       "DOCKER_VERSION=${var.docker_version}",
+      "AWS_REGION=${var.aws_region}",
       "DEBIAN_FRONTEND=noninteractive",
     ]
     execute_command = "sudo -S env {{ .Vars }} bash '{{ .Path }}'"
