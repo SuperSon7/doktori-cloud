@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat
+  namespace: prod
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: doktori
+      component: chat
+  template:
+    metadata:
+      labels:
+        app: doktori
+        component: chat
+    spec:
+      imagePullSecrets:
+        - name: ecr-credentials
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: doktori
+              component: chat
+      containers:
+        - name: chat
+          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-chat:latest
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "512Mi"
+            limits:
+              memory: "1536Mi"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "15"]
