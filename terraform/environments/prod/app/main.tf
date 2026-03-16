@@ -17,6 +17,14 @@ locals {
 
 locals {
   chat_observer_user_data = templatefile("${path.module}/templates/chat_observer_user_data.sh.tftpl", {})
+  frontend_ami_builder_user_data = templatefile("${path.module}/templates/frontend_ami_builder_user_data.sh.tftpl", {
+    region = var.aws_region
+  })
+  frontend_ami_id = "ami-062480ce1fc9b3271"
+  frontend_private_subnet_ids = [
+    local.net.subnet_ids["private_app"],
+    local.net.subnet_ids["private_app_c"],
+  ]
 
   # control_plane_endpoint는 Route53 CNAME (k8s.prod.doktori.internal → NLB)
   # 모듈 output 참조 시 순환참조 발생하므로 DNS 이름 직접 사용
@@ -191,17 +199,42 @@ module "frontend" {
     local.net.subnet_ids["public"],
     local.net.subnet_ids["public_c"],
   ]
-  private_subnet_ids = [
-    local.net.subnet_ids["private_app"],
-    local.net.subnet_ids["private_app_c"],
-  ]
+  private_subnet_ids = local.frontend_private_subnet_ids
 
-  ami_id                    = "ami-062480ce1fc9b3271"
+  ami_id                    = local.frontend_ami_id
   instance_type             = "t4g.small"
   iam_instance_profile_name = module.compute.iam_instance_profile_name
   desired_capacity          = 2
   min_size                  = 2
   max_size                  = 4
+}
+
+resource "aws_instance" "frontend_ami_builder" {
+  ami                         = local.frontend_ami_id
+  instance_type               = "t4g.small"
+  subnet_id                   = local.net.subnet_ids["private_app"]
+  vpc_security_group_ids      = [module.frontend.instance_sg_id]
+  iam_instance_profile        = module.compute.iam_instance_profile_name
+  associate_public_ip_address = false
+  user_data                   = local.frontend_ami_builder_user_data
+
+  metadata_options {
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2
+  }
+
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+    encrypted   = true
+  }
+
+  tags = {
+    Name    = "doktori-prod-frontend-ami-builder"
+    Part    = "fe"
+    Purpose = "ami-builder"
+  }
 }
 
 # =============================================================================

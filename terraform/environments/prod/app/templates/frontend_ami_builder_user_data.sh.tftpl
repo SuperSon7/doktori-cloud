@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+AWS_REGION="${region}"
+
+apt-get update -qq
+apt-get install -y -qq \
+  ca-certificates curl gnupg unzip jq \
+  ruby-full wget
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+
+apt-get update -qq
+apt-get install -y -qq \
+  docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ubuntu
+
+ARCH="$(uname -m)"
+if [ "$ARCH" = "aarch64" ]; then
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+else
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+fi
+cd /tmp && unzip -qo awscliv2.zip && ./aws/install --update && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+snap install amazon-ssm-agent --classic || true
+systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+systemctl restart snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+
+curl -fsSL "https://aws-codedeploy-${region}.s3.${region}.amazonaws.com/latest/install" -o /tmp/codedeploy-install
+chmod +x /tmp/codedeploy-install
+/tmp/codedeploy-install auto
+systemctl enable codedeploy-agent
+systemctl start codedeploy-agent
+
+mkdir -p /home/ubuntu/app
+cat <<'ECRLOGIN' > /home/ubuntu/app/ecr-login.sh
+#!/usr/bin/env bash
+REGION="${AWS_DEFAULT_REGION:-ap-northeast-2}"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+ECRLOGIN
+chmod +x /home/ubuntu/app/ecr-login.sh
+chown -R ubuntu:ubuntu /home/ubuntu/app
+
+apt-get autoremove -y -qq
+apt-get clean
+rm -rf /var/lib/apt/lists/*

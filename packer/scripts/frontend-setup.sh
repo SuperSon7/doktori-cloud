@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Frontend AMI Setup — Docker CE + Compose + ECR login + AWS CLI + SSM
+# Frontend AMI Setup — Docker CE + Compose + ECR login + AWS CLI + SSM + CodeDeploy
 #
 # Packer provisioner로 실행됨
 # 환경변수: DOCKER_VERSION
@@ -8,6 +8,7 @@
 set -euo pipefail
 
 DOCKER_VERSION="${DOCKER_VERSION:-5:27.4.1-1~ubuntu.22.04~jammy}"
+AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 
 echo "============================================="
 echo " Frontend AMI Build"
@@ -17,16 +18,17 @@ echo "============================================="
 # -----------------------------------------------------------------------------
 # 1. 시스템 업데이트 + 필수 패키지
 # -----------------------------------------------------------------------------
-echo "[1/5] 필수 패키지 설치..."
+echo "[1/6] 필수 패키지 설치..."
 apt-get update -qq
 apt-get install -y -qq \
   ca-certificates curl gnupg \
-  unzip jq htop net-tools
+  unzip jq htop net-tools \
+  ruby-full wget
 
 # -----------------------------------------------------------------------------
 # 2. Docker CE + Compose (버전 핀닝)
 # -----------------------------------------------------------------------------
-echo "[2/5] Docker CE ${DOCKER_VERSION} 설치..."
+echo "[2/6] Docker CE ${DOCKER_VERSION} 설치..."
 
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -59,7 +61,7 @@ usermod -aG docker ubuntu
 # -----------------------------------------------------------------------------
 # 3. AWS CLI v2
 # -----------------------------------------------------------------------------
-echo "[3/5] AWS CLI v2 설치..."
+echo "[3/6] AWS CLI v2 설치..."
 
 ARCH=$(uname -m)
 if [ "$ARCH" = "aarch64" ]; then
@@ -72,15 +74,26 @@ cd /tmp && unzip -qo awscliv2.zip && ./aws/install && rm -rf /tmp/aws /tmp/awscl
 # -----------------------------------------------------------------------------
 # 4. SSM Agent
 # -----------------------------------------------------------------------------
-echo "[4/5] SSM Agent 설치..."
+echo "[4/6] SSM Agent 설치..."
 
 snap install amazon-ssm-agent --classic
 systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
 
 # -----------------------------------------------------------------------------
-# 5. ECR credential helper + 앱 디렉토리
+# 5. CodeDeploy Agent
 # -----------------------------------------------------------------------------
-echo "[5/5] ECR 헬퍼 + 앱 디렉토리..."
+echo "[5/6] CodeDeploy Agent 설치..."
+
+curl -fsSL "https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install" -o /tmp/codedeploy-install
+chmod +x /tmp/codedeploy-install
+/tmp/codedeploy-install auto
+systemctl enable codedeploy-agent
+systemctl start codedeploy-agent
+
+# -----------------------------------------------------------------------------
+# 6. ECR credential helper + 앱 디렉토리
+# -----------------------------------------------------------------------------
+echo "[6/6] ECR 헬퍼 + 앱 디렉토리..."
 
 mkdir -p /home/ubuntu/app
 cat <<'ECRLOGIN' > /home/ubuntu/app/ecr-login.sh
@@ -112,4 +125,5 @@ echo "  docker        : $(docker --version)"
 echo "  compose       : $(docker compose version)"
 echo "  aws cli       : $(aws --version 2>&1 | head -1)"
 echo "  ssm agent     : $(snap list amazon-ssm-agent 2>/dev/null | tail -1 | awk '{print $2}')"
+echo "  codedeploy    : $(systemctl is-active codedeploy-agent 2>/dev/null || true)"
 echo "============================================="

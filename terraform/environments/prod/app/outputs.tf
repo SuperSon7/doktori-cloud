@@ -17,6 +17,29 @@ output "frontend_alb_dns" {
   value = module.frontend.alb_dns_name
 }
 
+output "frontend_asg_configuration" {
+  value = {
+    asg_name                       = module.frontend.asg_name
+    launch_template_id             = module.frontend.launch_template_id
+    launch_template_name           = module.frontend.launch_template_name
+    launch_template_latest_version = module.frontend.launch_template_latest_version
+    ami_id                         = module.frontend.ami_id
+    subnet_ids                     = module.frontend.private_subnet_ids
+    security_group_id              = module.frontend.instance_sg_id
+    iam_instance_profile_name      = module.frontend.iam_instance_profile_name
+  }
+}
+
+output "frontend_ami_builder" {
+  value = {
+    instance_id               = aws_instance.frontend_ami_builder.id
+    private_ip                = aws_instance.frontend_ami_builder.private_ip
+    subnet_id                 = aws_instance.frontend_ami_builder.subnet_id
+    security_group_ids        = aws_instance.frontend_ami_builder.vpc_security_group_ids
+    iam_instance_profile_name = aws_instance.frontend_ami_builder.iam_instance_profile
+  }
+}
+
 output "k8s_nlb_dns" {
   value = module.k8s_cluster.nlb_dns_name
 }

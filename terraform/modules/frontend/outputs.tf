@@ -28,6 +28,30 @@ output "asg_name" {
   value = aws_autoscaling_group.this.name
 }
 
+output "launch_template_id" {
+  value = aws_launch_template.this.id
+}
+
+output "launch_template_name" {
+  value = aws_launch_template.this.name
+}
+
+output "launch_template_latest_version" {
+  value = aws_launch_template.this.latest_version
+}
+
+output "ami_id" {
+  value = local.ami_id
+}
+
+output "private_subnet_ids" {
+  value = var.private_subnet_ids
+}
+
+output "iam_instance_profile_name" {
+  value = var.iam_instance_profile_name
+}
+
 output "http_listener_arn" {
   description = "HTTP listener ARN (for adding path-based rules)"
   value       = aws_lb_listener.http.arn
