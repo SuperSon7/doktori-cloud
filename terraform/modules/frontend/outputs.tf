@@ -27,3 +27,8 @@ output "instance_sg_id" {
 output "asg_name" {
   value = aws_autoscaling_group.this.name
 }
+
+output "http_listener_arn" {
+  description = "HTTP listener ARN (for adding path-based rules)"
+  value       = aws_lb_listener.http.arn
+}
