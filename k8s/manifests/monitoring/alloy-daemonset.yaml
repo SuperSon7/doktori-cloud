@@ -21,6 +21,9 @@ spec:
       containers:
         - name: alloy
           image: grafana/alloy:__ALLOY_VERSION__
+          env:
+            - name: TZ
+              value: Asia/Seoul
           args:
             - run
             - /etc/alloy/config.alloy

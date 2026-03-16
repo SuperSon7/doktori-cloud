@@ -42,6 +42,8 @@ spec:
             limits:
               memory: "1536Mi"
           env:
+            - name: TZ
+              value: Asia/Seoul
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
           lifecycle:
