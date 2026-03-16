@@ -67,3 +67,11 @@ variable "target_server_cidrs" {
   type        = list(string)
   default     = [] # prod/dev 서버 EIP → terraform.tfvars에서 설정
 }
+
+# ── VPC Peering ─────────────────────────────────────────────
+
+variable "peered_vpc_cidrs" {
+  description = "Peered VPC CIDR 목록 (Loki/Prometheus ingress 허용)"
+  type        = list(string)
+  default     = []
+}

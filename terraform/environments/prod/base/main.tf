@@ -82,3 +82,61 @@ module "ssm_parameters" {
     "NEXT_PUBLIC_CHAT_BASE_URL_PROD" = { type = "String" }
   }
 }
+
+# =============================================================================
+# VPC Peering — prod ↔ mgmt (monitoring)
+# =============================================================================
+data "terraform_remote_state" "monitoring" {
+  backend = "s3"
+  config = {
+    bucket = var.state_bucket
+    key    = "monitoring/terraform.tfstate"
+    region = var.aws_region
+  }
+}
+
+locals {
+  mgmt_vpc_id   = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_id
+  mgmt_vpc_cidr = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_cidr
+}
+
+resource "aws_vpc_peering_connection" "prod_to_mgmt" {
+  vpc_id      = module.networking.vpc_id
+  peer_vpc_id = local.mgmt_vpc_id
+  auto_accept = true
+
+  tags = { Name = "${var.project_name}-${var.environment}-to-mgmt" }
+}
+
+# --- prod → mgmt routes ---
+# public route table
+resource "aws_route" "prod_public_to_mgmt" {
+  route_table_id            = module.networking.public_route_table_id
+  destination_cidr_block    = local.mgmt_vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.prod_to_mgmt.id
+}
+
+# private route tables (all AZs)
+resource "aws_route" "prod_private_to_mgmt" {
+  for_each = module.networking.private_route_table_ids
+
+  route_table_id            = each.value
+  destination_cidr_block    = local.mgmt_vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.prod_to_mgmt.id
+}
+
+# --- mgmt → prod route (default VPC main route table) ---
+data "aws_route_table" "mgmt_main" {
+  vpc_id = local.mgmt_vpc_id
+
+  filter {
+    name   = "association.main"
+    values = ["true"]
+  }
+}
+
+resource "aws_route" "mgmt_to_prod" {
+  route_table_id            = data.aws_route_table.mgmt_main.id
+  destination_cidr_block    = "10.1.0.0/16"
+  vpc_peering_connection_id = aws_vpc_peering_connection.prod_to_mgmt.id
+}

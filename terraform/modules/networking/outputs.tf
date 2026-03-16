@@ -48,6 +48,11 @@ output "internal_zone_name" {
   value       = aws_route53_zone.internal.name
 }
 
+output "public_route_table_id" {
+  description = "Public route table ID"
+  value       = aws_route_table.public.id
+}
+
 output "private_route_table_ids" {
   description = "Map of private route table IDs per AZ key"
   value       = { for k, v in aws_route_table.private : k => v.id }

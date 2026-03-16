@@ -9,6 +9,7 @@ output "networking" {
     vpc_endpoint_sg_id = module.networking.vpc_endpoint_sg_id
     internal_zone_id        = module.networking.internal_zone_id
     internal_zone_name      = module.networking.internal_zone_name
+    public_route_table_id   = module.networking.public_route_table_id
     private_route_table_ids = module.networking.private_route_table_ids
   }
 }
