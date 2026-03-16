@@ -22,6 +22,7 @@ echo "[1/7] 필수 패키지 설치..."
 apt-get update -qq
 apt-get install -y -qq \
   ca-certificates curl gnupg apt-transport-https \
+  conntrack socat \
   unzip jq htop net-tools
 
 # -----------------------------------------------------------------------------
@@ -98,9 +99,16 @@ apt-get install -y -qq kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
 # -----------------------------------------------------------------------------
-# 6. AWS CLI v2
+# 6. Helm 3
 # -----------------------------------------------------------------------------
-echo "[6/7] AWS CLI v2 설치..."
+echo "[6/8] Helm 설치..."
+
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# -----------------------------------------------------------------------------
+# 7. AWS CLI v2
+# -----------------------------------------------------------------------------
+echo "[7/8] AWS CLI v2 설치..."
 
 ARCH=$(uname -m)
 if [ "$ARCH" = "aarch64" ]; then
@@ -111,9 +119,9 @@ fi
 cd /tmp && unzip -qo awscliv2.zip && ./aws/install && rm -rf /tmp/aws /tmp/awscliv2.zip
 
 # -----------------------------------------------------------------------------
-# 7. SSM Agent
+# 8. SSM Agent
 # -----------------------------------------------------------------------------
-echo "[7/7] SSM Agent 설치..."
+echo "[8/8] SSM Agent 설치..."
 
 snap install amazon-ssm-agent --classic
 systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
@@ -139,6 +147,7 @@ echo "  containerd   : $(containerd --version)"
 echo "  kubeadm      : $(kubeadm version -o short)"
 echo "  kubelet      : $(kubelet --version 2>/dev/null | awk '{print $2}')"
 echo "  kubectl      : $(kubectl version --client -o yaml 2>/dev/null | grep gitVersion | awk '{print $2}')"
+echo "  helm         : $(helm version --short 2>/dev/null)"
 echo "  aws cli      : $(aws --version 2>&1 | head -1)"
 echo "  ssm agent    : $(snap list amazon-ssm-agent 2>/dev/null | tail -1 | awk '{print $2}')"
 echo "============================================="
