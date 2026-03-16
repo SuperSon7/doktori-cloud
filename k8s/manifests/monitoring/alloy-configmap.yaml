@@ -1,0 +1,176 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: monitoring
+data:
+  config.alloy: |
+    // =============================================================
+    // 1. Spring Boot Actuator 메트릭 (K8s Service Discovery)
+    // =============================================================
+    discovery.kubernetes "pods" {
+      role = "pod"
+      namespaces {
+        names = ["prod"]
+      }
+    }
+
+    discovery.relabel "spring_pods" {
+      targets = discovery.kubernetes.pods.targets
+
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_app"]
+        regex         = "doktori"
+        action        = "keep"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        target_label  = "component"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        regex         = "api"
+        replacement   = "/api/actuator/prometheus"
+        target_label  = "__metrics_path__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        regex         = "chat"
+        replacement   = "/api/actuator/prometheus"
+        target_label  = "__metrics_path__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_ip", "__meta_kubernetes_pod_label_component"]
+        separator     = ":"
+        regex         = "(.*):api"
+        replacement   = "${1}:8080"
+        target_label  = "__address__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_ip", "__meta_kubernetes_pod_label_component"]
+        separator     = ":"
+        regex         = "(.*):chat"
+        replacement   = "${1}:8081"
+        target_label  = "__address__"
+      }
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+    }
+
+    prometheus.scrape "spring_apps" {
+      targets    = discovery.relabel.spring_pods.output
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "15s"
+    }
+
+    // =============================================================
+    // 2. kube-state-metrics
+    // =============================================================
+    prometheus.scrape "kube_state" {
+      targets = [{
+        __address__ = "kube-state-metrics.monitoring.svc.cluster.local:8080",
+      }]
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "30s"
+    }
+
+    // =============================================================
+    // 3. kubelet cAdvisor (컨테이너 리소스)
+    // =============================================================
+    discovery.kubernetes "nodes" {
+      role = "node"
+    }
+
+    discovery.relabel "cadvisor" {
+      targets = discovery.kubernetes.nodes.targets
+      rule {
+        replacement  = "/metrics/cadvisor"
+        target_label = "__metrics_path__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_node_name"]
+        target_label  = "node"
+      }
+    }
+
+    prometheus.scrape "cadvisor" {
+      targets    = discovery.relabel.cadvisor.output
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "30s"
+      scheme     = "https"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        insecure_skip_verify = true
+      }
+    }
+
+    // =============================================================
+    // 4. 호스트 메트릭
+    // =============================================================
+    prometheus.exporter.unix "host" {
+      set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
+    }
+
+    prometheus.scrape "host_metrics" {
+      targets    = prometheus.exporter.unix.host.targets
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "30s"
+    }
+
+    // =============================================================
+    // 5. remote_write → Prometheus
+    // =============================================================
+    prometheus.remote_write "monitoring" {
+      endpoint {
+        url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+        queue_config {
+          capacity             = 10000
+          max_shards           = 5
+          max_samples_per_send = 2000
+        }
+      }
+      wal {
+        truncate_frequency = "2h"
+        max_keepalive_time = "8h"
+      }
+    }
+
+    // =============================================================
+    // 6. 로그 → Loki
+    // =============================================================
+    loki.source.kubernetes "pods" {
+      targets    = discovery.kubernetes.pods.targets
+      forward_to = [loki.process.pipeline.receiver]
+    }
+
+    loki.process "pipeline" {
+      stage.json {
+        expressions = {
+          level   = "level",
+          message = "message",
+          traceId = "traceId",
+        }
+      }
+      stage.labels {
+        values = {
+          level = "",
+        }
+      }
+      forward_to = [loki.write.monitoring.receiver]
+    }
+
+    loki.write "monitoring" {
+      endpoint {
+        url = "http://monitoring.mgmt.doktori.internal:3100/loki/api/v1/push"
+      }
+    }

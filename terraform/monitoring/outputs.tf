@@ -37,3 +37,8 @@ output "mgmt_vpc_cidr" {
   description = "Default VPC CIDR (for peered route tables)"
   value       = data.aws_vpc.default.cidr_block
 }
+
+output "mgmt_zone_id" {
+  description = "mgmt.doktori.internal PHZ ID (for cross-VPC association)"
+  value       = aws_route53_zone.mgmt.zone_id
+}
