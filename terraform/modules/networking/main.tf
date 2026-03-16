@@ -245,6 +245,11 @@ resource "aws_route_table" "public" {
   tags = {
     Name = "${var.project_name}-${var.environment}-public-rt"
   }
+
+  # 별도 aws_route 리소스(VPC peering 등)로 추가된 route와 충돌 방지
+  lifecycle {
+    ignore_changes = [route]
+  }
 }
 
 resource "aws_route_table" "private" {
