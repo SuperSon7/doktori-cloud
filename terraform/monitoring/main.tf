@@ -179,6 +179,30 @@ resource "aws_security_group" "monitoring" {
     cidr_blocks = var.allowed_admin_cidrs
   }
 
+  # Loki from peered VPCs (private IP 통신)
+  dynamic "ingress" {
+    for_each = length(var.peered_vpc_cidrs) > 0 ? [1] : []
+    content {
+      description = "Loki from peered VPCs"
+      from_port   = 3100
+      to_port     = 3100
+      protocol    = "tcp"
+      cidr_blocks = var.peered_vpc_cidrs
+    }
+  }
+
+  # Prometheus remote_write from peered VPCs (private IP 통신)
+  dynamic "ingress" {
+    for_each = length(var.peered_vpc_cidrs) > 0 ? [1] : []
+    content {
+      description = "Prometheus remote_write from peered VPCs"
+      from_port   = 9090
+      to_port     = 9090
+      protocol    = "tcp"
+      cidr_blocks = var.peered_vpc_cidrs
+    }
+  }
+
   # Outbound - 전부 허용 (HTTPS 스크레이프, Docker pull 등)
   egress {
     description = "Allow all outbound"

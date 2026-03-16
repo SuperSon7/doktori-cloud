@@ -17,3 +17,9 @@ variable "nat_key_name" {
   type    = string
   default = "doktori-dev"
 }
+
+variable "state_bucket" {
+  description = "S3 bucket for Terraform remote state"
+  type        = string
+  default     = "doktori-v2-terraform-state"
+}

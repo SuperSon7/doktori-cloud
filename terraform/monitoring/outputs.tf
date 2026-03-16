@@ -27,3 +27,13 @@ output "ami_name" {
   description = "AMI name (Ubuntu version + architecture)"
   value       = data.aws_ami.ubuntu.name
 }
+
+output "mgmt_vpc_id" {
+  description = "Default VPC ID (for peering accepter)"
+  value       = data.aws_vpc.default.id
+}
+
+output "mgmt_vpc_cidr" {
+  description = "Default VPC CIDR (for peered route tables)"
+  value       = data.aws_vpc.default.cidr_block
+}
