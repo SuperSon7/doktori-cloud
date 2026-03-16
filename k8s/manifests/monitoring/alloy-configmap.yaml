@@ -80,8 +80,16 @@ data:
       targets = [{
         __address__ = "kube-state-metrics.monitoring.svc.cluster.local:8080",
       }]
-      forward_to = [prometheus.remote_write.monitoring.receiver]
+      forward_to = [prometheus.relabel.kube_state_env.receiver]
       scrape_interval = "30s"
+    }
+
+    prometheus.relabel "kube_state_env" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
     }
 
     // =============================================================
@@ -148,8 +156,23 @@ data:
     // =============================================================
     // 6. 로그 → Loki
     // =============================================================
+
+    // prod namespace 로그
     loki.source.kubernetes "pods" {
       targets    = discovery.kubernetes.pods.targets
+      forward_to = [loki.process.pipeline.receiver]
+    }
+
+    // kube-system namespace 로그 (CoreDNS, kube-proxy 등 디버깅용)
+    discovery.kubernetes "kube_system_pods" {
+      role = "pod"
+      namespaces {
+        names = ["kube-system"]
+      }
+    }
+
+    loki.source.kubernetes "kube_system" {
+      targets    = discovery.kubernetes.kube_system_pods.targets
       forward_to = [loki.process.pipeline.receiver]
     }
 
