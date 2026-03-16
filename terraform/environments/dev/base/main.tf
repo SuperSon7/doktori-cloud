@@ -121,6 +121,7 @@ data "terraform_remote_state" "monitoring" {
 locals {
   mgmt_vpc_id   = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_id
   mgmt_vpc_cidr = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_cidr
+  mgmt_zone_id  = data.terraform_remote_state.monitoring.outputs.mgmt_zone_id
 }
 
 resource "aws_vpc_peering_connection" "dev_to_mgmt" {
@@ -162,6 +163,12 @@ resource "aws_route" "mgmt_to_dev" {
   route_table_id            = data.aws_route_table.mgmt_main.id
   destination_cidr_block    = "10.0.0.0/16"
   vpc_peering_connection_id = aws_vpc_peering_connection.dev_to_mgmt.id
+}
+
+# --- mgmt PHZ → dev VPC association (monitoring.mgmt.doktori.internal resolve) ---
+resource "aws_route53_zone_association" "mgmt_phz_dev" {
+  zone_id = local.mgmt_zone_id
+  vpc_id  = module.networking.vpc_id
 }
 
 # -----------------------------------------------------------------------------

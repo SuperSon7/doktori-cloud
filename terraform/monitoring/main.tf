@@ -370,3 +370,32 @@ resource "aws_eip_association" "monitoring" {
   allocation_id = aws_eip.monitoring.id
   instance_id   = aws_instance.monitoring.id
 }
+
+# -----------------------------------------------------------------------------
+# Private Hosted Zone — mgmt.doktori.internal (shared across peered VPCs)
+# -----------------------------------------------------------------------------
+resource "aws_route53_zone" "mgmt" {
+  name = "mgmt.doktori.internal"
+
+  vpc {
+    vpc_id = data.aws_vpc.default.id
+  }
+
+  tags = {
+    Name    = "mgmt.doktori.internal"
+    Service = "monitoring"
+  }
+
+  # peered VPC association은 각 환경 base에서 추가 → lifecycle으로 drift 방지
+  lifecycle {
+    ignore_changes = [vpc]
+  }
+}
+
+resource "aws_route53_record" "monitoring" {
+  zone_id = aws_route53_zone.mgmt.zone_id
+  name    = "monitoring.mgmt.doktori.internal"
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.monitoring.private_ip]
+}
