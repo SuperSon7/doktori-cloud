@@ -84,6 +84,11 @@ systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
 # -----------------------------------------------------------------------------
 echo "[5/6] CodeDeploy Agent 설치..."
 
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 3; done
+while fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done
+while fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 3; done
+apt-get install -y -qq gdebi-core
+
 curl -fsSL "https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install" -o /tmp/codedeploy-install
 chmod +x /tmp/codedeploy-install
 /tmp/codedeploy-install auto
