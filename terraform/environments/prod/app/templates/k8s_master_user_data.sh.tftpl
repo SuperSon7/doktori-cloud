@@ -6,6 +6,11 @@
 # 이 스크립트는 동적 설정만 수행:
 #   - 첫 번째 마스터: kubeadm init → SSM에 join 정보 저장 → CNI/Helm/NGF 설치
 #   - 추가 마스터: SSM에서 join 정보 조회 → kubeadm join --control-plane
+#
+# NLB hairpin 회피:
+#   마스터에서는 /etc/hosts로 control-plane-endpoint를 127.0.0.1로 영구 설정.
+#   kubelet.conf, admin.conf 등 모든 kubeconfig이 자동으로 localhost 사용.
+#   워커는 /etc/hosts 없으므로 NLB로 정상 라우팅 (다른 인스턴스라 hairpin 아님).
 # =============================================================================
 set -euo pipefail
 exec > >(tee /var/log/k8s-master-init.log) 2>&1
@@ -38,6 +43,14 @@ echo " Svc CIDR: $${SERVICE_CIDR}"
 echo "============================================="
 
 # -----------------------------------------------------------------------------
+# /etc/hosts — NLB hairpin 영구 회피
+# 마스터 노드에서 control-plane-endpoint를 localhost로 해석.
+# kubelet, scheduler, controller-manager 모두 이 설정을 따름.
+# -----------------------------------------------------------------------------
+echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+echo "  → /etc/hosts: $${CONTROL_PLANE_ENDPOINT} → 127.0.0.1 (NLB hairpin 회피)"
+
+# -----------------------------------------------------------------------------
 # SSM 헬퍼 함수
 # -----------------------------------------------------------------------------
 ssm_get() {
@@ -66,7 +79,7 @@ echo "[1/2] 리더 선출 확인..."
 IS_FIRST=false
 if ! ssm_get "$${LOCK_PARAM}" > /dev/null 2>&1; then
   # init-lock 없음 → 첫 번째 마스터 시도
-  # 경합 방지: PutParameter로 선점 (기존 값 없을 때만 성공하도록 시도)
+  # 경합 방지: PutParameter로 선점 (기존 값 없을 때만 성공)
   if aws ssm put-parameter \
     --name "$${LOCK_PARAM}" \
     --value "$${MASTER_IP}" \
@@ -94,11 +107,13 @@ if [ "$${IS_FIRST}" = true ]; then
     --cri-socket=unix:///run/containerd/containerd.sock \
     2>&1 | tee /tmp/kubeadm-init.log
 
-  # kubectl 설정
+  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
   mkdir -p /home/ubuntu/.kube
   cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
   chown ubuntu:ubuntu /home/ubuntu/.kube/config
-  export KUBECONFIG=/home/ubuntu/.kube/config
+
+  # root에서도 kubectl 사용 가능
+  export KUBECONFIG=/etc/kubernetes/admin.conf
 
   # join 명령 저장 → SSM
   WORKER_JOIN=$(kubeadm token create --print-join-command)
@@ -112,18 +127,18 @@ if [ "$${IS_FIRST}" = true ]; then
 
   # --- Calico CNI ---
   echo "[CNI] Calico $${CALICO_VERSION} 설치..."
-  su - ubuntu -c "kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/tigera-operator.yaml"
+  kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/tigera-operator.yaml"
 
-  curl -sO "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/custom-resources.yaml"
-  sed -i 's/encapsulation: .*/encapsulation: VXLAN/' custom-resources.yaml
-  sed -i '/calicoNetwork:/a\    bgp: Disabled' custom-resources.yaml
-  su - ubuntu -c "kubectl create -f $(pwd)/custom-resources.yaml"
-  rm -f custom-resources.yaml
+  curl -s -o /tmp/custom-resources.yaml "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/custom-resources.yaml"
+  sed -i 's/encapsulation: .*/encapsulation: VXLAN/' /tmp/custom-resources.yaml
+  sed -i '/calicoNetwork:/a\    bgp: Disabled' /tmp/custom-resources.yaml
+  kubectl create -f /tmp/custom-resources.yaml
+  rm -f /tmp/custom-resources.yaml
 
   echo "  → Calico 설치 완료 (VXLAN, BGP Disabled)"
 
   # Calico Ready 대기
-  su - ubuntu -c "kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n calico-system --timeout=300s" || \
+  kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n calico-system --timeout=300s || \
     echo "  ⚠ Calico Pod 아직 Ready 아님"
 
   # --- Helm ---
@@ -132,17 +147,17 @@ if [ "$${IS_FIRST}" = true ]; then
 
   # --- Gateway API CRD ---
   echo "[Gateway API] CRD $${GATEWAY_API_VERSION} 설치..."
-  su - ubuntu -c "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
+  kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
 
   # --- NGINX Gateway Fabric ---
   echo "[NGF] $${NGF_VERSION} 설치..."
-  su - ubuntu -c "helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
-    --version $${NGF_VERSION} \
+  helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
+    --version "$${NGF_VERSION}" \
     --namespace nginx-gateway \
     --create-namespace \
     --set service.type=NodePort \
-    --set 'service.ports[0].port=80,service.ports[0].targetPort=80,service.ports[0].nodePort=30080,service.ports[0].protocol=TCP,service.ports[0].name=http' \
-    --set 'service.ports[1].port=443,service.ports[1].targetPort=443,service.ports[1].nodePort=30443,service.ports[1].protocol=TCP,service.ports[1].name=https'"
+    --set "service.ports[0].port=80,service.ports[0].targetPort=80,service.ports[0].nodePort=30080,service.ports[0].protocol=TCP,service.ports[0].name=http" \
+    --set "service.ports[1].port=443,service.ports[1].targetPort=443,service.ports[1].nodePort=30443,service.ports[1].protocol=TCP,service.ports[1].name=https"
 
   echo "  → 클러스터 초기화 완료"
 
@@ -153,6 +168,7 @@ else
   echo "[2/2] 추가 마스터 — SSM에서 join 정보 대기..."
 
   # 최대 10분 대기 (첫 번째 마스터 init 완료까지)
+  MASTER_JOIN=""
   for i in $(seq 1 60); do
     MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
     if [ -n "$${MASTER_JOIN}" ]; then
@@ -167,12 +183,53 @@ else
     exit 1
   fi
 
-  echo "  → join 정보 수신. kubeadm join 실행..."
-  eval "$${MASTER_JOIN}" \
-    --apiserver-advertise-address="$${MASTER_IP}" \
-    --cri-socket=unix:///run/containerd/containerd.sock
+  # /etc/hosts를 일시 제거 — join은 NLB 경유로 첫 번째 마스터에 접속해야 함
+  sed -i "/127.0.0.1 $${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
 
-  # kubectl 설정
+  echo "  → join 정보 수신. kubeadm join 실행..."
+
+  # join 명령 구성
+  JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
+
+  # retry loop — etcd learner sync, 네트워크 타이밍 등 일시적 실패 대응
+  JOIN_SUCCESS=false
+  for attempt in $(seq 1 5); do
+    echo "  → join 시도 $${attempt}/5..."
+
+    # 재시도 전 reset (첫 시도 제외)
+    if [ "$${attempt}" -gt 1 ]; then
+      kubeadm reset -f --cri-socket=unix:///run/containerd/containerd.sock 2>/dev/null || true
+      sleep 15
+
+      # certificate-key 만료 대응: SSM에서 최신 join 정보 다시 가져오기
+      MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
+      if [ -n "$${MASTER_JOIN}" ]; then
+        JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
+      fi
+    fi
+
+    echo "$${JOIN_CMD}" > /tmp/join-cmd.sh
+    if bash /tmp/join-cmd.sh; then
+      JOIN_SUCCESS=true
+      rm -f /tmp/join-cmd.sh
+      break
+    fi
+
+    echo "  ⚠ join 실패 (시도 $${attempt}/5). $((attempt * 15))초 후 재시도..."
+    sleep $((attempt * 15))
+  done
+
+  rm -f /tmp/join-cmd.sh
+
+  if [ "$${JOIN_SUCCESS}" = false ]; then
+    echo "ERROR: 5회 시도 모두 실패"
+    exit 1
+  fi
+
+  # join 완료 후 /etc/hosts 복원 (이 마스터도 hairpin 회피 필요)
+  echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+
+  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
   mkdir -p /home/ubuntu/.kube
   cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
   chown ubuntu:ubuntu /home/ubuntu/.kube/config

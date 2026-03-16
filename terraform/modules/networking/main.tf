@@ -46,13 +46,13 @@ resource "aws_subnet" "this" {
 # -----------------------------------------------------------------------------
 # NAT Instance (t4g.nano — NAT Gateway 대비 비용 절감)
 # -----------------------------------------------------------------------------
-data "aws_ami" "nat_amazon_linux" {
+data "aws_ami" "nat_ubuntu" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-kernel-*-arm64-gp2"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
   }
 
   filter {
@@ -116,20 +116,60 @@ locals {
   }
 }
 
+# --- NAT Instance IAM (SSM access) ---
+resource "aws_iam_role" "nat" {
+  count = var.nat_iam_instance_profile == "" ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-nat-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = { Name = "${var.project_name}-${var.environment}-nat-role" }
+}
+
+resource "aws_iam_role_policy_attachment" "nat_ssm" {
+  count = var.nat_iam_instance_profile == "" ? 1 : 0
+
+  role       = aws_iam_role.nat[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "nat" {
+  count = var.nat_iam_instance_profile == "" ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-nat-profile"
+  role = aws_iam_role.nat[0].name
+}
+
+locals {
+  nat_instance_profile = var.nat_iam_instance_profile != "" ? var.nat_iam_instance_profile : (
+    length(aws_iam_instance_profile.nat) > 0 ? aws_iam_instance_profile.nat[0].name : null
+  )
+}
+
 resource "aws_instance" "nat" {
   for_each = local.nat_instances
 
-  ami                    = var.nat_ami_id != "" ? var.nat_ami_id : data.aws_ami.nat_amazon_linux.id
+  ami                    = var.nat_ami_id != "" ? var.nat_ami_id : data.aws_ami.nat_ubuntu.id
   instance_type          = var.nat_instance_type
   key_name               = var.nat_key_name != "" ? var.nat_key_name : null
   subnet_id              = aws_subnet.this[each.value.subnet_key].id
   vpc_security_group_ids = [aws_security_group.nat.id]
   source_dest_check      = false
+  iam_instance_profile   = local.nat_instance_profile
 
   user_data = var.nat_user_data != "" ? var.nat_user_data : <<-EOF
     #!/bin/bash
     sysctl -w net.ipv4.ip_forward=1
-    iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE
+    DEFAULT_IF=$(ip route show default | awk '{print $5}')
+    iptables -t nat -A POSTROUTING -o "$DEFAULT_IF" -j MASQUERADE
   EOF
 
   metadata_options {

@@ -258,10 +258,11 @@ resource "aws_vpc_security_group_ingress_rule" "worker_typha_from_self" {
 # Internal NLB (Worker NodePort)
 # -----------------------------------------------------------------------------
 resource "aws_lb" "nlb" {
-  name               = "${var.project_name}-${var.environment}-k8s-nlb"
-  internal           = true
-  load_balancer_type = "network"
-  subnets            = var.private_subnet_ids
+  name                       = "${var.project_name}-${var.environment}-k8s-nlb"
+  internal                   = true
+  load_balancer_type         = "network"
+  subnets                    = var.private_subnet_ids
+  enable_cross_zone_load_balancing = true
 
   tags = { Name = "${var.project_name}-${var.environment}-k8s-nlb" }
 }

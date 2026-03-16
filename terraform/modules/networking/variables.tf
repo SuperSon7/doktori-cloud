@@ -81,6 +81,12 @@ variable "nat_volume_size" {
   default     = 8
 }
 
+variable "nat_iam_instance_profile" {
+  description = "IAM instance profile name for NAT instances (SSM access)"
+  type        = string
+  default     = ""
+}
+
 variable "nat_extra_tags" {
   description = "Additional tags for the NAT instance (overrides default Name/Service)"
   type        = map(string)
