@@ -11,12 +11,15 @@ module "networking" {
   vpc_cidr                    = "10.1.0.0/16"
   availability_zone           = "ap-northeast-2a"
   secondary_availability_zone = "ap-northeast-2c"
+  tertiary_availability_zone  = "ap-northeast-2b"
 
   subnets = {
     public        = { cidr = "10.1.0.0/22", tier = "public", az_key = "primary" }
     public_c      = { cidr = "10.1.4.0/22", tier = "public", az_key = "secondary" }
+    public_b      = { cidr = "10.1.8.0/22", tier = "public", az_key = "tertiary" }
     private_app   = { cidr = "10.1.16.0/20", tier = "private-app", az_key = "primary" }
     private_app_c = { cidr = "10.1.48.0/20", tier = "private-app", az_key = "secondary" }
+    private_app_b = { cidr = "10.1.64.0/20", tier = "private-app", az_key = "tertiary" }
     private_db    = { cidr = "10.1.32.0/24", tier = "private-db", az_key = "primary" }
     private_rds   = { cidr = "10.1.40.0/24", tier = "private-db", az_key = "secondary" }
   }
