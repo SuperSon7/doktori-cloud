@@ -1,0 +1,52 @@
+# ArgoCD Helm values — Non-HA, 최소 리소스, 불필요 컴포넌트 비활성화
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false
+
+configs:
+  params:
+    server.insecure: true
+  cm:
+    timeout.reconciliation: 180s
+    kustomize.buildOptions: "--load-restrictor LoadRestrictionsNone"
