@@ -159,8 +159,32 @@ data:
 
     // prod namespace 로그
     loki.source.kubernetes "pods" {
-      targets    = discovery.kubernetes.pods.targets
+      targets    = discovery.relabel.loki_pods.output
       forward_to = [loki.process.pipeline.receiver]
+    }
+
+    discovery.relabel "loki_pods" {
+      targets = discovery.kubernetes.pods.targets
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        target_label  = "component"
+      }
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
     }
 
     // kube-system namespace 로그 (CoreDNS, kube-proxy 등 디버깅용)
@@ -171,8 +195,28 @@ data:
       }
     }
 
+    discovery.relabel "loki_kube_system" {
+      targets = discovery.kubernetes.kube_system_pods.targets
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
+    }
+
     loki.source.kubernetes "kube_system" {
-      targets    = discovery.kubernetes.kube_system_pods.targets
+      targets    = discovery.relabel.loki_kube_system.output
       forward_to = [loki.process.pipeline.receiver]
     }
 
