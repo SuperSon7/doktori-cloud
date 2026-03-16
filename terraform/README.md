@@ -49,7 +49,8 @@ terraform/
 ├── environments/
 │   ├── dev/
 │   │   ├── base/                  # VPC (10.0.0.0/16)
-│   │   └── app/                   # EC2 x2 (all-in-one)
+│   │   ├── app/                   # EC2 x2 (all-in-one)
+│   │   └── cdn/                   # CloudFront for dev.doktori.kr image caching
 │   ├── staging/
 │   │   ├── base/                  # VPC (10.2.0.0/16)
 │   │   ├── app/                   # EC2 x6 (service-per-instance)
@@ -128,6 +129,7 @@ global/terraform.tfstate
 {env}/base/terraform.tfstate
 {env}/app/terraform.tfstate
 {env}/data/terraform.tfstate
+{env}/cdn/terraform.tfstate
 monitoring/terraform.tfstate
 dns-zone/terraform.tfstate
 ecr/terraform.tfstate
