@@ -1,0 +1,69 @@
+# 1. default-deny — 모든 인바운드 차단
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 2. NGF → api
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ngf-to-api
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      component: api
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# 3. NGF → chat
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ngf-to-chat
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      component: chat
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway
+      ports:
+        - port: 8081
+          protocol: TCP
+---
+# 4. Alloy(monitoring ns) → api/chat 메트릭 수집
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-to-apps
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      app: doktori
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
