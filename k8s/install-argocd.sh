@@ -7,7 +7,8 @@
 #   chmod +x install-argocd.sh
 #   ./install-argocd.sh
 #
-# ※ etcd 암호화, kubelet 보안은 수동 작업 필요 (스크립트 하단 안내)
+# 설치 후 초기 설정 (Git 연결, etcd 암호화, kubelet 보안, 비밀번호 변경):
+#   ./setup-argocd.sh
 # =============================================================================
 set -euo pipefail
 
@@ -90,37 +91,20 @@ echo "    kubectl patch svc argocd-server -n argocd -p '{\"spec\":{\"type\":\"No
 echo "    → https://<Worker-IP>:${ARGOCD_NODEPORT}"
 echo ""
 echo "============================================="
-echo " 수동 작업 필요 (master 노드에서):"
+echo " 다음 단계: 초기 설정"
 echo "============================================="
 echo ""
-echo " [A] Git 저장소 연결:"
-echo "   kubectl apply -f - <<EOF"
-echo "   apiVersion: v1"
-echo "   kind: Secret"
-echo "   metadata:"
-echo "     name: private-repo-creds"
-echo "     namespace: argocd"
-echo "     labels:"
-echo "       argocd.argoproj.io/secret-type: repository"
-echo "   type: Opaque"
-echo "   stringData:"
-echo "     type: git"
-echo "     url: <GIT_REPO_URL>"
-echo "     username: <GIT_USERNAME>"
-echo "     password: <GIT_PAT>"
-echo "   EOF"
+echo "  아래 스크립트로 Git 연결 + 보안 설정을 자동화할 수 있습니다:"
 echo ""
-echo " [B] etcd 암호화 (Secret 보호):"
-echo "   ENCRYPTION_KEY=\$(head -c 32 /dev/urandom | base64)"
-echo "   # → 가이드: K8s_provisioning/07_argocd.md § Phase 1.2"
+echo "    ./setup-argocd.sh"
 echo ""
-echo " [C] kubelet 보안 (모든 노드):"
-echo "   # /var/lib/kubelet/config.yaml 수정:"
-echo "   #   authentication.anonymous.enabled: false"
-echo "   #   readOnlyPort: 0"
-echo "   sudo systemctl restart kubelet"
+echo "  자동화 항목:"
+echo "    [A] Git 저장소 연결 + ArgoCD Application 배포"
+echo "    [B] etcd 암호화 (Secret 보호)"
+echo "    [C] kubelet 보안 (anonymous auth 비활성화)"
+echo "    [D] ArgoCD admin 비밀번호 변경"
 echo ""
-echo " [D] ArgoCD 비밀번호 변경:"
-echo "   argocd login localhost:8443 --username admin --password '${ARGOCD_PASSWORD}' --insecure"
-echo "   argocd account update-password"
+echo "  옵션:"
+echo "    --skip-etcd     etcd 암호화 건너뜀"
+echo "    --skip-kubelet  kubelet 보안 건너뜀"
 echo "============================================="
