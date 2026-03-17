@@ -1,0 +1,9 @@
+- name: wait for apiserver
+  command: kubectl get nodes --no-headers
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: apiserver_wait
+  until: apiserver_wait.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false

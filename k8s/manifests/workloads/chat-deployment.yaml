@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: chat
   namespace: prod
+  labels:
+    app: doktori
+    component: chat
 spec:
   replicas: 2
   strategy:
@@ -22,10 +25,19 @@ spec:
     spec:
       imagePullSecrets:
         - name: ecr-credentials
+      priorityClassName: high-priority
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: doktori
+              component: chat
+        - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: doktori
@@ -35,18 +47,48 @@ spec:
           image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-chat:5afb0d5
           ports:
             - containerPort: 8081
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: "300m"
               memory: "512Mi"
             limits:
+              cpu: "1"
               memory: "1536Mi"
           env:
             - name: TZ
               value: Asia/Seoul
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            periodSeconds: 30
+            failureThreshold: 5
           lifecycle:
             preStop:
               exec:
                 command: ["sleep", "15"]
+      volumes:
+        - name: tmp
+          emptyDir: {}

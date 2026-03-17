@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 워크로드 배포 — ECR 인증 + Deployments + Services + Gateway + HTTPRoutes
+# 워크로드 초기 배포 (1회성) — ArgoCD 설치 전 부트스트랩 전용
 #
-# 사용법: master 노드에서 실행
+# ⚠ ArgoCD 설치 후에는 이 스크립트를 실행하지 마세요.
+#   이후 변경은 Git manifest 수정 → push → ArgoCD auto-sync 경로를 사용합니다.
+#   (k8s/manifests/workloads/ 디렉토리가 ArgoCD의 진실의 원천)
+#
+# 사용법: master 노드에서 실행 (cluster-init.sh + worker join 완료 후)
 #   ./deploy-workloads.sh
 #
-# cluster-init.sh + worker join 완료 후 사용
+# 이 스크립트가 하는 일:
+#   1. Namespace + PriorityClass 생성
+#   2. ECR imagePullSecret 생성 (12시간 유효)
+#   3. ECR 토큰 갱신 CronJob 배포
+#   4. Firebase Secret 생성 (SSM에서 자동 조회)
+#   5. api/chat Deployment + Service + PDB 배포
+#   6. Gateway + HTTPRoutes 배포
 # =============================================================================
 set -euo pipefail
 
@@ -32,8 +42,19 @@ echo ""
 # -----------------------------------------------------------------------------
 # 1. Namespace
 # -----------------------------------------------------------------------------
-echo "[1/7] Namespace..."
+echo "[1/7] Namespace + PriorityClass..."
 kubectl create namespace "${NAMESPACE}" 2>/dev/null || echo "  → 이미 존재"
+
+cat <<EOF | kubectl apply -f -
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "High priority for doktori api/chat workloads"
+EOF
 
 # -----------------------------------------------------------------------------
 # 2. ECR 인증 Secret
@@ -119,7 +140,7 @@ spec:
                     -H "Authorization: Bearer \${TOKEN}" || true
 
                   # Create docker-registry secret
-                  DOCKER_CONFIG=\$(echo -n "{\"auths\":{\"${ECR_REGISTRY}\":{\"username\":\"AWS\",\"password\":\"\${ECR_TOKEN}\"}}}" | base64 -w 0)
+                  DOCKER_CONFIG=\$(echo -n "{\"auths\":{\"${ECR_REGISTRY}\":{\"username\":\"AWS\",\"password\":\"\${ECR_TOKEN}\"}}}" | base64 | tr -d '\n')
                   curl -s -k -X POST "\${API_SERVER}/api/v1/namespaces/\${NS}/secrets" \
                     -H "Authorization: Bearer \${TOKEN}" \
                     -H "Content-Type: application/json" \
@@ -200,10 +221,19 @@ spec:
     spec:
       imagePullSecrets:
         - name: ecr-credentials
+      priorityClassName: high-priority
+      terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: doktori
+              component: api
+        - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: doktori
@@ -220,6 +250,8 @@ spec:
             limits:
               memory: "1280Mi"
           env:
+            - name: TZ
+              value: Asia/Seoul
             - name: SPRING_PROFILES_ACTIVE
               value: "${SPRING_PROFILE}"
             - name: FIREBASE_CREDENTIALS_PATH
@@ -228,10 +260,29 @@ spec:
             - name: firebase-cred
               mountPath: /app/secrets
               readOnly: true
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 30
+            failureThreshold: 5
           lifecycle:
             preStop:
               exec:
-                command: ["sleep", "15"]
+                command: ["sleep", "10"]
       volumes:
         - name: firebase-cred
           secret:
@@ -297,10 +348,19 @@ spec:
     spec:
       imagePullSecrets:
         - name: ecr-credentials
+      priorityClassName: high-priority
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: doktori
+              component: chat
+        - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: doktori
@@ -315,10 +375,32 @@ spec:
               cpu: "300m"
               memory: "512Mi"
             limits:
+              cpu: "1"
               memory: "1536Mi"
           env:
+            - name: TZ
+              value: Asia/Seoul
             - name: SPRING_PROFILES_ACTIVE
               value: "${SPRING_PROFILE}"
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            periodSeconds: 30
+            failureThreshold: 5
           lifecycle:
             preStop:
               exec:

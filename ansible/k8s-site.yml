@@ -1,0 +1,40 @@
+# =============================================================================
+# K8s Post-Bootstrap Playbook
+#
+# Usage:
+#   # 전체 실행 (마스터에서)
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml
+#
+#   # 특정 단계만
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags workloads
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags observability
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags argocd
+#
+#   # hardening은 마스터+워커 전체 (kubelet)
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags hardening
+#
+#   # ArgoCD Git 정보 전달
+#   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags argocd \
+#     -e git_repo_url=https://github.com/100-hours-a-week/5-team-service-cloud.git \
+#     -e git_username=SuperSon7 \
+#     -e git_pat=ghp_xxxxx
+# =============================================================================
+
+# --- Master: workloads + observability + argocd ---
+- name: K8s Post-Bootstrap (master)
+  hosts: k8s_master
+  become: false
+  roles:
+    - role: k8s-post-bootstrap
+      tags: [workloads, observability, argocd]
+
+# --- All nodes: kubelet hardening ---
+- name: K8s Security Hardening (all nodes)
+  hosts: k8s_all
+  become: true
+  tasks:
+    - name: Include hardening tasks
+      include_role:
+        name: k8s-post-bootstrap
+        tasks_from: hardening
+      tags: [hardening]

@@ -1,0 +1,121 @@
+# =============================================================================
+# Observability — install-observability.sh 대응
+# metrics-server + kube-state-metrics + Alloy + HPA
+# =============================================================================
+
+- name: Check Helm installed
+  command: helm version --short
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: helm_check
+  changed_when: false
+  failed_when: helm_check.rc != 0
+
+- name: Add Helm repos
+  shell: |
+    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ 2>/dev/null || true
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+    helm repo update
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+
+- name: Create monitoring namespace
+  command: kubectl create namespace monitoring
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: mon_ns
+  changed_when: "'created' in mon_ns.stdout"
+  failed_when: false
+
+- name: Label monitoring namespace
+  command: kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+
+- name: Install metrics-server
+  shell: |
+    if helm status metrics-server -n kube-system &>/dev/null; then
+      helm upgrade metrics-server metrics-server/metrics-server \
+        --namespace kube-system \
+        --version {{ metrics_server_version }} \
+        --set args[0]=--kubelet-insecure-tls \
+        --set args[1]=--kubelet-preferred-address-types=InternalIP \
+        --set resources.requests.cpu=100m \
+        --set resources.requests.memory=128Mi \
+        --set resources.limits.memory=256Mi
+    else
+      helm install metrics-server metrics-server/metrics-server \
+        --namespace kube-system \
+        --version {{ metrics_server_version }} \
+        --set args[0]=--kubelet-insecure-tls \
+        --set args[1]=--kubelet-preferred-address-types=InternalIP \
+        --set resources.requests.cpu=100m \
+        --set resources.requests.memory=128Mi \
+        --set resources.limits.memory=256Mi
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Install kube-state-metrics
+  shell: |
+    if helm status kube-state-metrics -n monitoring &>/dev/null; then
+      helm upgrade kube-state-metrics prometheus-community/kube-state-metrics \
+        --namespace monitoring \
+        --version {{ kube_state_metrics_version }} \
+        --set resources.requests.cpu=100m \
+        --set resources.requests.memory=128Mi \
+        --set resources.limits.memory=256Mi
+    else
+      helm install kube-state-metrics prometheus-community/kube-state-metrics \
+        --namespace monitoring \
+        --version {{ kube_state_metrics_version }} \
+        --set resources.requests.cpu=100m \
+        --set resources.requests.memory=128Mi \
+        --set resources.limits.memory=256Mi
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Apply Alloy RBAC + ConfigMap
+  command: kubectl apply -f {{ item }}
+  loop:
+    - "{{ k8s_scripts_dir }}/manifests/monitoring/alloy-rbac.yaml"
+    - "{{ k8s_scripts_dir }}/manifests/monitoring/alloy-configmap.yaml"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Apply Alloy DaemonSet (with version injection)
+  shell: |
+    sed "s|__ALLOY_VERSION__|{{ alloy_version }}|g" \
+      {{ k8s_scripts_dir }}/manifests/monitoring/alloy-daemonset.yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Apply HPA
+  command: kubectl apply -f {{ item }}
+  loop:
+    - "{{ k8s_scripts_dir }}/manifests/hpa/chat-hpa.yaml"
+    - "{{ k8s_scripts_dir }}/manifests/hpa/api-hpa.yaml"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Verify observability
+  shell: |
+    echo "--- Helm releases ---"
+    helm list -A
+    echo ""
+    echo "--- monitoring pods ---"
+    kubectl get pods -n monitoring
+    echo ""
+    echo "--- HPA ---"
+    kubectl get hpa -n {{ k8s_namespace }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: obs_result
+  changed_when: false
+
+- name: Display observability status
+  debug:
+    msg: "{{ obs_result.stdout_lines }}"
