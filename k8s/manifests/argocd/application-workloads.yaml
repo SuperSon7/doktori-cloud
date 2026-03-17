@@ -1,0 +1,30 @@
+# ArgoCD Application — prod 워크로드 (k8s/manifests/workloads/ 폴더만 감시)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: doktori-workloads
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: __GIT_REPO_URL__
+    targetRevision: main
+    path: k8s/manifests/workloads
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
