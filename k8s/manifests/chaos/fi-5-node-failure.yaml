@@ -1,0 +1,36 @@
+# =============================================================================
+# FI-5: 워커 노드 장애
+#
+# ⚠️ 이 실험은 AWS FIS로 실행하는 것을 권장 (EC2 stop → 5분 후 자동 start)
+#    Chaos Mesh의 PhysicalMachineChaos는 추가 에이전트 필요
+#
+# 가설: 워커 노드 1대 종료 → Pod 다른 노드로 재스케줄링 → 서비스 중단 < 2분
+# 성공 기준: Pod 재스케줄링 완료, SLO-1/SLO-3 유지
+# 관측: kubectl get pods -o wide (노드 변화 확인), Grafana → SLO 대시보드
+#
+# --- AWS FIS 실험 템플릿 (AWS Console 또는 CLI에서 생성) ---
+#
+# aws fis create-experiment-template \
+#   --description "FI-5: Worker node stop" \
+#   --targets '{
+#     "workerNode": {
+#       "resourceType": "aws:ec2:instance",
+#       "selectionMode": "COUNT(1)",
+#       "resourceTags": {"kubernetes.io/role": "worker"}
+#     }
+#   }' \
+#   --actions '{
+#     "stopNode": {
+#       "actionId": "aws:ec2:stop-instances",
+#       "parameters": {"startInstancesAfterDuration": "PT5M"},
+#       "targets": {"Instances": "workerNode"}
+#     }
+#   }' \
+#   --role-arn "arn:aws:iam::role/FISRole"
+#
+# --- 대안: kubectl drain으로 시뮬레이션 ---
+# kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data --grace-period=0
+# (복구: kubectl uncordon <node-name>)
+# =============================================================================
+#
+# 이 파일은 참조용입니다. 실제 실행은 AWS FIS 또는 kubectl drain을 사용합니다.

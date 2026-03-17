@@ -1,0 +1,28 @@
+# =============================================================================
+# FI-4: CPU Stress (HPA 스케일아웃 트리거 검증)
+#
+# 가설: CPU 80% 점유 → HPA 60% threshold 초과 → 2분 이내 스케일아웃 → latency 정상화
+# 성공 기준: HPA 2→3~4 스케일아웃, 스케일아웃 후 P95 < 1,000ms
+# 관측: kubectl get hpa -w, Grafana → container CPU, http-red latency
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: fi-4-cpu-stress
+  namespace: chaos-testing
+  labels:
+    experiment: fi-4
+    target: api
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app: doktori
+      component: api
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: '5m'

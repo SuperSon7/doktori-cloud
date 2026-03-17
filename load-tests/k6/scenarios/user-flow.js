@@ -15,10 +15,10 @@ export const options = {
   stages: loadStages.load,
   thresholds: {
     http_req_duration: [`p(95)<${thresholds.read.p95}`],
-    'http_req_duration{name:/users/me}': ['p(95)<300'],
-    'http_req_duration{name:/users/me/meetings}': ['p(95)<500'],
-    'http_req_duration{name:/users/me/meetings/today}': ['p(95)<500'],
-    'http_req_duration{name:/notifications}': ['p(95)<300'],
+    'http_req_duration{name:/users/me}': ['p(95)<500'],
+    'http_req_duration{name:/users/me/meetings}': ['p(95)<1000'],
+    'http_req_duration{name:/users/me/meetings/today}': ['p(95)<1000'],
+    'http_req_duration{name:/notifications}': ['p(95)<500'],
     errors: [`rate<${thresholds.errorRate}`],
   },
 };
@@ -44,10 +44,7 @@ export default function (data) {
       const res = apiGet('/users/me', {}, true);
       checkResponse(res, 200, 'My Profile');
 
-      const data = extractData(res);
-      if (data) {
-        console.log(`사용자: ${data.nickname}`);
-      }
+      // 프로필 조회 완료
     });
 
     thinkTime(3, 8);
@@ -57,10 +54,7 @@ export default function (data) {
       const res = apiGet('/recommendations/meetings', {}, true);
       checkResponse(res, 200, 'Personalized Recommendations');
 
-      const data = extractData(res);
-      if (data && Array.isArray(data)) {
-        console.log(`개인화 추천 ${data.length}개`);
-      }
+      // 개인화 추천 조회 완료
     });
 
     thinkTime(3, 8);
@@ -74,7 +68,6 @@ export default function (data) {
       const data = extractData(res);
       if (data && data.items) {
         myMeetingIds = data.items.map(m => m.meetingId);
-        console.log(`내 활성 모임 ${myMeetingIds.length}개`);
       }
     });
 
@@ -85,10 +78,7 @@ export default function (data) {
       const res = apiGet('/users/me/meetings/today', {}, true);
       checkResponse(res, 200, 'Today Meetings');
 
-      const data = extractData(res);
-      if (data && data.items) {
-        console.log(`오늘 모임 ${data.items.length}개`);
-      }
+      // 오늘의 모임 조회 완료
     });
 
     thinkTime(3, 8);
@@ -100,10 +90,7 @@ export default function (data) {
         const res = apiGet(`/users/me/meetings/${meetingId}`, {}, true);
         checkResponse(res, 200, 'My Meeting Detail');
 
-        const data = extractData(res);
-        if (data) {
-          console.log(`모임 상세: ${data.title}, 현재 ${data.currentRoundNo}회차`);
-        }
+        // 내 모임 상세 조회 완료
       });
     }
 
@@ -114,10 +101,7 @@ export default function (data) {
       const res = apiGet('/notifications/unread', {}, true);
       checkResponse(res, 200, 'Unread Check');
 
-      const data = extractData(res);
-      if (data) {
-        console.log(`읽지 않은 알림: ${data.hasUnread}`);
-      }
+      // 읽지 않은 알림 확인 완료
     });
 
     thinkTime(3, 8);
@@ -133,7 +117,6 @@ export default function (data) {
         notificationIds = data.notifications
           .filter(n => !n.isRead)
           .map(n => n.notificationId);
-        console.log(`알림 ${data.notifications.length}개, 미읽음 ${notificationIds.length}개`);
       }
     });
 

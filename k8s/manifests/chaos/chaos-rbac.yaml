@@ -1,0 +1,34 @@
+# Chaos Mesh가 prod namespace의 Pod에 접근할 수 있도록 허용
+# chaos-testing namespace의 chaos-mesh SA → prod namespace 리소스 조작
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-mesh-target-access
+  labels:
+    app.kubernetes.io/component: chaos-mesh
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/ephemeralcontainers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-mesh-target-access
+  labels:
+    app.kubernetes.io/component: chaos-mesh
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chaos-mesh-target-access
+subjects:
+  - kind: ServiceAccount
+    name: chaos-controller-manager
+    namespace: chaos-testing

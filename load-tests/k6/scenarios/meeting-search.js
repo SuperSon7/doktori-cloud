@@ -38,7 +38,7 @@ export const options = {
     },
   },
   thresholds: {
-    meeting_search_duration: ['p(95)<800', 'p(99)<1500'],
+    meeting_search_duration: ['p(95)<1000', 'p(99)<2000'],
     meeting_search_with_filter_duration: ['p(95)<1000', 'p(99)<2000'],
     http_req_failed: ['rate<0.01'],
   },

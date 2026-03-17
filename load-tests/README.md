@@ -83,14 +83,14 @@ k6 run --out influxdb=http://localhost:8086/k6 k6/scenarios/load.js
 k6 run --out json=results.json k6/scenarios/load.js
 ```
 
-## SLO 기준
+## SLO v2 기준 (SLI-SLO-정의서-v2.md)
 
-| 지표 | 목표 |
-|------|------|
-| 응답시간 P95 | < 500ms (읽기), < 1000ms (쓰기) |
-| 응답시간 P99 | < 1500ms |
-| 에러율 | < 1% |
-| 처리량 | 최소 100 RPS |
+| SLO | 지표 | 목표 |
+|-----|------|------|
+| SLO-1 | API 가용성 (5xx 비율) | < 0.5% |
+| SLO-2 | 핵심 API Latency P95 | ≤ 1,000ms |
+| SLO-3 | Chat 서비스 가용성 | 99.0% |
+| SLO-4 | 모임 가입 성공률 (5xx / 전체-비즈니스거부) | 99.0% |
 
 ## 테스트 전 준비사항
 

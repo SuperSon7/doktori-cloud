@@ -14,10 +14,10 @@ export const options = {
   stages: loadStages.load,
   thresholds: {
     http_req_duration: [`p(95)<${thresholds.read.p95}`],
-    'http_req_duration{name:/health}': ['p(95)<100'],
-    'http_req_duration{name:/recommendations/meetings}': ['p(95)<500'],
-    'http_req_duration{name:/meetings}': ['p(95)<500'],
-    'http_req_duration{name:/meetings/search}': ['p(95)<800'],
+    'http_req_duration{name:/health}': ['p(95)<200'],
+    'http_req_duration{name:/recommendations/meetings}': ['p(95)<1000'],
+    'http_req_duration{name:/meetings}': ['p(95)<1000'],
+    'http_req_duration{name:/meetings/search}': ['p(95)<1000'],
     errors: [`rate<${thresholds.errorRate}`],
   },
 };
@@ -40,7 +40,7 @@ export default function () {
       const data = extractData(res);
       // 비로그인 시 최대 4개 반환
       if (data && Array.isArray(data)) {
-        console.log(`추천 모임 ${data.length}개 조회`);
+        // 추천 모임 조회 완료
       }
     });
 
@@ -51,7 +51,7 @@ export default function () {
     group('모임 목록 스크롤', function () {
       const meetings = paginateWithCursor('/meetings', { size: 10 }, 3, false);
       meetingIds = meetings.map(m => m.meetingId);
-      console.log(`모임 목록 ${meetingIds.length}개 조회`);
+      // 모임 목록 조회 완료
     });
 
     thinkTime(2, 5);
@@ -64,9 +64,7 @@ export default function () {
         checkResponse(res, 200, 'Meeting Detail');
 
         const data = extractData(res);
-        if (data && data.meeting) {
-          console.log(`모임 상세: ${data.meeting.title}`);
-        }
+        // 모임 상세 조회 완료
       });
     }
 
@@ -79,9 +77,7 @@ export default function () {
       checkResponse(res, 200, 'Search by keyword');
 
       const data = extractData(res);
-      if (data && data.items) {
-        console.log(`검색 "${keyword}": ${data.items.length}개 결과`);
-      }
+      // 검색 결과 확인
     });
 
     thinkTime(2, 5);
@@ -93,10 +89,7 @@ export default function () {
       const res = apiGet(`/meetings/search?keyword=${encodeURIComponent(keyword)}&readingGenre=${genre}&size=10`);
       checkResponse(res, 200, 'Search with filter');
 
-      const data = extractData(res);
-      if (data && data.items) {
-        console.log(`검색 "${keyword}" + ${genre}: ${data.items.length}개 결과`);
-      }
+      // 필터 검색 결과 확인
     });
   });
 }

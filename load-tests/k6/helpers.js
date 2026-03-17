@@ -4,7 +4,8 @@ import { Rate, Trend } from 'k6/metrics';
 import { config } from './config.js';
 
 // 커스텀 메트릭
-export const errorRate = new Rate('errors');
+export const errorRate = new Rate('errors');           // SLO-1: 5xx만 카운트
+export const clientErrorRate = new Rate('client_errors'); // 디버깅용: 4xx 카운트
 export const apiDuration = new Trend('api_duration', true);
 
 // Access Token 저장소 (VU별로 공유)
@@ -94,7 +95,8 @@ export function apiGet(path, params = {}, auth = false) {
   response = handleResponse(response, doRequest, auth);
 
   apiDuration.add(response.timings.duration);
-  errorRate.add(response.status >= 400);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
 
   return response;
 }
@@ -114,7 +116,8 @@ export function apiPost(path, body = {}, auth = false) {
   response = handleResponse(response, doRequest, auth);
 
   apiDuration.add(response.timings.duration);
-  errorRate.add(response.status >= 400);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
 
   return response;
 }
@@ -134,7 +137,8 @@ export function apiPut(path, body = {}, auth = false) {
   response = handleResponse(response, doRequest, auth);
 
   apiDuration.add(response.timings.duration);
-  errorRate.add(response.status >= 400);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
 
   return response;
 }
@@ -154,7 +158,31 @@ export function apiDelete(path, auth = false) {
   response = handleResponse(response, doRequest, auth);
 
   apiDuration.add(response.timings.duration);
-  errorRate.add(response.status >= 400);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
+
+  return response;
+}
+
+// POST 요청 (토큰 직접 지정 — 다중 사용자 시나리오용)
+export function apiPostWithToken(path, body = {}, token = null) {
+  const url = `${config.baseUrl}${path}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = http.post(url, JSON.stringify(body), {
+    headers,
+    tags: { name: path.split('?')[0] },
+  });
+
+  apiDuration.add(response.timings.duration);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
 
   return response;
 }
@@ -163,7 +191,7 @@ export function apiDelete(path, auth = false) {
 export function checkResponse(response, expectedStatus = 200, name = 'API') {
   return check(response, {
     [`${name} status is ${expectedStatus}`]: (r) => r.status === expectedStatus,
-    [`${name} response time < 500ms`]: (r) => r.timings.duration < 500,
+    [`${name} response time < 1000ms`]: (r) => r.timings.duration < 1000,
   });
 }
 
