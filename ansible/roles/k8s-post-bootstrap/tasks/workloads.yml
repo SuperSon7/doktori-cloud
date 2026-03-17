@@ -45,10 +45,16 @@
   changed_when: "'created' in firebase_result.stdout"
   no_log: true
 
-- name: Warn if Firebase Secret not available
-  debug:
-    msg: "WARNING: Firebase Secret이 없습니다. FCM 푸시가 동작하지 않습니다."
-  when: firebase_result.stdout is defined and 'ssm_not_found' in firebase_result.stdout
+- name: Fail if Firebase Secret not available
+  fail:
+    msg: >
+      Firebase Secret을 생성하지 못했습니다 (SSM 파라미터 없음).
+      FCM 푸시 알림이 동작하지 않습니다.
+      건너뛰려면: --extra-vars 'skip_firebase=true'
+  when:
+    - firebase_result.stdout is defined
+    - "'ssm_not_found' in firebase_result.stdout"
+    - not (skip_firebase | default(false) | bool)
 
 - name: Apply workload manifests
   command: kubectl apply -f {{ k8s_scripts_dir }}/manifests/workloads/

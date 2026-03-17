@@ -59,7 +59,7 @@ spec:
                   curl -s -k -X DELETE "${API_SERVER}/api/v1/namespaces/${NS}/secrets/${SECRET_NAME}" \
                     -H "Authorization: Bearer ${TOKEN}" || true
 
-                  DOCKER_CONFIG=$(echo -n "{\"auths\":{\"250857930609.dkr.ecr.ap-northeast-2.amazonaws.com\":{\"username\":\"AWS\",\"password\":\"${ECR_TOKEN}\"}}}" | base64 -w 0)
+                  DOCKER_CONFIG=$(echo -n "{\"auths\":{\"250857930609.dkr.ecr.ap-northeast-2.amazonaws.com\":{\"username\":\"AWS\",\"password\":\"${ECR_TOKEN}\"}}}" | base64 | tr -d '\n')
                   curl -s -k -X POST "${API_SERVER}/api/v1/namespaces/${NS}/secrets" \
                     -H "Authorization: Bearer ${TOKEN}" \
                     -H "Content-Type: application/json" \

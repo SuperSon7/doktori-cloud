@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: api
   namespace: prod
+  labels:
+    app: doktori
+    component: api
 spec:
   replicas: 2
   strategy:
@@ -22,19 +25,32 @@ spec:
     spec:
       imagePullSecrets:
         - name: ecr-credentials
+      priorityClassName: high-priority
+      terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: doktori
+              component: api
+        - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: doktori
               component: api
       containers:
         - name: api
-          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-api:latest
+          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-api:5afb0d5
           ports:
             - containerPort: 8080
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: "300m"
@@ -52,12 +68,35 @@ spec:
             - name: firebase-cred
               mountPath: /app/secrets
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 30
+            failureThreshold: 5
           lifecycle:
             preStop:
               exec:
-                command: ["sleep", "15"]
+                command: ["sleep", "10"]
       volumes:
         - name: firebase-cred
           secret:
             secretName: firebase-credentials
             optional: true
+        - name: tmp
+          emptyDir: {}
