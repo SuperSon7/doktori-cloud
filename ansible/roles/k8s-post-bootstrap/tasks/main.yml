@@ -1,0 +1,32 @@
+# =============================================================================
+# K8s Post-Bootstrap — 태스크 오케스트레이션
+# 클러스터 Ready 후 워크로드 → Observability → ArgoCD → 보안 순서로 실행
+# =============================================================================
+
+- name: Verify cluster is ready
+  command: kubectl get nodes --no-headers
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: nodes_result
+  changed_when: false
+  failed_when: "'NotReady' in nodes_result.stdout"
+
+- name: Show cluster nodes
+  debug:
+    msg: "{{ nodes_result.stdout_lines }}"
+
+- name: Deploy workloads
+  include_tasks: workloads.yml
+  tags: [workloads]
+
+- name: Install observability
+  include_tasks: observability.yml
+  tags: [observability]
+
+- name: Install and configure ArgoCD
+  include_tasks: argocd.yml
+  tags: [argocd]
+
+- name: Apply security hardening
+  include_tasks: hardening.yml
+  tags: [hardening]

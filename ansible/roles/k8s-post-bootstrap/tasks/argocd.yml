@@ -1,0 +1,102 @@
+# =============================================================================
+# ArgoCD — install-argocd.sh + setup-argocd.sh 대응
+# =============================================================================
+
+- name: Apply NetworkPolicy
+  command: kubectl apply -f {{ k8s_scripts_dir }}/manifests/security/netpol-all.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Add ArgoCD Helm repo
+  shell: |
+    helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+    helm repo update argo
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+
+- name: Install ArgoCD
+  shell: |
+    if helm status argocd -n argocd &>/dev/null; then
+      helm upgrade argocd argo/argo-cd \
+        --namespace argocd \
+        --version {{ argocd_chart_version }} \
+        -f {{ k8s_scripts_dir }}/helm/argocd-values.yaml
+    else
+      helm install argocd argo/argo-cd \
+        --namespace argocd \
+        --create-namespace \
+        --version {{ argocd_chart_version }} \
+        -f {{ k8s_scripts_dir }}/helm/argocd-values.yaml
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Wait for ArgoCD server
+  command: >
+    kubectl wait --for=condition=Ready pod
+    -l app.kubernetes.io/name=argocd-server
+    -n argocd --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Connect Git repository
+  shell: |
+    kubectl delete secret private-repo-creds -n argocd 2>/dev/null || true
+    kubectl create secret generic private-repo-creds \
+      --namespace argocd \
+      --from-literal=type=git \
+      --from-literal=url="{{ git_repo_url }}" \
+      --from-literal=username="{{ git_username }}" \
+      --from-literal=password="{{ git_pat }}"
+    kubectl label secret private-repo-creds -n argocd \
+      argocd.argoproj.io/secret-type=repository --overwrite
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: git_repo_url | length > 0 and git_pat | length > 0
+  no_log: true
+
+- name: Deploy ArgoCD Applications
+  shell: |
+    for f in {{ k8s_scripts_dir }}/manifests/argocd/application-*.yaml; do
+      sed "s|__GIT_REPO_URL__|{{ git_repo_url }}|g" "$f" | kubectl apply -f -
+    done
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: git_repo_url | length > 0
+
+- name: Change ArgoCD admin password
+  shell: |
+    BCRYPT_HASH=$(python3 -c "
+    import bcrypt
+    password = '{{ argocd_admin_password }}'.encode('utf-8')
+    hashed = bcrypt.hashpw(password, bcrypt.gensalt(rounds=10))
+    print(hashed.decode('utf-8'))
+    ")
+    kubectl -n argocd patch secret argocd-secret \
+      -p "{\"stringData\":{\"admin.password\":\"${BCRYPT_HASH}\",\"admin.passwordMtime\":\"$(date -u +%FT%TZ)\"}}"
+    kubectl delete secret argocd-initial-admin-secret -n argocd 2>/dev/null || true
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: argocd_admin_password is defined and argocd_admin_password | length > 0
+  no_log: true
+
+- name: Get ArgoCD password info
+  shell: |
+    if kubectl get secret argocd-initial-admin-secret -n argocd &>/dev/null; then
+      echo "Initial password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+    else
+      echo "Admin password has been changed from default"
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: argocd_password
+  changed_when: false
+
+- name: Display ArgoCD info
+  debug:
+    msg:
+      - "ArgoCD installed successfully"
+      - "Username: admin"
+      - "{{ argocd_password.stdout }}"
+      - "Access: http://localhost:8443 (via SSM port-forward)"

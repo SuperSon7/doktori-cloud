@@ -1,0 +1,128 @@
+# =============================================================================
+# Security Hardening — etcd 암호화 + kubelet 보안
+# =============================================================================
+
+# --- etcd Encryption at Rest (master only) ---
+
+- name: Check if encryption config exists
+  stat:
+    path: /etc/kubernetes/enc/encryption-config.yaml
+  register: enc_config
+  when: enable_etcd_encryption
+
+- name: Create encryption config directory
+  file:
+    path: /etc/kubernetes/enc
+    state: directory
+    mode: "0700"
+  become: true
+  when: enable_etcd_encryption and not enc_config.stat.exists
+
+- name: Generate encryption key
+  shell: head -c 32 /dev/urandom | base64
+  register: enc_key
+  when: enable_etcd_encryption and not enc_config.stat.exists
+  no_log: true
+  changed_when: false
+
+- name: Create EncryptionConfiguration
+  copy:
+    dest: /etc/kubernetes/enc/encryption-config.yaml
+    content: |
+      apiVersion: apiserver.config.k8s.io/v1
+      kind: EncryptionConfiguration
+      resources:
+        - resources:
+            - secrets
+          providers:
+            - aescbc:
+                keys:
+                  - name: key1
+                    secret: {{ enc_key.stdout }}
+            - identity: {}
+    mode: "0600"
+  become: true
+  when: enable_etcd_encryption and not enc_config.stat.exists
+  no_log: true
+
+- name: Check if apiserver has encryption flag
+  shell: grep -c "encryption-provider-config" /etc/kubernetes/manifests/kube-apiserver.yaml || true
+  register: enc_flag_check
+  changed_when: false
+  become: true
+  when: enable_etcd_encryption
+
+- name: Backup kube-apiserver manifest
+  copy:
+    src: /etc/kubernetes/manifests/kube-apiserver.yaml
+    dest: /etc/kubernetes/manifests/kube-apiserver.yaml.backup
+    remote_src: true
+  become: true
+  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+
+- name: Patch kube-apiserver for encryption
+  shell: |
+    set -e
+    MANIFEST="/etc/kubernetes/manifests/kube-apiserver.yaml"
+
+    # Add flag
+    sed -i '/- --tls-private-key-file/a\    - --encryption-provider-config=/etc/kubernetes/enc/encryption-config.yaml' "$MANIFEST"
+
+    # Add volumeMount (before k8s-certs mount)
+    sed -i '/name: k8s-certs/i\    - mountPath: /etc/kubernetes/enc\n      name: encryption-config\n      readOnly: true' "$MANIFEST"
+
+    # Add volume (before k8s-certs volume definition)
+    sed -i '/- hostPath:/,/name: k8s-certs/{/- hostPath:/{i\  - hostPath:\n      path: /etc/kubernetes/enc\n      type: DirectoryOrCreate\n    name: encryption-config
+}}' "$MANIFEST"
+  become: true
+  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  changed_when: true
+  notify: wait for apiserver
+
+- name: Flush handlers (wait for apiserver restart)
+  meta: flush_handlers
+  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+
+- name: Re-encrypt existing secrets
+  shell: |
+    for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}'); do
+      kubectl get secrets -n "$ns" -o json 2>/dev/null | kubectl replace -n "$ns" -f - 2>/dev/null || true
+    done
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  changed_when: false
+
+# --- kubelet Hardening (all nodes) ---
+
+- name: Disable kubelet anonymous auth (scoped)
+  shell: |
+    sed -i '/anonymous:/,/enabled:/{s/enabled: true/enabled: false/}' /var/lib/kubelet/config.yaml
+  become: true
+  when: enable_kubelet_hardening
+  register: kubelet_anon
+  changed_when: kubelet_anon.rc == 0
+
+- name: Set kubelet readOnlyPort to 0
+  lineinfile:
+    path: /var/lib/kubelet/config.yaml
+    regexp: '^readOnlyPort:\s+\d+'
+    line: 'readOnlyPort: 0'
+  become: true
+  when: enable_kubelet_hardening
+  register: kubelet_readonly
+
+- name: Add readOnlyPort if not present
+  lineinfile:
+    path: /var/lib/kubelet/config.yaml
+    line: 'readOnlyPort: 0'
+    state: present
+  become: true
+  when: enable_kubelet_hardening
+
+- name: Restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+  become: true
+  when: enable_kubelet_hardening and (kubelet_anon.changed or kubelet_readonly.changed)

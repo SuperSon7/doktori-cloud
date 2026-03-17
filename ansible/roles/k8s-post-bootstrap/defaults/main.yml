@@ -1,0 +1,53 @@
+# =============================================================================
+# K8s Post-Bootstrap 기본 변수
+# group_vars/all.yml 또는 --extra-vars로 오버라이드 가능
+# =============================================================================
+
+# --- 기본 ---
+k8s_namespace: prod
+project_name: doktori
+aws_region: ap-northeast-2
+ecr_registry: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com
+
+# --- 모니터링 ---
+monitoring_server: monitoring.mgmt.doktori.internal
+prometheus_port: "9090"
+loki_port: "3100"
+
+# --- Helm 차트 버전 ---
+metrics_server_version: "3.12.2"
+kube_state_metrics_version: "5.28.1"
+argocd_chart_version: "7.8.13"
+
+# --- 컨테이너 이미지 ---
+alloy_version: "v1.9.0"
+
+# --- HPA ---
+hpa_cpu_target: 60
+hpa_min_replicas: 2
+hpa_max_replicas: 4
+
+# --- ArgoCD ---
+argocd_nodeport: 31443
+
+# --- 스크립트 경로 (마스터 노드) ---
+k8s_scripts_dir: /home/ubuntu/k8s
+kubeconfig_path: /home/ubuntu/.kube/config
+
+# --- 워크로드 이미지 태그 (실행 시 --extra-vars로 지정) ---
+api_image_tag: "latest"
+chat_image_tag: "latest"
+spring_profile: "prod"
+
+# --- ArgoCD Git (ansible-vault 또는 --extra-vars로 지정) ---
+git_repo_url: ""
+git_username: ""
+git_pat: ""
+
+# --- ArgoCD admin 비밀번호 (--extra-vars 또는 ansible-vault로 지정) ---
+# 비어있으면 초기 비밀번호 유지
+argocd_admin_password: ""
+
+# --- hardening ---
+enable_etcd_encryption: true
+enable_kubelet_hardening: true

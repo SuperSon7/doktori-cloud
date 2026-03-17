@@ -1,0 +1,91 @@
+# =============================================================================
+# 워크로드 배포 — deploy-workloads.sh 대응
+# =============================================================================
+
+- name: Create namespace
+  command: kubectl create namespace {{ k8s_namespace }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: false
+
+- name: Create ECR imagePullSecret
+  shell: |
+    ECR_TOKEN=$(aws ecr get-login-password --region {{ aws_region }})
+    kubectl delete secret ecr-credentials -n {{ k8s_namespace }} --ignore-not-found
+    kubectl create secret docker-registry ecr-credentials \
+      --namespace={{ k8s_namespace }} \
+      --docker-server={{ ecr_registry }} \
+      --docker-username=AWS \
+      --docker-password="${ECR_TOKEN}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  no_log: true
+
+- name: Create Firebase Secret from SSM
+  shell: |
+    if kubectl get secret firebase-credentials -n {{ k8s_namespace }} &>/dev/null; then
+      echo "already exists"
+      exit 0
+    fi
+    FIREBASE_JSON=$(aws ssm get-parameter \
+      --name "/{{ project_name }}/{{ k8s_namespace }}/FIREBASE_SERVICE_ACCOUNT" \
+      --with-decryption --query "Parameter.Value" --output text \
+      --region {{ aws_region }} 2>/dev/null) || { echo "ssm_not_found"; exit 0; }
+    echo "${FIREBASE_JSON}" > /tmp/firebase-sa.json
+    kubectl create secret generic firebase-credentials \
+      --namespace={{ k8s_namespace }} \
+      --from-file=firebase-service-account.json=/tmp/firebase-sa.json
+    rm -f /tmp/firebase-sa.json
+    echo "created"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: firebase_result
+  changed_when: "'created' in firebase_result.stdout"
+  no_log: true
+
+- name: Warn if Firebase Secret not available
+  debug:
+    msg: "WARNING: Firebase Secret이 없습니다. FCM 푸시가 동작하지 않습니다."
+  when: firebase_result.stdout is defined and 'ssm_not_found' in firebase_result.stdout
+
+- name: Apply workload manifests
+  command: kubectl apply -f {{ k8s_scripts_dir }}/manifests/workloads/
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: workloads_apply
+  changed_when: "'configured' in workloads_apply.stdout or 'created' in workloads_apply.stdout"
+
+- name: Wait for api pods ready
+  command: >
+    kubectl wait --for=condition=Ready pod
+    -l app=doktori,component=api
+    -n {{ k8s_namespace }}
+    --timeout=180s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: api_wait
+  failed_when: api_wait.rc != 0 and 'timed out' not in api_wait.stderr
+
+- name: Wait for chat pods ready
+  command: >
+    kubectl wait --for=condition=Ready pod
+    -l app=doktori,component=chat
+    -n {{ k8s_namespace }}
+    --timeout=180s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: chat_wait
+  failed_when: chat_wait.rc != 0 and 'timed out' not in chat_wait.stderr
+
+- name: Show workload pods
+  command: kubectl get pods -n {{ k8s_namespace }} -o wide
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: pods_result
+  changed_when: false
+
+- name: Display pods
+  debug:
+    msg: "{{ pods_result.stdout_lines }}"
