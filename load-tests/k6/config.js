@@ -36,20 +36,20 @@ export const config = {
   dayOfWeeks: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
 };
 
-// SLO 임계값
+// SLO v2 임계값 (SLI-SLO-정의서-v2.md 기준)
 export const thresholds = {
-  // 읽기 API
+  // SLO-2: 핵심 API Latency — P95 ≤ 1,000ms
   read: {
-    p95: 500,   // ms
-    p99: 1500,  // ms
+    p95: 1000,  // ms
+    p99: 2000,  // ms
   },
   // 쓰기 API
   write: {
     p95: 1000,  // ms
     p99: 2000,  // ms
   },
-  // 에러율
-  errorRate: 0.01,  // 1%
+  // SLO-1: API 가용성 — 5xx < 0.5%
+  errorRate: 0.005,  // 0.5%
 };
 
 // 부하 단계 정의

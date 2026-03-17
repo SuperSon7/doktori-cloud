@@ -5,7 +5,7 @@
  */
 import { group, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
-import { config, loadStages } from '../config.js';
+import { config, thresholds, loadStages } from '../config.js';
 import {
   apiGet, extractData, randomItem, randomInt, thinkTime, initAuth
 } from '../helpers.js';
@@ -23,14 +23,15 @@ const timeoutErrors = new Counter('timeout_errors');
 export const options = {
   stages: loadStages.soak,
   thresholds: {
-    http_req_duration: ['p(95)<500', 'p(99)<1500'],
+    http_req_duration: [`p(95)<${thresholds.read.p95}`, `p(99)<${thresholds.read.p99}`],
     http_req_failed: ['rate<0.01'],
+    errors: [`rate<${thresholds.errorRate}`],
     connection_errors: ['count<10'],
     timeout_errors: ['count<10'],
   },
 };
 
-export default function (data) {
+export default function (setupData) {
   const iteration = __ITER;
 
   // 10분마다 상태 로깅
@@ -52,10 +53,10 @@ export default function (data) {
 
     // 2. 모임 목록 + 상세
     const listRes = apiGet('/meetings?size=10');
-    const data = extractData(listRes);
-    if (data && data.items && data.items.length > 0) {
+    const listData = extractData(listRes);
+    if (listData && listData.items && listData.items.length > 0) {
       thinkTime(1, 3);
-      const meetingId = randomItem(data.items).meetingId;
+      const meetingId = randomItem(listData.items).meetingId;
       apiGet(`/meetings/${meetingId}`);
     }
 
@@ -68,7 +69,7 @@ export default function (data) {
     thinkTime(2, 5);
 
     // 4. 인증 API (토큰 있을 경우)
-    if (data.hasAuth) {
+    if (setupData.hasAuth) {
       apiGet('/users/me', {}, true);
       thinkTime(2, 5);
 

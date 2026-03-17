@@ -1,0 +1,43 @@
+# =============================================================================
+# FI-3: API↔DB 네트워크 지연 주입
+#
+# 가설: DB 응답 200ms 지연에도 HikariCP 풀이 버티고 SLO-2 (P95 ≤ 1,000ms) 유지
+# 성공 기준: HikariCP pending=0, API P95 < 1,000ms, 5xx 0건
+# 관측: Grafana → jvm-api (HikariCP), http-red (latency)
+#
+# 단계적 실행 권장: 100ms → 200ms → 500ms (latency 값만 변경)
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: fi-3-db-latency
+  namespace: chaos-testing
+  labels:
+    experiment: fi-3
+    target: api-to-db
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app: doktori
+      component: api
+  delay:
+    latency: '200ms'
+    jitter: '50ms'
+    correlation: '50'
+  direction: to
+  # MySQL RDS/외부 DB의 IP 또는 CIDR (실제 DB 엔드포인트에 맞게 수정)
+  # externalTargets 대신 target selector를 사용할 수도 있음
+  # 아래는 특정 포트(3306)로 나가는 트래픽만 지연
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - prod
+      labelSelectors:
+        app: doktori
+        component: api
+  duration: '5m'

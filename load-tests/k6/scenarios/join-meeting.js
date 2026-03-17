@@ -18,7 +18,7 @@ import { group, check, sleep } from 'k6';
 import { Trend, Counter, Rate } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 import { config, thresholds } from '../config.js';
-import { apiGet, apiPost, checkResponse, extractData } from '../helpers.js';
+import { apiGet, apiPostWithToken, checkResponse, extractData } from '../helpers.js';
 
 // 커스텀 메트릭
 const joinDuration = new Trend('join_meeting_duration', true);
@@ -106,8 +106,8 @@ export default function (data) {
   group('모임 참여 신청', function () {
     const start = Date.now();
 
-    // 참여 신청 API 호출
-    const res = apiPost(`/meetings/${data.meetingId}/participations`, {}, true);
+    // 참여 신청 API 호출 (VU별 토큰 직접 전달)
+    const res = apiPostWithToken(`/meetings/${data.meetingId}/participations`, {}, token);
 
     const duration = Date.now() - start;
     joinDuration.add(duration);

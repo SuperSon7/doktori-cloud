@@ -41,14 +41,14 @@ export const options = {
 };
 
 // 캐시 테스트할 고정 URL들 (쿼리스트링 고정)
+// meetingId는 환경변수로 설정 가능 (기본값: 1,2,3)
+const meetingIds = (__ENV.CACHE_MEETING_IDS || '1,2,3').split(',');
 const CACHE_URLS = [
   '/health',
   '/recommendations/meetings',
   '/meetings?size=10',
-  '/meetings/1',  // 고정 ID
-  '/meetings/2',
-  '/meetings/3',
-  '/meetings/search?keyword=소설&size=10',  // 고정 키워드
+  ...meetingIds.map(id => `/meetings/${id.trim()}`),
+  '/meetings/search?keyword=소설&size=10',
   '/meetings/search?keyword=에세이&size=10',
   '/policies/reading-genres',
 ];

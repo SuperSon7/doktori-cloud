@@ -1,0 +1,28 @@
+# =============================================================================
+# FI-6: RabbitMQ 장애 (비동기 장애 격리 검증)
+#
+# 가설: RabbitMQ 다운 → 알림만 지연, 핵심 기능(API/Chat)은 정상 (장애 격리)
+# 성공 기준: API SLO-1 99.5% 유지, Chat SLO-3 99.0% 유지
+# 관측: Grafana → http-red (API 에러율), Chat probe, Loki (RabbitMQ 에러 로그)
+#
+# ⚠️ RabbitMQ의 label은 실제 배포에 맞게 수정 필요
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-6-rabbitmq-kill
+  namespace: chaos-testing
+  labels:
+    experiment: fi-6
+    target: rabbitmq
+spec:
+  action: pod-kill
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app: rabbitmq
+  gracePeriod: 0
+  duration: '30s'

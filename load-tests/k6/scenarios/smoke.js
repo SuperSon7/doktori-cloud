@@ -13,7 +13,7 @@ import {
 export const options = {
   stages: loadStages.smoke,
   thresholds: {
-    http_req_duration: [`p(95)<${thresholds.read.p95}`],
+    http_req_duration: [`p(95)<${thresholds.read.p95}`, `p(99)<${thresholds.read.p99}`],
     errors: [`rate<${thresholds.errorRate}`],
   },
 };

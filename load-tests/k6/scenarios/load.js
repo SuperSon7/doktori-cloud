@@ -3,10 +3,11 @@
  * 목적: 일반적인 트래픽 수준에서 시스템 성능 검증
  *
  * 혼합 시나리오:
- * - 40%: 비회원 탐색 흐름
- * - 35%: 로그인 사용자 흐름
+ * - 35%: 비회원 탐색 흐름
+ * - 30%: 로그인 사용자 흐름
  * - 15%: 모임 검색
  * - 10%: 도서 검색
+ * - 10%: 이미지 업로드
  */
 import http from 'k6/http';
 import { group, sleep } from 'k6';
@@ -20,8 +21,8 @@ import {
 export const options = {
   stages: loadStages.load,
   thresholds: {
-    http_req_duration: ['p(95)<500', 'p(99)<1500'],
-    http_req_failed: ['rate<0.01'],
+    http_req_duration: [`p(95)<${thresholds.read.p95}`, `p(99)<${thresholds.read.p99}`],
+    http_req_failed: [`rate<${thresholds.errorRate}`],
     errors: [`rate<${thresholds.errorRate}`],
   },
 };

@@ -1,0 +1,28 @@
+# =============================================================================
+# FI-2: Chat Pod 강제 종료 (WebSocket 복원력)
+#
+# 가설: Chat Pod 사망 → WebSocket 끊김 → 재연결 → DB에서 메시지 이력 복구
+#       메시지 유실 0건 (DB 영속화)
+# 성공 기준: SLO-3 Chat probe 3분 이내 복구, 메시지 유실 0건
+# 관측: Grafana → Chat probe, chat_ws_connect_total
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-2-chat-pod-kill
+  namespace: chaos-testing
+  labels:
+    experiment: fi-2
+    target: chat
+spec:
+  action: pod-kill
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app: doktori
+      component: chat
+  gracePeriod: 0
+  duration: '30s'

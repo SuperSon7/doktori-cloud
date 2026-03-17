@@ -18,8 +18,9 @@ export function setup() {
 export const options = {
   stages: loadStages.stress,
   thresholds: {
-    http_req_duration: ['p(95)<1000', 'p(99)<2000'],
+    http_req_duration: [`p(95)<${thresholds.read.p95}`, `p(99)<${thresholds.read.p99}`],
     http_req_failed: ['rate<0.05'],  // 5% 에러 허용 (한계점 테스트)
+    errors: ['rate<0.05'],
   },
 };
 

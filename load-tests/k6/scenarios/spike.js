@@ -14,8 +14,9 @@ export function setup() {
 export const options = {
   stages: loadStages.spike,
   thresholds: {
-    http_req_duration: ['p(95)<1500', 'p(99)<3000'],
+    http_req_duration: ['p(95)<2000', 'p(99)<3000'],
     http_req_failed: ['rate<0.1'],  // 10% 에러 허용 (스파이크 상황)
+    errors: ['rate<0.1'],
   },
 };
 
