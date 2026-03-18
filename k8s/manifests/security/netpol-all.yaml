@@ -68,7 +68,14 @@ spec:
         - port: 8081
           protocol: TCP
 ---
-# 5. monitoring namespace — default-deny + Alloy 필수 통신 허용
+# 5. Actuator 보호 전략 참고:
+#   NetworkPolicy는 L3/L4 (IP/port) 필터링만 가능 → URL path 차단 불가
+#   Actuator 접근 제한은 Spring Boot에서 처리:
+#     - prometheus/health/info만 expose (나머지 404 자동 반환)
+#     - Alloy가 클러스터 내부에서 직접 스크래핑 (policy #4에서 허용)
+#   외부 접근 시: ALB → NGF(/api/* catch-all) → api-svc → Spring Boot가 응답 제한
+---
+# 6. monitoring namespace — default-deny + Alloy 필수 통신 허용
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

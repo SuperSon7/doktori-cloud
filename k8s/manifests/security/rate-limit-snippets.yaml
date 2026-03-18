@@ -1,0 +1,47 @@
+# =============================================================================
+# Rate Limiting — SnippetsFilter (NGF 1.5+)
+#
+# 기존 nginx의 limit_req 설정을 NGF로 이전.
+# SnippetsFilter는 nginx config snippet을 HTTPRoute에 주입하는 CRD.
+#
+# 구조:
+#   rate-limit-api-zones: http context에 limit_req_zone 정의 + location에 limit_req 적용
+#     → api-route에만 연결 (http context는 전역이므로 한 번만 정의)
+#   rate-limit-api: location context에 limit_req만 적용
+#     → chat-rooms route 등 추가 경로에 연결
+#
+# 주의:
+#   - limit_req_zone은 http 블록에 한 번만 정의해야 함 (중복 시 nginx 에러)
+#   - WS/SSE 경로 (/api/chat/, /ws/chat)에는 적용하지 않음 (long-lived connection)
+#   - $binary_remote_addr: 클라이언트 IP 기준 제한 (IPv4=4byte, IPv6=16byte)
+#   - zone=api:10m: 10MB shared memory ≈ 약 160,000개 IP 상태 저장
+#   - rate=20r/s: 초당 20 요청 (Token Bucket의 토큰 충전 속도)
+#   - burst=40: 순간 40개까지 초과 허용 (버킷 크기)
+#   - nodelay: burst 내 요청을 지연 없이 즉시 처리
+# =============================================================================
+---
+# Zone 정의 (http context, 전역) + API rate limit (location context)
+# api-route에 연결하여 zone을 전역으로 등록
+apiVersion: gateway.nginx.org/v1alpha1
+kind: SnippetsFilter
+metadata:
+  name: rate-limit-api-zones
+  namespace: prod
+spec:
+  snippets:
+    - context: http
+      value: "limit_req_zone $binary_remote_addr zone=api:10m rate=20r/s;"
+    - context: http.server.location
+      value: "limit_req zone=api burst=40 nodelay;"
+---
+# API rate limit만 적용 (zone은 이미 위에서 정의됨)
+# chat-rooms 등 추가 경로에 연결
+apiVersion: gateway.nginx.org/v1alpha1
+kind: SnippetsFilter
+metadata:
+  name: rate-limit-api
+  namespace: prod
+spec:
+  snippets:
+    - context: http.server.location
+      value: "limit_req zone=api burst=40 nodelay;"

@@ -88,3 +88,9 @@ variable "extra_sg_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "idle_timeout" {
+  description = "ALB idle timeout in seconds. 3600 for WebSocket/SSE support."
+  type        = number
+  default     = 3600
+}

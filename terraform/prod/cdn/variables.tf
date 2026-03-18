@@ -22,8 +22,9 @@ variable "static_bucket_name" {
 }
 
 variable "ssr_origin_domain" {
-  description = "SSR origin domain (Nginx public DNS/EIP)"
+  description = "SSR origin domain. Empty string = auto-resolve from app layer ALB DNS via remote state."
   type        = string
+  default     = ""
 }
 
 variable "ssr_origin_protocol_policy" {

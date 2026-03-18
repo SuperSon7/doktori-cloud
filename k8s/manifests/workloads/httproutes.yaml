@@ -1,3 +1,15 @@
+# ────────────────────────────────────────────────────────────────────────────
+# Actuator 접근 제한 방침:
+#   기존 nginx에서는 allow 127.0.0.1 + deny all로 처리했으나,
+#   NGF HTTPRoute는 L7 deny를 직접 지원하지 않음.
+#   현재 보호 전략 (defense in depth):
+#     1. Spring Boot: prometheus/health/info만 expose (나머지 404)
+#     2. Alloy(모니터링)가 클러스터 내부에서 직접 스크래핑 → 외부 노출 불필요
+#     3. 외부에서 /api/actuator 접근 시 → /api/* catch-all → api-svc로 전달
+#        → Spring Security에서 인증 없는 endpoint만 응답 (health/info/prometheus)
+#   TODO: 완전 차단이 필요하면 NGF SnippetsFilter로 `deny all` 주입 검토
+# ────────────────────────────────────────────────────────────────────────────
+---
 # WebSocket — /ws/chat → rewrite /api/ws
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -47,6 +59,13 @@ spec:
         - path:
             type: PathPrefix
             value: /api/chat-rooms/
+      # TODO: 부하 테스트 완료 후 rate limiting 활성화
+      # filters:
+      #   - type: ExtensionRef
+      #     extensionRef:
+      #       group: gateway.nginx.org
+      #       kind: SnippetsFilter
+      #       name: rate-limit-api
       timeouts:
         backendRequest: "75s"
       backendRefs:
@@ -67,6 +86,16 @@ spec:
         - path:
             type: PathPrefix
             value: /api/
+      # TODO: 부하 테스트 완료 후 rate limiting 활성화
+      # 선행 조건:
+      #   1. NGF helm upgrade --set nginxGateway.snippetsFilters.enable=true
+      #   2. NginxProxy + GatewayClass 적용 (rewriteClientIP)
+      # filters:
+      #   - type: ExtensionRef
+      #     extensionRef:
+      #       group: gateway.nginx.org
+      #       kind: SnippetsFilter
+      #       name: rate-limit-api-zones
       timeouts:
         backendRequest: "30s"
       backendRefs:
