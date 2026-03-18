@@ -308,6 +308,12 @@ resource "aws_iam_role_policy" "terraform_infra" {
         Resource = "*"
       },
       {
+        Sid      = "ACM"
+        Effect   = "Allow"
+        Action   = ["acm:*"]
+        Resource = "*"
+      },
+      {
         Sid      = "Lambda"
         Effect   = "Allow"
         Action   = ["lambda:*"]
