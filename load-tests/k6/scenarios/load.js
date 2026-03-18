@@ -1,13 +1,15 @@
 /**
- * Load 테스트
- * 목적: 일반적인 트래픽 수준에서 시스템 성능 검증
+ * Load 테스트 (멀티 유저)
+ * 목적: 일반적인 트래픽 수준에서 K8s 클러스터 성능 검증
  *
  * 혼합 시나리오:
- * - 35%: 비회원 탐색 흐름
- * - 30%: 로그인 사용자 흐름
+ * - 25%: 비회원 탐색 흐름
+ * - 25%: 로그인 사용자 흐름 (멀티 토큰)
  * - 15%: 모임 검색
  * - 10%: 도서 검색
  * - 10%: 이미지 업로드
+ * - 10%: 채팅방 API (REST)
+ * - 5%:  알림 API
  */
 import http from 'k6/http';
 import { group, sleep } from 'k6';
@@ -15,7 +17,8 @@ import { config, thresholds, loadStages } from '../config.js';
 import {
   apiGet, apiPost, apiPut,
   checkResponse, extractData, thinkTime, randomItem, randomInt,
-  initAuth, getAccessToken
+  fetchMultiTokens, pickToken,
+  apiGetWithToken, apiPostWithToken, apiPutWithToken,
 } from '../helpers.js';
 
 export const options = {
@@ -28,71 +31,56 @@ export const options = {
 };
 
 export function setup() {
-  const hasAuth = initAuth();
-  return { hasAuth };
+  const tokens = fetchMultiTokens();
+  return { tokens };
 }
 
 // 비회원 탐색 흐름
 function guestFlow() {
   group('비회원 탐색', function () {
-    // 추천 모임
     apiGet('/recommendations/meetings');
     thinkTime(2, 4);
 
-    // 모임 목록
     const listRes = apiGet('/meetings?size=10');
     const data = extractData(listRes);
 
     if (data && data.items && data.items.length > 0) {
       thinkTime(1, 3);
-      // 모임 상세
       const meetingId = randomItem(data.items).meetingId;
       apiGet(`/meetings/${meetingId}`);
     }
 
     thinkTime(2, 4);
 
-    // 모임 검색
     const keyword = randomItem(config.searchKeywords);
     apiGet(`/meetings/search?keyword=${encodeURIComponent(keyword)}&size=10`);
   });
 }
 
-// 로그인 사용자 흐름
-function userFlow(hasAuth) {
-  if (!hasAuth) {
-    guestFlow();  // 토큰 없으면 비회원 흐름으로 대체
-    return;
-  }
+// 로그인 사용자 흐름 (멀티 토큰)
+function userFlow(token) {
+  if (!token) { guestFlow(); return; }
 
   group('로그인 사용자', function () {
-    // 내 프로필
-    apiGet('/users/me', {}, true);
+    apiGetWithToken('/users/me', token);
     thinkTime(2, 4);
 
-    // 개인화 추천
-    apiGet('/recommendations/meetings', {}, true);
+    apiGetWithToken('/recommendations/meetings', token);
     thinkTime(2, 4);
 
-    // 내 모임 목록
-    const myMeetingsRes = apiGet('/users/me/meetings?status=ACTIVE&size=10', {}, true);
+    const myMeetingsRes = apiGetWithToken('/users/me/meetings?status=ACTIVE&size=10', token);
     const myData = extractData(myMeetingsRes);
 
     if (myData && myData.items && myData.items.length > 0) {
       thinkTime(1, 3);
-      // 내 모임 상세
       const meetingId = randomItem(myData.items).meetingId;
-      apiGet(`/users/me/meetings/${meetingId}`, {}, true);
+      apiGetWithToken(`/users/me/meetings/${meetingId}`, token);
     }
 
     thinkTime(2, 4);
-
-    // 오늘의 모임
-    apiGet('/users/me/meetings/today', {}, true);
+    apiGetWithToken('/users/me/meetings/today', token);
     thinkTime(2, 4);
-
-    // 알림 확인
-    apiGet('/notifications/unread', {}, true);
+    apiGetWithToken('/notifications/unread', token);
   });
 }
 
@@ -103,7 +91,6 @@ function searchFlow() {
       const keyword = randomItem(config.searchKeywords);
       const params = [`keyword=${encodeURIComponent(keyword)}`, 'size=10'];
 
-      // 50% 확률로 필터 추가
       if (Math.random() > 0.5) {
         params.push(`readingGenre=${randomItem(config.genreCodes)}`);
       }
@@ -114,52 +101,38 @@ function searchFlow() {
   });
 }
 
-// 도서 검색 (인증 필요)
-function bookSearchFlow(hasAuth) {
-  if (!hasAuth) {
-    searchFlow();  // 토큰 없으면 모임 검색으로 대체
-    return;
-  }
+// 도서 검색
+function bookSearchFlow(token) {
+  if (!token) { searchFlow(); return; }
 
   group('도서 검색', function () {
     const keywords = ['해리포터', '아몬드', '데미안', '사피엔스', '코스모스'];
     for (let i = 0; i < 2; i++) {
       const keyword = randomItem(keywords);
-      apiGet(`/books?query=${encodeURIComponent(keyword)}&page=1&size=10`, {}, true);
+      apiGetWithToken(`/books?query=${encodeURIComponent(keyword)}&page=1&size=10`, token);
       thinkTime(2, 4);
     }
   });
 }
 
-// 이미지 업로드 (인증 필요)
-function imageUploadFlow(hasAuth) {
-  if (!hasAuth) {
-    guestFlow();
-    return;
-  }
+// 이미지 업로드
+function imageUploadFlow(token) {
+  if (!token) { guestFlow(); return; }
 
   group('이미지 업로드', function () {
-    const directories = ['PROFILE', 'MEETING'];
-    const contentTypes = ['image/jpeg', 'image/png'];
-
-    const directory = randomItem(directories);
-    const contentType = randomItem(contentTypes);
-    const fileSize = randomInt(100, 500) * 1024;  // 100KB ~ 500KB
+    const directory = randomItem(['PROFILE', 'MEETING']);
+    const contentType = randomItem(['image/jpeg', 'image/png']);
+    const fileSize = randomInt(100, 500) * 1024;
     const extension = contentType.split('/')[1];
     const fileName = `test_${Date.now()}_${__VU}.${extension}`;
 
-    // Presigned URL 발급
-    const res = apiPost('/uploads/presigned-url', {
-      directory: directory,
-      fileName: fileName,
-      contentType: contentType,
-      fileSize: fileSize,
-    }, true);
+    const res = apiPostWithToken('/uploads/presigned-url', {
+      directory, fileName, contentType, fileSize,
+    }, token);
 
     if (res.status === 200) {
       const data = extractData(res);
       if (data && data.presignedUrl) {
-        // S3 업로드 (더미 데이터)
         const dummyData = new ArrayBuffer(fileSize);
         http.put(data.presignedUrl, dummyData, {
           headers: { 'Content-Type': contentType },
@@ -170,24 +143,62 @@ function imageUploadFlow(hasAuth) {
   });
 }
 
+// 채팅방 REST API
+function chatApiFlow(token) {
+  group('채팅방 API', function () {
+    // 채팅방 목록 (비인증 가능)
+    const listRes = apiGet('/chat-rooms?size=10');
+    const data = extractData(listRes);
+    thinkTime(1, 3);
+
+    if (token && data && data.items && data.items.length > 0) {
+      // 채팅방 상세
+      const roomId = randomItem(data.items).chatRoomId || randomItem(data.items).id;
+      if (roomId) {
+        apiGetWithToken(`/chat-rooms/${roomId}`, token);
+      }
+    }
+  });
+}
+
+// 알림 API
+function notificationFlow(token) {
+  if (!token) { guestFlow(); return; }
+
+  group('알림 API', function () {
+    apiGetWithToken('/notifications/unread', token);
+    thinkTime(1, 2);
+
+    const res = apiGetWithToken('/notifications', token);
+    const data = extractData(res);
+
+    if (data && data.notifications && data.notifications.length > 0) {
+      const unread = data.notifications.filter(n => !n.isRead);
+      if (unread.length > 0) {
+        apiPutWithToken(`/notifications/${unread[0].notificationId}`, {}, token);
+      }
+    }
+  });
+}
+
 export default function (data) {
+  const token = pickToken(data.tokens);
   const scenario = randomInt(1, 100);
 
-  if (scenario <= 35) {
-    // 35%: 비회원 탐색
+  if (scenario <= 25) {
     guestFlow();
+  } else if (scenario <= 50) {
+    userFlow(token);
   } else if (scenario <= 65) {
-    // 30%: 로그인 사용자
-    userFlow(data.hasAuth);
-  } else if (scenario <= 80) {
-    // 15%: 모임 검색
     searchFlow();
-  } else if (scenario <= 90) {
-    // 10%: 도서 검색
-    bookSearchFlow(data.hasAuth);
+  } else if (scenario <= 75) {
+    bookSearchFlow(token);
+  } else if (scenario <= 85) {
+    imageUploadFlow(token);
+  } else if (scenario <= 95) {
+    chatApiFlow(token);
   } else {
-    // 10%: 이미지 업로드
-    imageUploadFlow(data.hasAuth);
+    notificationFlow(token);
   }
 
   sleep(1);

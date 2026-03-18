@@ -275,3 +275,88 @@ export function initAuth() {
   console.log('인증 토큰이 설정되지 않았습니다. (JWT_TOKEN 또는 REFRESH_TOKEN 필요)');
   return false;
 }
+
+// ── 멀티 토큰 (다수 유저 시뮬레이션) ──────────────────────────────────────
+
+// /api/dev/tokens 에서 테스트 유저 토큰 목록을 발급받아 반환 (setup에서 1회 호출)
+export function fetchMultiTokens(count = 500) {
+  const baseUrl = __ENV.BASE_URL || config.baseUrl;
+  const tokenUrl = `${baseUrl}/dev/tokens`;
+
+  console.log(`멀티 토큰 발급: ${tokenUrl}`);
+  const res = http.get(tokenUrl, {
+    headers: { 'Accept': 'application/json' },
+    tags: { name: '/dev/tokens' },
+    timeout: '30s',
+  });
+
+  if (res.status === 200) {
+    try {
+      const json = res.json();
+      const items = json.data || json.tokens || json;
+      if (Array.isArray(items) && items.length > 0) {
+        const tokens = items.map(t => typeof t === 'string' ? t : (t.accessToken || t.token));
+        console.log(`멀티 토큰 ${tokens.length}개 발급 성공`);
+        return tokens;
+      }
+    } catch (e) {
+      console.log('멀티 토큰 파싱 실패:', e.message);
+    }
+  } else {
+    console.log(`멀티 토큰 발급 실패: ${res.status}`);
+  }
+
+  // fallback: 단일 JWT_TOKEN
+  if (config.accessToken) {
+    console.warn('멀티 토큰 실패 — 단일 토큰 fallback');
+    return [config.accessToken];
+  }
+  return [];
+}
+
+// VU별 라운드로빈 토큰 선택
+export function pickToken(tokens) {
+  if (!tokens || tokens.length === 0) return null;
+  return tokens[__VU % tokens.length];
+}
+
+// 특정 토큰으로 GET
+export function apiGetWithToken(path, token, params = {}) {
+  const url = `${config.baseUrl}${path}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = http.get(url, {
+    headers,
+    tags: { name: path.split('?')[0] },
+    ...params,
+  });
+
+  apiDuration.add(response.timings.duration);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
+  return response;
+}
+
+// 특정 토큰으로 PUT
+export function apiPutWithToken(path, body = {}, token = null) {
+  const url = `${config.baseUrl}${path}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = http.put(url, JSON.stringify(body), {
+    headers,
+    tags: { name: path.split('?')[0] },
+  });
+
+  apiDuration.add(response.timings.duration);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
+  return response;
+}
