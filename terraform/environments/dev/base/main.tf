@@ -106,6 +106,12 @@ module "storage" {
 # -----------------------------------------------------------------------------
 # SSM Parameter Store
 # -----------------------------------------------------------------------------
+resource "random_password" "qdrant_api_key" {
+  length           = 32
+  special          = false
+  override_special = ""
+}
+
 # =============================================================================
 # VPC Peering — dev ↔ mgmt (monitoring)
 # =============================================================================
@@ -191,5 +197,75 @@ module "ssm_parameters" {
     "NEXT_PUBLIC_API_BASE_URL_DEV"  = { type = "String" }
     "NEXT_PUBLIC_CHAT_BASE_URL_DEV" = { type = "String" }
     "MONGO_URI"                     = { type = "SecureString" }
+  }
+}
+
+resource "aws_ssm_parameter" "qdrant_url" {
+  name  = "/${var.project_name}/${var.environment}/QDRANT_URL"
+  type  = "String"
+  value = "http://ai-qdrant.${module.networking.internal_zone_name}:6333"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-QDRANT_URL"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description]
+  }
+}
+
+resource "aws_ssm_parameter" "qdrant_api_key" {
+  name  = "/${var.project_name}/${var.environment}/QDRANT_API_KEY"
+  type  = "SecureString"
+  value = random_password.qdrant_api_key.result
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-QDRANT_API_KEY"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description]
+  }
+}
+
+resource "aws_ssm_parameter" "qdrant_location" {
+  name  = "/${var.project_name}/${var.environment}/QDRANT_LOCATION"
+  type  = "String"
+  value = ":memory:"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-QDRANT_LOCATION"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description]
+  }
+}
+
+resource "aws_ssm_parameter" "qdrant_collection_discussion" {
+  name  = "/${var.project_name}/${var.environment}/QDRANT_COLLECTION_DISCUSSION"
+  type  = "String"
+  value = "discussion_topics_dev"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-QDRANT_COLLECTION_DISCUSSION"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description]
+  }
+}
+
+resource "aws_ssm_parameter" "qdrant_collection_reco" {
+  name  = "/${var.project_name}/${var.environment}/QDRANT_COLLECTION_RECO"
+  type  = "String"
+  value = "reco_meetings_dev"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-QDRANT_COLLECTION_RECO"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description]
   }
 }

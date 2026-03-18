@@ -22,6 +22,7 @@ data "archive_file" "batch_start_lambda" {
 locals {
   net                = data.terraform_remote_state.base.outputs.networking
   batch_instance_key = "ai_batch"
+  qdrant_instance_key = "ai_qdrant"
   batch_log_file     = "/var/log/doktori/weekly-batch.log"
   batch_tag_selector = {
     Environment = "dev"
@@ -37,6 +38,13 @@ locals {
     batch_command      = join(" ", [for part in var.batch_container_command : format("%q", part)])
     log_file           = local.batch_log_file
   })
+  qdrant_internal_host = "ai-qdrant.${local.net.internal_zone_name}"
+  qdrant_user_data = templatefile("${path.module}/templates/dev_qdrant_user_data.sh.tftpl", {
+    aws_region         = var.aws_region
+    ssm_parameter_path = var.batch_ssm_parameter_path
+    qdrant_image       = var.qdrant_image
+    qdrant_host        = local.qdrant_internal_host
+  })
 }
 
 # -----------------------------------------------------------------------------
@@ -44,8 +52,9 @@ locals {
 # -----------------------------------------------------------------------------
 locals {
   dns_name_map = {
-    app = "app"
-    ai  = "ai"
+    app       = "app"
+    ai        = "ai"
+    ai_qdrant = "ai-qdrant"
   }
 }
 
@@ -118,6 +127,20 @@ module "compute" {
       }
       sg_ingress = [] # AI port(8000)는 app SG에서 cross-rule로 허용
     }
+    (local.qdrant_instance_key) = {
+      instance_type = var.qdrant_instance_type
+      architecture  = "arm64"
+      subnet_key    = "private_app"
+      volume_size   = var.qdrant_volume_size
+      user_data     = local.qdrant_user_data
+      tags = {
+        Part     = "ai"
+        AutoStop = "false"
+        Service  = "ai-qdrant"
+        Role     = "vector-store"
+      }
+      sg_ingress = []
+    }
     (local.batch_instance_key) = {
       instance_type = var.batch_instance_type
       architecture  = "arm64"
@@ -141,6 +164,8 @@ module "compute" {
 
   sg_cross_rules = [
     { service_key = "ai", source_key = "app", from_port = 8000, to_port = 8000, protocol = "tcp" },
+    { service_key = local.qdrant_instance_key, source_key = "ai", from_port = 6333, to_port = 6333, protocol = "tcp" },
+    { service_key = local.qdrant_instance_key, source_key = local.batch_instance_key, from_port = 6333, to_port = 6333, protocol = "tcp" },
   ]
 }
 
