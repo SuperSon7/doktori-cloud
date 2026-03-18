@@ -58,3 +58,21 @@ variable "batch_container_command" {
   type        = list(string)
   default     = ["python", "-m", "app.batch.weekly_batch"]
 }
+
+variable "qdrant_instance_type" {
+  description = "Instance type for the dev Qdrant EC2"
+  type        = string
+  default     = "t4g.medium"
+}
+
+variable "qdrant_volume_size" {
+  description = "Root volume size in GiB for the dev Qdrant EC2"
+  type        = number
+  default     = 30
+}
+
+variable "qdrant_image" {
+  description = "Container image used for the dev Qdrant instance"
+  type        = string
+  default     = "qdrant/qdrant:v1.13.6"
+}

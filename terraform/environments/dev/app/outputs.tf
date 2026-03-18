@@ -22,3 +22,16 @@ output "weekly_batch" {
     container_command  = var.batch_container_command
   }
 }
+
+output "qdrant" {
+  description = "Dev Qdrant outputs"
+  value = {
+    instance_id        = module.compute.instance_ids[local.qdrant_instance_key]
+    private_ip         = module.compute.private_ips[local.qdrant_instance_key]
+    security_group_id  = module.compute.security_group_ids[local.qdrant_instance_key]
+    internal_host      = local.qdrant_internal_host
+    endpoint           = "http://${local.qdrant_internal_host}:6333"
+    ssm_parameter_path = var.batch_ssm_parameter_path
+    image              = var.qdrant_image
+  }
+}
