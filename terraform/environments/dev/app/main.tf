@@ -141,6 +141,8 @@ module "compute" {
       }
       sg_ingress = [
         { description = "HTTPS from internal subnet", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["10.100.0.0/24"] },
+        { description = "Qdrant HTTP from VPC", from_port = 6333, to_port = 6333, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
+        { description = "Qdrant gRPC from VPC", from_port = 6334, to_port = 6334, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
       ]
     }
     (local.batch_instance_key) = {
