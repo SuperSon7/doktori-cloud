@@ -139,7 +139,9 @@ module "compute" {
         Service  = "ai-qdrant"
         Role     = "vector-store"
       }
-      sg_ingress = []
+      sg_ingress = [
+        { description = "HTTPS from internal subnet", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["10.100.0.0/24"] },
+      ]
     }
     (local.batch_instance_key) = {
       instance_type = var.batch_instance_type
