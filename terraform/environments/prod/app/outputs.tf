@@ -30,15 +30,6 @@ output "frontend_asg_configuration" {
   }
 }
 
-output "frontend_ami_builder" {
-  value = {
-    instance_id               = aws_instance.frontend_ami_builder.id
-    private_ip                = aws_instance.frontend_ami_builder.private_ip
-    subnet_id                 = aws_instance.frontend_ami_builder.subnet_id
-    security_group_ids        = aws_instance.frontend_ami_builder.vpc_security_group_ids
-    iam_instance_profile_name = aws_instance.frontend_ami_builder.iam_instance_profile
-  }
-}
 
 output "k8s_nlb_dns" {
   value = module.k8s_cluster.nlb_dns_name

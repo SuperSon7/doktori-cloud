@@ -11,16 +11,22 @@ data "terraform_remote_state" "base" {
   }
 }
 
+data "terraform_remote_state" "dns" {
+  backend = "s3"
+  config = {
+    bucket = var.state_bucket
+    key    = "dns-zone/terraform.tfstate"
+    region = var.aws_region
+  }
+}
+
 locals {
   net = data.terraform_remote_state.base.outputs.networking
 }
 
 locals {
   chat_observer_user_data = templatefile("${path.module}/templates/chat_observer_user_data.sh.tftpl", {})
-  frontend_ami_builder_user_data = templatefile("${path.module}/templates/frontend_ami_builder_user_data.sh.tftpl", {
-    region = var.aws_region
-  })
-  frontend_ami_id = "ami-062480ce1fc9b3271"
+  frontend_ami_id = "ami-0a282f9b690bbcd58"
   frontend_private_subnet_ids = [
     local.net.subnet_ids["private_app"],
     local.net.subnet_ids["private_app_c"],
@@ -60,6 +66,7 @@ locals {
     rds_monitoring = "rds-exporter"
     redis          = "redis"
     rabbitmq       = "rabbitmq"
+    mongodb        = "mongodb"
   }
 }
 
@@ -145,7 +152,7 @@ module "compute" {
     redis = {
       instance_type = "t4g.micro"
       architecture  = "arm64"
-      subnet_key    = "private_app"
+      subnet_key    = "private_db"
       tags          = { Part = "data" }
       sg_ingress = [
         { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
@@ -154,11 +161,20 @@ module "compute" {
     rabbitmq = {
       instance_type = "t4g.micro"
       architecture  = "arm64"
-      subnet_key    = "private_app"
+      subnet_key    = "private_db"
       tags          = { Part = "data" }
       sg_ingress = [
         { description = "RabbitMQ AMQP from VPC", from_port = 5672, to_port = 5672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "RabbitMQ mgmt from VPC", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
+      ]
+    }
+    mongodb = {
+      instance_type = "t4g.micro"
+      architecture  = "arm64"
+      subnet_key    = "private_db"
+      tags          = { Part = "data" }
+      sg_ingress = [
+        { description = "MongoDB from VPC", from_port = 27017, to_port = 27017, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
     }
     chat_observer = {
@@ -204,38 +220,11 @@ module "frontend" {
   ami_id                    = local.frontend_ami_id
   instance_type             = "t4g.small"
   iam_instance_profile_name = module.compute.iam_instance_profile_name
-  desired_capacity          = 2
-  min_size                  = 2
+  desired_capacity          = 0
+  min_size                  = 0
   max_size                  = 4
 }
 
-resource "aws_instance" "frontend_ami_builder" {
-  ami                         = local.frontend_ami_id
-  instance_type               = "t4g.small"
-  subnet_id                   = local.net.subnet_ids["private_app"]
-  vpc_security_group_ids      = [module.frontend.instance_sg_id]
-  iam_instance_profile        = module.compute.iam_instance_profile_name
-  associate_public_ip_address = false
-  user_data                   = local.frontend_ami_builder_user_data
-
-  metadata_options {
-    http_tokens                 = "required"
-    http_endpoint               = "enabled"
-    http_put_response_hop_limit = 2
-  }
-
-  root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = {
-    Name    = "doktori-prod-frontend-ami-builder"
-    Part    = "fe"
-    Purpose = "ami-builder"
-  }
-}
 
 # =============================================================================
 # K8s Cluster — Master ASG + Worker ASG + Internal NLB (Multi-AZ)
@@ -277,7 +266,7 @@ module "k8s_cluster" {
 # DNS — ALB / NLB alias records
 # =============================================================================
 
-# Frontend ALB → front-alb.prod.doktori.internal
+# Public ALB → front-alb.prod.doktori.internal
 resource "aws_route53_record" "frontend_alb" {
   zone_id = local.net.internal_zone_id
   name    = "front-alb.${local.net.internal_zone_name}"
@@ -300,8 +289,7 @@ resource "aws_route53_record" "k8s_nlb" {
 }
 
 # =============================================================================
-# Unified ALB Routing — Frontend ALB에 path-based 규칙 추가
-#   nginx/prod/sites-available/default 라우팅 패턴 기반:
+# Public ALB Routing — path-based 규칙
 #   /api/*   → K8s Worker NodePort (30080) → NGF → api/chat 분기
 #   /ws/*    → K8s Worker NodePort (30080) → NGF (WebSocket)
 #   /ai/*    → AI EC2 (port 8000)
@@ -433,4 +421,102 @@ resource "aws_vpc_security_group_ingress_rule" "ai_from_alb" {
   to_port                      = 8000
   ip_protocol                  = "tcp"
   referenced_security_group_id = module.frontend.alb_sg_id
+}
+
+# --- ACM Certificate for api.doktori.kr ---
+resource "aws_acm_certificate" "api" {
+  domain_name       = "api.${var.domain_name}"
+  validation_method = "DNS"
+
+  tags = { Name = "api.${var.domain_name}" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id = data.terraform_remote_state.dns.outputs.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for r in aws_route53_record.api_cert_validation : r.fqdn]
+}
+
+# --- ALB HTTPS Listener ---
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = module.frontend.alb_arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = module.frontend.target_group_arn
+  }
+}
+
+# HTTPS listener rules (same as HTTP)
+resource "aws_lb_listener_rule" "api_https" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.k8s_backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ws_https" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 110
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.k8s_backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/ws/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ai_https" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 120
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ai.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/ai/*"]
+    }
+  }
 }
