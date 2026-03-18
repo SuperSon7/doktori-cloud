@@ -47,6 +47,16 @@ kubectl port-forward -n chaos-testing svc/chaos-dashboard 2333:2333
 | FI-8 | `fi-8-graceful-shutdown.sh` | API Pod | 부하 중 Pod graceful delete → 요청 유실 확인 | SLO-1 |
 | FI-9 | `fi-9-gateway-kill.yaml` | Gateway Pod | Nginx Gateway Pod kill → SPOF 여부 확인 | SLO-1,3 |
 
+**시스템/클라우드 레벨**
+
+| ID | 파일 | 대상 | 내용 | SLO |
+|----|------|------|------|-----|
+| FI-10 | `fi-10-cascading-failure.sh` | DB→API→전체 | k6 stress + DB 500ms → 연쇄 장애 관찰 | SLO-1,2 |
+| FI-11 | `fi-11-network-partition.yaml` | API↔Chat | 서비스 간 네트워크 파티션 → 격리 검증 | SLO-1,3 |
+| FI-12 | `fi-12-az-failure.sh` | 워커 노드 (AZ) | AZ 전체 drain → 멀티 AZ HA 검증 | SLO-1,3 |
+| FI-13 | `fi-13-gameday.sh` | 전 시스템 | 30분간 5분 간격 랜덤 FI 연쇄 (Game Day) | SLO-1~4 |
+| FI-14 | `fi-14-monitoring-kill.yaml` | Alloy | 모니터링 장애 → 서비스 영향 없음 확인 | 관측성 |
+
 ## 실행 방법
 
 ```bash
