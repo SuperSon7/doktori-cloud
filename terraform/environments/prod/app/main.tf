@@ -20,6 +20,8 @@ data "terraform_remote_state" "dns" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   net = data.terraform_remote_state.base.outputs.networking
 }
@@ -31,6 +33,9 @@ locals {
     local.net.subnet_ids["private_app"],
     local.net.subnet_ids["private_app_c"],
   ]
+  frontend_codedeploy_application_name      = "${var.project_name}-frontend-${var.environment}"
+  frontend_codedeploy_deployment_group_name = "${local.frontend_codedeploy_application_name}-asg"
+  frontend_codedeploy_revision_bucket_name  = "${var.project_name}-${var.environment}-frontend-codedeploy-revisions-${data.aws_caller_identity.current.account_id}"
 
   # control_plane_endpoint는 Route53 CNAME (k8s.prod.doktori.internal → NLB)
   # 모듈 output 참조 시 순환참조 발생하므로 DNS 이름 직접 사용
@@ -94,6 +99,7 @@ module "compute" {
 
   s3_bucket_arns = [
     "arn:aws:s3:::${var.project_name}-v2-${var.environment}",
+    aws_s3_bucket.frontend_codedeploy_revisions.arn,
   ]
 
   ssm_parameter_paths = [
@@ -225,6 +231,101 @@ module "frontend" {
   max_size                  = 4
 }
 
+
+# =============================================================================
+# Frontend CodeDeploy — Application + Deployment Group + Revision Bucket
+# =============================================================================
+resource "aws_s3_bucket" "frontend_codedeploy_revisions" {
+  bucket = local.frontend_codedeploy_revision_bucket_name
+
+  tags = {
+    Name    = local.frontend_codedeploy_revision_bucket_name
+    Part    = "fe"
+    Purpose = "codedeploy-revisions"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "frontend_codedeploy_revisions" {
+  bucket = aws_s3_bucket.frontend_codedeploy_revisions.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "frontend_codedeploy_revisions" {
+  bucket = aws_s3_bucket.frontend_codedeploy_revisions.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "frontend_codedeploy_revisions" {
+  bucket = aws_s3_bucket.frontend_codedeploy_revisions.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_codedeploy_app" "frontend_prod" {
+  name             = local.frontend_codedeploy_application_name
+  compute_platform = "Server"
+}
+
+resource "aws_iam_role" "frontend_codedeploy_service" {
+  name = "${local.frontend_codedeploy_application_name}-service-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "codedeploy.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "frontend_codedeploy_service" {
+  role       = aws_iam_role.frontend_codedeploy_service.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+}
+
+resource "aws_codedeploy_deployment_group" "frontend_prod" {
+  app_name               = aws_codedeploy_app.frontend_prod.name
+  deployment_group_name  = local.frontend_codedeploy_deployment_group_name
+  service_role_arn       = aws_iam_role.frontend_codedeploy_service.arn
+  autoscaling_groups     = [module.frontend.asg_name]
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+  deployment_style {
+    deployment_option = "WITH_TRAFFIC_CONTROL"
+    deployment_type   = "IN_PLACE"
+  }
+
+  load_balancer_info {
+    target_group_info {
+      name = module.frontend.target_group_name
+    }
+  }
+
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM", "DEPLOYMENT_STOP_ON_REQUEST"]
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.frontend_codedeploy_service,
+  ]
+}
 
 # =============================================================================
 # K8s Cluster — Master ASG + Worker ASG + Internal NLB (Multi-AZ)

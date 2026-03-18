@@ -20,6 +20,8 @@ output "frontend_alb_dns" {
 output "frontend_asg_configuration" {
   value = {
     asg_name                       = module.frontend.asg_name
+    target_group_name              = module.frontend.target_group_name
+    target_group_arn               = module.frontend.target_group_arn
     launch_template_id             = module.frontend.launch_template_id
     launch_template_name           = module.frontend.launch_template_name
     launch_template_latest_version = module.frontend.launch_template_latest_version
@@ -41,4 +43,33 @@ output "k8s_master_asg" {
 
 output "k8s_worker_asg" {
   value = module.k8s_cluster.worker_asg_name
+}
+
+output "frontend_codedeploy" {
+  description = "Production frontend CodeDeploy configuration"
+  value = {
+    application_name      = aws_codedeploy_app.frontend_prod.name
+    deployment_group_name = aws_codedeploy_deployment_group.frontend_prod.deployment_group_name
+    service_role_arn      = aws_iam_role.frontend_codedeploy_service.arn
+    revision_bucket_name  = aws_s3_bucket.frontend_codedeploy_revisions.bucket
+    frontend_asg_name     = module.frontend.asg_name
+    target_group_name     = module.frontend.target_group_name
+    target_group_arn      = module.frontend.target_group_arn
+  }
+}
+
+output "codedeploy_application_name_prod" {
+  value = aws_codedeploy_app.frontend_prod.name
+}
+
+output "codedeploy_deployment_group_name_prod" {
+  value = aws_codedeploy_deployment_group.frontend_prod.deployment_group_name
+}
+
+output "codedeploy_revision_bucket_prod" {
+  value = aws_s3_bucket.frontend_codedeploy_revisions.bucket
+}
+
+output "frontend_prod_target_group_arn" {
+  value = module.frontend.target_group_arn
 }
