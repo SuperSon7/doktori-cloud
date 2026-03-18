@@ -110,6 +110,7 @@ module "compute" {
         { description = "SSH", from_port = 22, to_port = 22, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "MySQL from prod VPC", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = ["10.1.0.0/16"] },
         { description = "RDS replication source", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = ["15.164.45.30/32"] },
+        { description = "MongoDB from VPC", from_port = 27017, to_port = 27017, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
         { description = "Wiremock", from_port = 9090, to_port = 9090, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "RabbitMQ Management", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
