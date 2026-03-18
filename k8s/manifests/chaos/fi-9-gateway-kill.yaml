@@ -1,0 +1,29 @@
+# =============================================================================
+# FI-9: Gateway (Nginx) Pod Kill
+#
+# 가설: Gateway Pod가 죽으면 전체 서비스 트래픽이 끊긴다 (SPOF 확인)
+#       → replica 2개 이상이면 서비스 지속, 1개면 SPOF 확인 후 증설 판단
+# 성공 기준: Gateway replica ≥ 2면 서비스 지속, 1이면 SPOF 문서화
+# 관측: 외부 curl 응답, http-red (요청 드롭), kubectl get pods -n nginx-gateway -w
+#
+# ⚠️ Gateway namespace/label은 실제 배포에 맞게 수정 필요
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-9-gateway-kill
+  namespace: chaos-testing
+  labels:
+    experiment: fi-9
+    target: gateway
+spec:
+  action: pod-kill
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - nginx-gateway
+    labelSelectors:
+      app.kubernetes.io/name: nginx-gateway-fabric
+  gracePeriod: 0
+  duration: '30s'

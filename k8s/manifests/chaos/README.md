@@ -43,6 +43,9 @@ kubectl port-forward -n chaos-testing svc/chaos-dashboard 2333:2333
 | FI-4 | `fi-4-cpu-stress.yaml` | API Pod | CPU 80% stress | SLO-1,2 |
 | FI-5 | `fi-5-node-failure.yaml` | 워커 노드 | 노드 종료 (AWS FIS/drain) | SLO-1,3 |
 | FI-6 | `fi-6-rabbitmq-kill.yaml` | RabbitMQ | Pod 강제 종료 | 보조 지표 |
+| FI-7 | `fi-7-rolling-update.sh` | Deployment | 부하 중 Rolling Update → 5xx 0건 확인 | SLO-1 |
+| FI-8 | `fi-8-graceful-shutdown.sh` | API Pod | 부하 중 Pod graceful delete → 요청 유실 확인 | SLO-1 |
+| FI-9 | `fi-9-gateway-kill.yaml` | Gateway Pod | Nginx Gateway Pod kill → SPOF 여부 확인 | SLO-1,3 |
 
 ## 실행 방법
 
@@ -60,6 +63,21 @@ cd manifests/chaos
 
 # 전체 비상 중단
 ./run-experiment.sh stop-all
+```
+
+### FI-7, FI-8 (k6 + kubectl 조합)
+
+FI-7, FI-8은 Chaos Mesh가 아닌 쉘 스크립트로 실행한다. **반드시 k6 부하를 먼저 실행한 상태에서 실행**:
+
+```bash
+# 터미널 1: k6 부하 실행
+k6 run --env BASE_URL=http://<endpoint>/api load-tests/k6/scenarios/load.js
+
+# 터미널 2: FI-7 (Rolling Update)
+./fi-7-rolling-update.sh <new-image-tag>
+
+# 또는 FI-8 (Graceful Shutdown)
+./fi-8-graceful-shutdown.sh
 ```
 
 ## ⚠️ 주의사항
