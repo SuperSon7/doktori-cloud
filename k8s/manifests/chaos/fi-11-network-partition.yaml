@@ -1,0 +1,36 @@
+# =============================================================================
+# FI-11: API ↔ Chat 네트워크 파티션
+#
+# 가설: API와 Chat이 독립 프로세스이므로, 서로 통신 불가해도 각자 정상 동작
+#       - API: 모임 CRUD, 인증, 알림 — Chat 의존 없음
+#       - Chat: 기존 채팅방 메시지 송수신 — API 의존 없음
+# 성공 기준: API SLO-1 유지, Chat SLO-3 유지
+# 관측: http-red (API 에러율), Chat probe, Loki 에러 로그
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: fi-11-api-chat-partition
+  namespace: chaos-testing
+  labels:
+    experiment: fi-11
+    target: api-chat
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app: doktori
+      component: api
+  direction: both
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - prod
+      labelSelectors:
+        app: doktori
+        component: chat
+  duration: '5m'

@@ -1,0 +1,26 @@
+# =============================================================================
+# FI-14: 모니터링 파이프라인 장애
+#
+# 가설: Alloy Pod가 죽어도 서비스(API/Chat)에 영향 없음
+#       Alloy 재시작 후 WAL replay로 메트릭 갭 최소화
+# 성공 기준: SLO-1~4 영향 없음, Alloy 재시작 후 Grafana 메트릭 갭 < 1분
+# 관측: Grafana 메트릭 끊김 구간, Alloy Pod restart 시간
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-14-monitoring-kill
+  namespace: chaos-testing
+  labels:
+    experiment: fi-14
+    target: monitoring
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces:
+      - monitoring
+    labelSelectors:
+      app: alloy
+  gracePeriod: 0
+  duration: '30s'
