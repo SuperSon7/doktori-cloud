@@ -1,3 +1,23 @@
+# -----------------------------------------------------------------------------
+# Remote State — App 레이어에서 Public ALB DNS 참조
+# CF SSR origin을 nginx EIP 대신 ALB DNS로 변경하기 위함
+# -----------------------------------------------------------------------------
+data "terraform_remote_state" "app" {
+  backend = "s3"
+  config = {
+    bucket = "doktori-v2-terraform-state"
+    key    = "${var.environment}/app/terraform.tfstate"
+    region = var.aws_region
+  }
+}
+
+locals {
+  # nginx EC2 제거 후에는 ALB DNS를 직접 SSR origin으로 사용
+  # 전환 전: var.ssr_origin_domain (origin.doktori.kr → nginx EIP)
+  # 전환 후: ALB DNS (자동 참조)
+  ssr_origin = var.ssr_origin_domain != "" ? var.ssr_origin_domain : data.terraform_remote_state.app.outputs.frontend_alb_dns
+}
+
 resource "aws_s3_bucket" "static" {
   bucket = var.static_bucket_name
 }
@@ -81,6 +101,48 @@ resource "aws_cloudfront_origin_request_policy" "ssr_req" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# Response Headers Policy — Security headers (기존 nginx에서 담당하던 역할)
+#
+# HSTS: 브라우저에게 HTTPS만 사용하도록 강제 (MITM 방지)
+# X-Frame-Options: 클릭재킹 공격 방지 (iframe 삽입 차단)
+# X-Content-Type-Options: MIME 스니핑 방지 (브라우저가 Content-Type 무시하고 추론하는 것 차단)
+# Referrer-Policy: 외부 사이트로 이동 시 원본 URL 노출 범위 제한
+# X-XSS-Protection: 레거시 브라우저의 XSS 필터 활성화
+# -----------------------------------------------------------------------------
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "${var.project_name}-${var.environment}-security-headers"
+
+  security_headers_config {
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = false
+      override                   = true
+    }
+
+    frame_options {
+      frame_option = "SAMEORIGIN"
+      override     = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    xss_protection {
+      mode_block = true
+      protection = true
+      override   = true
+    }
+  }
+}
+
 resource "aws_cloudfront_distribution" "cdn" {
   enabled         = true
   is_ipv6_enabled = true
@@ -94,7 +156,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   }
 
   origin {
-    domain_name = var.ssr_origin_domain
+    domain_name = local.ssr_origin
     origin_id   = "origin-next-app"
 
     custom_origin_config {
@@ -111,9 +173,10 @@ resource "aws_cloudfront_distribution" "cdn" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
     cached_methods         = ["GET", "HEAD", "OPTIONS"]
 
-    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.ssr_req.id
-    compress                 = true
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id   = aws_cloudfront_origin_request_policy.ssr_req.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    compress                   = true
   }
 
   ordered_cache_behavior {
@@ -123,9 +186,10 @@ resource "aws_cloudfront_distribution" "cdn" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD", "OPTIONS"]
 
-    cache_policy_id          = aws_cloudfront_cache_policy.static_long.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.none.id
-    compress                 = true
+    cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+    origin_request_policy_id   = aws_cloudfront_origin_request_policy.none.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    compress                   = true
   }
 
   restrictions {
