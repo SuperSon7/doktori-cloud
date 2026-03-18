@@ -62,7 +62,7 @@ variable "batch_container_command" {
 variable "qdrant_instance_type" {
   description = "Instance type for the dev Qdrant EC2"
   type        = string
-  default     = "t4g.medium"
+  default     = "t4g.small"
 }
 
 variable "qdrant_volume_size" {
