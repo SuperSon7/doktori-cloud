@@ -44,7 +44,7 @@ spec:
               component: api
       containers:
         - name: api
-          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-api:5afb0d5
+          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-api:7607bc8
           ports:
             - containerPort: 8080
               name: http
