@@ -73,3 +73,8 @@ output "codedeploy_revision_bucket_prod" {
 output "frontend_prod_target_group_arn" {
   value = module.frontend.target_group_arn
 }
+
+output "frontend_codedeploy_stack_version" {
+  description = "Marker output used to force a safe prod/app Terraform apply when CodeDeploy stack wiring changes."
+  value       = "2026-03-19"
+}
