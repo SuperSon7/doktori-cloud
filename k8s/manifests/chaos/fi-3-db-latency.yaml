@@ -6,6 +6,14 @@
 # 관측: Grafana → jvm-api (HikariCP), http-red (latency)
 #
 # 단계적 실행 권장: 100ms → 200ms → 500ms (latency 값만 변경)
+#
+# ⚠️ DB가 k8s 외부(RDS)인 경우:
+#   externalTargets에 RDS 엔드포인트 IP 또는 CIDR을 지정해야 합니다.
+#   RDS IP 확인: nslookup <rds-endpoint>
+#   예: externalTargets: ['10.1.100.0/24']
+#
+# ⚠️ DB가 k8s 내부 Pod인 경우:
+#   externalTargets 대신 target.selector로 DB Pod를 지정하세요.
 # =============================================================================
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
@@ -29,15 +37,8 @@ spec:
     jitter: '50ms'
     correlation: '50'
   direction: to
-  # MySQL RDS/외부 DB의 IP 또는 CIDR (실제 DB 엔드포인트에 맞게 수정)
-  # externalTargets 대신 target selector를 사용할 수도 있음
-  # 아래는 특정 포트(3306)로 나가는 트래픽만 지연
-  target:
-    mode: all
-    selector:
-      namespaces:
-        - prod
-      labelSelectors:
-        app: doktori
-        component: api
+  # RDS 엔드포인트의 IP 대역 (실제 환경에 맞게 수정 필수)
+  # nslookup <rds-endpoint> 으로 IP 확인 후 기입
+  externalTargets:
+    - '10.1.0.0/16'       # prod VPC CIDR — RDS가 위치한 서브넷으로 좁히는 것을 권장
   duration: '5m'

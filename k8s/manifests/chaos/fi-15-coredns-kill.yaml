@@ -1,0 +1,45 @@
+# =============================================================================
+# FI-15: CoreDNS 장애
+#
+# 가설: CoreDNS Pod가 죽으면 클러스터 내 DNS 해석 불가
+#       → Service 이름 기반 통신 전부 실패 (API→RDS FQDN, API→RabbitMQ 등)
+#       → CoreDNS는 Deployment(replica=2)이므로 1개 kill 시 나머지로 서비스 지속
+#       → 전부 kill 시 전체 DNS 장애
+#
+# 왜 하는가:
+#   k8s에서 모든 Service 간 통신은 CoreDNS를 거친다.
+#   CoreDNS가 SPOF가 아닌지 (replica >= 2), 1개 죽어도 DNS 해석이 되는지,
+#   전부 죽으면 어떤 범위까지 영향을 미치는지 확인.
+#   실제 CoreDNS 장애 사례: 업그레이드 중 모든 Pod restart → 클러스터 전체 통신 두절
+#
+# 성공 기준:
+#   Phase A (1개 kill): DNS 해석 정상, SLO-1/3 영향 없음
+#   Phase B (전부 kill): DNS 실패 확인 → 복구 시간 측정
+#
+# 관측:
+#   kubectl exec <api-pod> -- nslookup kubernetes.default
+#   coredns_dns_requests_total (Prometheus)
+#   http-red 대시보드 (5xx — DNS 실패로 인한 connection refused)
+# =============================================================================
+
+# Phase A: CoreDNS 1개만 kill (HA 검증)
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-15-coredns-partial
+  namespace: chaos-testing
+  labels:
+    experiment: fi-15
+    target: coredns
+    phase: partial
+spec:
+  action: pod-kill
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - kube-system
+    labelSelectors:
+      k8s-app: kube-dns
+  gracePeriod: 0
+  duration: '60s'

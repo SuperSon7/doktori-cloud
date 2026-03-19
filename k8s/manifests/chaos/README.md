@@ -57,6 +57,15 @@ kubectl port-forward -n chaos-testing svc/chaos-dashboard 2333:2333
 | FI-13 | `fi-13-gameday.sh` | 전 시스템 | 30분간 5분 간격 랜덤 FI 연쇄 (Game Day) | SLO-1~4 |
 | FI-14 | `fi-14-monitoring-kill.yaml` | Alloy | 모니터링 장애 → 서비스 영향 없음 확인 | 관측성 |
 
+**k8s 핵심 시스템 컴포넌트**
+
+| ID | 파일 | 대상 | 내용 | SLO |
+|----|------|------|------|-----|
+| FI-15 | `fi-15-coredns-kill.yaml` | CoreDNS | Phase A: 1개 kill (HA 검증) | SLO-1,3 |
+| FI-15B | `fi-15-coredns-full-kill.yaml` | CoreDNS | Phase B: 전체 kill (DNS 전면 장애) | SLO-1,3 |
+| FI-16 | `fi-16-metrics-server-kill.yaml` | metrics-server | HPA 판단 불가 상태 확인 | HPA |
+| FI-17 | `fi-17-calico-kill.yaml` | Calico | CNI 장애 → 기존 Pod 통신 유지 확인 | 네트워크 |
+
 ## 실행 방법
 
 ```bash

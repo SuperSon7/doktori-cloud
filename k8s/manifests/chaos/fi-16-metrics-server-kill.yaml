@@ -1,0 +1,39 @@
+# =============================================================================
+# FI-16: metrics-server 장애 (HPA 판단 불가)
+#
+# 가설: metrics-server가 죽으면 HPA가 CPU 데이터를 받지 못해
+#       스케일아웃/다운 판단 불가. 부하 중에 이러면 현재 replica 수로 버텨야 함.
+#
+# 왜 하는가:
+#   HPA는 metrics-server의 CPU/Memory 데이터에 100% 의존한다.
+#   metrics-server가 다운되면 HPA는 "unknown" 상태가 되어 스케일 결정을 못 한다.
+#   이 상태에서 트래픽이 급증하면 스케일아웃 없이 현재 Pod만으로 버텨야 한다.
+#   metrics-server 복구 후 HPA가 즉시 정상 동작하는지도 확인.
+#
+# 성공 기준:
+#   - metrics-server 다운 중: HPA TARGETS이 <unknown>으로 표시
+#   - 서비스 자체에 영향 없음 (SLO-1 유지)
+#   - 복구 후 1~2분 이내 HPA TARGETS 정상 표시
+#
+# 관측:
+#   kubectl get hpa -n prod -w  (TARGETS 칼럼)
+#   kubectl top pods -n prod    (metrics-server 다운 시 에러)
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-16-metrics-server-kill
+  namespace: chaos-testing
+  labels:
+    experiment: fi-16
+    target: metrics-server
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces:
+      - kube-system
+    labelSelectors:
+      k8s-app: metrics-server
+  gracePeriod: 0
+  duration: '60s'
