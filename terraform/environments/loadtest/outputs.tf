@@ -27,3 +27,13 @@ output "ssm_connect_commands" {
     "aws ${var.aws_profile != "" ? "--profile ${var.aws_profile} " : ""}ssm start-session --target ${inst.id}"
   ]
 }
+
+output "grafana_url" {
+  description = "Grafana dashboard URL (runner-1)"
+  value       = "http://${aws_instance.runner[0].public_ip}:3000"
+}
+
+output "prometheus_url" {
+  description = "Prometheus URL (runner-1)"
+  value       = "http://${aws_instance.runner[0].public_ip}:9090"
+}
