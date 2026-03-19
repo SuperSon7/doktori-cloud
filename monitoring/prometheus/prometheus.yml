@@ -45,13 +45,8 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - https://dev.doktori.kr/api/actuator/health
-          - https://dev.doktori.kr/nginx-health
-        labels:
-          env: dev
-      - targets:
-          - https://doktori.kr/api/actuator/health
-          - https://doktori.kr/nginx-health
+          - https://doktori.kr/api/actuator/health   # ALB → Gateway → API Pod (E2E)
+          - https://doktori.kr/                       # 프론트엔드 진입점 (CloudFront)
         labels:
           env: prod
     relabel_configs:

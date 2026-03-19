@@ -27,6 +27,11 @@ data:
         source_labels = ["__meta_kubernetes_pod_label_component"]
         target_label  = "component"
       }
+      // component → app 매핑: 기존 대시보드/알림이 app 라벨로 쿼리하므로 호환 유지
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        target_label  = "app"
+      }
       rule {
         source_labels = ["__meta_kubernetes_pod_label_component"]
         regex         = "api"
@@ -180,6 +185,11 @@ data:
       rule {
         source_labels = ["__meta_kubernetes_pod_label_component"]
         target_label  = "component"
+      }
+      // component → app 매핑: 로그 쿼리 {app="api"} 호환
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        target_label  = "app"
       }
       rule {
         replacement  = "prod-k8s"
