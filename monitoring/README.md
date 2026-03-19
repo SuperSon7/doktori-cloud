@@ -1,6 +1,34 @@
 # Monitoring & IP Change Guide
 
-이 문서는 prod/dev/monitoring 서버의 IP, 도메인, 접근 CIDR이 변경될 때 어떤 파일을 확인/수정해야 하는지 정리한 가이드입니다.
+이 문서는 모니터링 스택 구성 요소 버전과, prod/dev/monitoring 서버의 IP, 도메인, 접근 CIDR이 변경될 때 어떤 파일을 확인/수정해야 하는지 정리한 가이드입니다.
+
+---
+
+## 모니터링 스택 버전 (2026-03-19 기준)
+
+### 모니터링 서버 (Docker Compose)
+
+| 컴포넌트 | 버전 | 용도 |
+|----------|------|------|
+| Prometheus | v3.5.1 | 메트릭 저장 + 알림 평가 |
+| Grafana | 12.3.3 | 대시보드 + 알림 라우팅 |
+| Loki | 3.6.5 | 로그 저장 (structured metadata 지원) |
+| Blackbox Exporter | latest | 외부 엔드포인트 프로빙 |
+| cAdvisor | latest | 모니터링 서버 컨테이너 리소스 |
+
+### K8s 클러스터 (DaemonSet / Deployment)
+
+| 컴포넌트 | 버전 | 용도 |
+|----------|------|------|
+| Grafana Alloy | v1.9.0 | 메트릭 수집 + 로그 수집 → 모니터링 서버로 push |
+| kube-state-metrics | v2.15.0 (Helm 5.28.1) | K8s 오브젝트 상태 메트릭 |
+| metrics-server | v0.7.2 (Helm 3.12.2) | HPA용 리소스 메트릭 |
+
+### 주요 설정 참고
+
+- Loki `limits_config.allow_structured_metadata: true` — traceId를 structured metadata로 저장
+- Alloy에서 `component` → `app` relabel 매핑 — 기존 대시보드/알림 호환
+- Prometheus `--web.enable-remote-write-receiver` — Alloy remote_write 수신
 
 ---
 

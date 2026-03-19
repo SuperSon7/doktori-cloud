@@ -30,7 +30,7 @@ const wsConnectSuccess = new Counter('ws_connect_success');
 const wsConnectFailed = new Counter('ws_connect_failed');
 const wsErrorRate = new Rate('ws_errors');
 
-const WS_URL = __ENV.WS_URL || 'wss://doktori.kr/ws/chat';
+const WS_URL = __ENV.WS_URL || 'wss://api.doktori.kr/ws/chat';
 const CHAT_ROOM_IDS = (__ENV.CHAT_ROOM_IDS || '1,2,3').split(',').map(Number);
 const MESSAGE_INTERVAL_SEC = Number(__ENV.MSG_INTERVAL || 3);
 

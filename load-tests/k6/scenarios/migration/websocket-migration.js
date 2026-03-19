@@ -38,8 +38,8 @@ const wsErrors = new Counter('ws_errors');
 // 채팅 REST API 가용성도 함께 측정
 const chatApiSuccess = new Rate('ws_chat_api_success');
 
-const WS_URL = __ENV.WS_URL || 'wss://doktori.kr/ws';
-const CHAT_BASE_URL = __ENV.CHAT_BASE_URL || __ENV.BASE_URL || 'https://doktori.kr/api';
+const WS_URL = __ENV.WS_URL || 'wss://api.doktori.kr/ws/chat';
+const CHAT_BASE_URL = __ENV.CHAT_BASE_URL || __ENV.BASE_URL || 'https://api.doktori.kr/api';
 
 export const options = {
   scenarios: {
