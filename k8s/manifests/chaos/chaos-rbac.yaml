@@ -1,5 +1,6 @@
-# Chaos Mesh가 prod namespace의 Pod에 접근할 수 있도록 허용
-# chaos-testing namespace의 chaos-mesh SA → prod namespace 리소스 조작
+# Chaos Mesh가 전체 namespace의 Pod에 접근할 수 있도록 허용
+# 대상: prod, kube-system, calico-system, monitoring, nginx-gateway
+# ClusterRole이므로 namespace 제한 없이 적용됨
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

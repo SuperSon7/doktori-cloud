@@ -1,0 +1,28 @@
+# =============================================================================
+# FI-15 Phase B: CoreDNS 전체 kill (전면 DNS 장애)
+#
+# ⚠️ 위험: 클러스터 전체 DNS 해석 불가. 모든 Service 간 통신 두절.
+#    반드시 Phase A(partial) 성공 후에만 실행.
+#    즉시 복구 준비: kubectl rollout restart deployment/coredns -n kube-system
+#
+# 성공 기준: DNS 장애 범위 확인, CoreDNS 재시작 후 30초 이내 정상화
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: fi-15-coredns-full
+  namespace: chaos-testing
+  labels:
+    experiment: fi-15
+    target: coredns
+    phase: full
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces:
+      - kube-system
+    labelSelectors:
+      k8s-app: kube-dns
+  gracePeriod: 0
+  duration: '30s'

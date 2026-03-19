@@ -62,26 +62,25 @@ case "$ACTION" in
   status)
     echo "=== 활성 Chaos 실험 ==="
     echo ""
-    echo "--- PodChaos ---"
-    kubectl get podchaos -n "$NS" 2>/dev/null || echo "  없음"
-    echo ""
-    echo "--- NetworkChaos ---"
-    kubectl get networkchaos -n "$NS" 2>/dev/null || echo "  없음"
-    echo ""
-    echo "--- StressChaos ---"
-    kubectl get stresschaos -n "$NS" 2>/dev/null || echo "  없음"
-    echo ""
+    for kind in podchaos networkchaos stresschaos iochaos httpchaos dnschaos; do
+      echo "--- ${kind} ---"
+      kubectl get "$kind" -n "$NS" 2>/dev/null || echo "  없음"
+      echo ""
+    done
     echo "--- prod Pod 상태 ---"
     kubectl get pods -n prod -o wide
+    echo ""
+    echo "--- kube-system 핵심 컴포넌트 ---"
+    kubectl get pods -n kube-system -l 'k8s-app in (kube-dns,metrics-server)' -o wide 2>/dev/null
     echo ""
     echo "--- HPA ---"
     kubectl get hpa -n prod
     ;;
   stop-all)
     echo "⚠️  모든 실험 즉시 중단..."
-    kubectl delete podchaos --all -n "$NS" --ignore-not-found
-    kubectl delete networkchaos --all -n "$NS" --ignore-not-found
-    kubectl delete stresschaos --all -n "$NS" --ignore-not-found
+    for kind in podchaos networkchaos stresschaos iochaos httpchaos dnschaos; do
+      kubectl delete "$kind" --all -n "$NS" --ignore-not-found 2>/dev/null || true
+    done
     echo "✅ 모든 실험 중단됨."
     echo ""
     kubectl get pods -n prod -o wide
