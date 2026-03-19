@@ -77,7 +77,7 @@ run_scenario() {
         --env BASE_URL="${BASE_URL}" \
         --env JWT_TOKEN="${JWT_TOKEN:-}" \
         --env REFRESH_TOKEN="${REFRESH_TOKEN:-}" \
-        --env WS_URL="${WS_URL:-wss://doktori.kr/ws}" \
+        --env WS_URL="${WS_URL:-wss://api.doktori.kr/ws/chat}" \
         --env CHAT_BASE_URL="${CHAT_BASE_URL:-${BASE_URL}}" \
         --env TEST_MEETING_ID="${TEST_MEETING_ID:-1}" \
         $EXTRA_ARGS \
