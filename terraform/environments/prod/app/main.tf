@@ -226,8 +226,8 @@ module "frontend" {
   ami_id                    = local.frontend_ami_id
   instance_type             = "t4g.small"
   iam_instance_profile_name = module.compute.iam_instance_profile_name
-  desired_capacity          = 0
-  min_size                  = 0
+  desired_capacity          = 2
+  min_size                  = 1
   max_size                  = 4
 }
 
@@ -448,6 +448,28 @@ resource "aws_lb_target_group_attachment" "ai" {
   target_group_arn = aws_lb_target_group.ai.arn
   target_id        = module.compute.instance_ids["ai"]
   port             = 8000
+}
+
+# --- HTTP → HTTPS redirect for api.doktori.kr direct access ---
+# CloudFront → ALB 트래픽은 Host: doktori.kr 이므로 영향 없음
+resource "aws_lb_listener_rule" "api_http_redirect" {
+  listener_arn = module.frontend.http_listener_arn
+  priority     = 1
+
+  action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["api.${var.domain_name}"]
+    }
+  }
 }
 
 # --- ALB Listener Rules (path-based routing) ---
