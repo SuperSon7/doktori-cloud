@@ -9,7 +9,7 @@
 #   X-Forwarded-For: L7 프록시 체인에서 원본 클라이언트 IP를 전달하는 de facto 표준 헤더
 #   Keepalive: HTTP/1.1 persistent connection — 매 요청마다 새 TCP 연결을 맺지 않고
 #              기존 연결을 재사용 → 3-way handshake 오버헤드 제거, latency 감소
-apiVersion: gateway.nginx.org/v1alpha2
+apiVersion: gateway.nginx.org/v1alpha1
 kind: NginxProxy
 metadata:
   name: doktori-proxy-config
@@ -20,8 +20,9 @@ spec:
     trustedAddresses:
       - type: CIDR
         value: "10.0.0.0/8"
-  upstream:
-    keepAlive:
-      connections: 64
-      requests: 1000
-      time: "1h"
+  # upstream.keepAlive는 v1alpha2 전용 — NGF 업그레이드 후 복원
+  # upstream:
+  #   keepAlive:
+  #     connections: 64
+  #     requests: 1000
+  #     time: "1h"
