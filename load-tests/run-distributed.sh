@@ -107,7 +107,7 @@ run_command() {
     args="${args} --prom ${PROM_REMOTE_WRITE_URL}"
   fi
 
-  local commands="bash ${runner_script} ${args}"
+  local commands="export HOME=/root && bash ${runner_script} ${args}"
 
   echo -e "${GREEN}========================================${NC}"
   echo -e "${GREEN} 분산 부하테스트 실행${NC}"

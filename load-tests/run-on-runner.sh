@@ -2,6 +2,7 @@
 # 러너에서 실행되는 스크립트 (SSM Run Command로 호출)
 # 사용법: /home/ubuntu/5-team-service-cloud/load-tests/run-on-runner.sh <scenario> [--pull] [--prom URL]
 set -e
+export HOME="${HOME:-/root}"
 
 SCENARIO="${1:?시나리오를 지정하세요}"
 REPO_DIR="/home/ubuntu/5-team-service-cloud"
