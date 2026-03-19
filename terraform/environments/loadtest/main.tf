@@ -80,11 +80,35 @@ resource "aws_iam_instance_profile" "k6_runner" {
 
 resource "aws_security_group" "k6_runner" {
   name_prefix = "${var.project_name}-loadtest-k6-"
-  description = "k6 load test runners — outbound only"
+  description = "k6 load test runners and monitoring"
   vpc_id      = aws_vpc.loadtest.id
 
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Grafana"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Prometheus"
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
-    description = "Allow all outbound (HTTPS to prod target)"
+    description = "Allow all outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -95,6 +119,8 @@ resource "aws_security_group" "k6_runner" {
 
   lifecycle { create_before_destroy = true }
 }
+
+# ── User Data (scripts/ 디렉토리에서 로드) ──────────────────────────────────
 
 # ── EC2 Runners ─────────────────────────────────────────────────────────────
 
@@ -118,6 +144,7 @@ resource "aws_instance" "runner" {
 
   ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.instance_type
+  key_name               = "doktori-loadtest"
   subnet_id              = aws_subnet.public[count.index % length(aws_subnet.public)].id
   iam_instance_profile   = aws_iam_instance_profile.k6_runner.name
   vpc_security_group_ids = [aws_security_group.k6_runner.id]
@@ -134,25 +161,10 @@ resource "aws_instance" "runner" {
     encrypted   = true
   }
 
-  user_data = base64encode(<<-SETUP
-    #!/bin/bash
-    set -e
-
-    # k6 설치 (ARM64)
-    sudo gpg --no-default-keyring \
-      --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
-      --keyserver hkp://keyserver.ubuntu.com:80 \
-      --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D68
-    echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
-      | sudo tee /etc/apt/sources.list.d/k6.list
-    sudo apt-get update
-    sudo apt-get install -y k6 git
-
-    # 테스트 코드 클론
-    cd /home/ubuntu
-    git clone https://github.com/100-hours-a-week/5-team-service-cloud.git
-    chown -R ubuntu:ubuntu 5-team-service-cloud
-  SETUP
+  user_data = base64encode(
+    count.index == 0
+    ? file("${path.module}/scripts/user-data-monitoring.sh")
+    : file("${path.module}/scripts/user-data-runner.sh")
   )
 
   tags = {
@@ -161,7 +173,7 @@ resource "aws_instance" "runner" {
     Access  = "ssm-only"
   }
 
-  lifecycle { ignore_changes = [ami, user_data] }
+  lifecycle { ignore_changes = [ami] }
 
   depends_on = [
     aws_iam_role_policy_attachment.ssm_managed,
