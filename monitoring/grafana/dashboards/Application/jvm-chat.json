@@ -1352,7 +1352,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\", pod=~\"$pod\"}, pod)",
+        "definition": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\"}, pod)",
         "hide": 0,
         "includeAll": true,
         "label": "Pod",
@@ -1360,7 +1360,7 @@
         "name": "pod",
         "query": {
           "qryType": 1,
-          "query": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\", pod=~\"$pod\"}, pod)"
+          "query": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\"}, pod)"
         },
         "refresh": 2,
         "regex": "",
