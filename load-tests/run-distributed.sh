@@ -112,6 +112,7 @@ run_on_runner() {
   local k6_args=""
   if [ "$use_prom" = "true" ] && [ -n "$PROM_URL" ]; then
     cmd="${cmd} && export K6_PROMETHEUS_RW_SERVER_URL=${PROM_URL}/api/v1/write"
+    cmd="${cmd} && export K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true"
     k6_args="--out experimental-prometheus-rw"
   fi
 
@@ -174,6 +175,24 @@ run_command() {
   wait
   echo ""
   echo -e "${GREEN}전체 완료!${NC}"
+}
+
+# ── 테스트 중단 ──
+kill_tests() {
+  local runner_ips
+  runner_ips=$(get_runner_ips)
+
+  if [ -z "$runner_ips" ]; then
+    echo -e "${RED}실행 중인 러너가 없습니다.${NC}"
+    exit 1
+  fi
+
+  echo -e "${YELLOW}k6 프로세스 종료 중...${NC}"
+  for ip in $runner_ips; do
+    ssh ${SSH_OPTS} ${SSH_USER}@${ip} "pkill -f k6 2>/dev/null; echo 'killed on ${ip}'" &
+  done
+  wait
+  echo -e "${GREEN}전체 중단 완료.${NC}"
 }
 
 # ── 결과 확인 ──
@@ -259,6 +278,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --pull)   DO_PULL="true"; shift ;;
     --prom)   USE_PROM="true"; shift ;;
+    --kill)   kill_tests; exit 0 ;;
     --stop)   manage_runners stop; exit 0 ;;
     --start)  manage_runners start; exit 0 ;;
     --status) manage_runners status; exit 0 ;;
@@ -269,6 +289,7 @@ done
 
 case "$ACTION" in
   help|-h|--help) show_help ;;
+  --kill)   kill_tests ;;
   --stop)   manage_runners stop ;;
   --start)  manage_runners start ;;
   --status) manage_runners status ;;
