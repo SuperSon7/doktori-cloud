@@ -54,7 +54,7 @@
       },
       "targets": [
         {
-          "expr": "sum(chat_ws_sessions_active{app=\"chat\", env=\"$env\"})",
+          "expr": "sum(chat_ws_sessions_active{app=\"chat\", env=\"$env\", pod=~\"$pod\"})",
           "refId": "A"
         }
       ],
@@ -106,7 +106,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(chat_ws_connect_total{app=\"chat\", env=\"$env\", result=\"success\"}[5m]))",
+          "expr": "sum(rate(chat_ws_connect_total{app=\"chat\", env=\"$env\", pod=~\"$pod\", result=\"success\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -166,7 +166,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(chat_ws_connect_total{app=\"chat\", env=\"$env\", result=\"failure\"}[5m]))",
+          "expr": "sum(rate(chat_ws_connect_total{app=\"chat\", env=\"$env\", pod=~\"$pod\", result=\"failure\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -218,7 +218,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\", exception=\"none\"}[5m]))",
+          "expr": "sum(rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\", exception=\"none\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -259,8 +259,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (exception) (rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\"}[5m]))",
-          "legendFormat": "{{exception}}",
+          "expr": "sum by (exception) (rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\"}[5m]))",
+          "legendFormat": "{{pod}} {{exception}}",
           "refId": "A"
         }
       ],
@@ -301,13 +301,13 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(chat_message_send_seconds_sum{app=\"chat\", env=\"$env\", exception=\"none\"}[5m])) / clamp_min(sum(rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\", exception=\"none\"}[5m])), 1)",
-          "legendFormat": "평균",
+          "expr": "sum(rate(chat_message_send_seconds_sum{app=\"chat\", env=\"$env\", pod=~\"$pod\", exception=\"none\"}[5m])) / clamp_min(sum(rate(chat_message_send_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\", exception=\"none\"}[5m])), 1)",
+          "legendFormat": "{{pod}} 평균",
           "refId": "A"
         },
         {
-          "expr": "max(chat_message_send_seconds_max{app=\"chat\", env=\"$env\", exception=\"none\"})",
-          "legendFormat": "최대",
+          "expr": "max(chat_message_send_seconds_max{app=\"chat\", env=\"$env\", pod=~\"$pod\", exception=\"none\"})",
+          "legendFormat": "{{pod}} 최대",
           "refId": "B"
         }
       ],
@@ -348,8 +348,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", uri=~\"/chat-rooms.*|/ws.*\"}[5m]))",
-          "legendFormat": "{{method}} {{uri}}",
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\", uri=~\"/chat-rooms.*|/ws.*\"}[5m]))",
+          "legendFormat": "{{pod}} {{method}} {{uri}}",
           "refId": "A"
         }
       ],
@@ -390,8 +390,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", uri=~\"/chat-rooms.*|/ws.*\", status=~\"4..|5..\"}[5m]))",
-          "legendFormat": "{{method}} {{uri}} {{status}}",
+          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\", uri=~\"/chat-rooms.*|/ws.*\", status=~\"4..|5..\"}[5m]))",
+          "legendFormat": "{{pod}} {{method}} {{uri}} {{status}}",
           "refId": "A"
         }
       ],
@@ -432,8 +432,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_sum{app=\"chat\", env=\"$env\", uri=~\"/chat-rooms.*|/ws.*\"}[5m])) / clamp_min(sum by (method, uri) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", uri=~\"/chat-rooms.*|/ws.*\"}[5m])), 1)",
-          "legendFormat": "{{method}} {{uri}}",
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_sum{app=\"chat\", env=\"$env\", pod=~\"$pod\", uri=~\"/chat-rooms.*|/ws.*\"}[5m])) / clamp_min(sum by (method, uri) (rate(http_server_requests_seconds_count{app=\"chat\", env=\"$env\", pod=~\"$pod\", uri=~\"/chat-rooms.*|/ws.*\"}[5m])), 1)",
+          "legendFormat": "{{pod}} {{method}} {{uri}}",
           "refId": "A"
         }
       ],
@@ -463,7 +463,7 @@
       },
       "targets": [
         {
-          "expr": "{app=\"chat\", env=\"$env\"}",
+          "expr": "{app=\"chat\", env=\"$env\", pod=~\"$pod\"}",
           "refId": "A"
         }
       ],
@@ -503,6 +503,32 @@
         ],
         "query": "dev,prod",
         "type": "custom"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\"}, pod)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Pod",
+        "multi": true,
+        "name": "pod",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(process_uptime_seconds{app=\"chat\", env=\"$env\"}, pod)"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
