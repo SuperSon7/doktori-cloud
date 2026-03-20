@@ -37,7 +37,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "description": "Nginx request_time \uae30\ubc18 \uc804\uccb4 \ub808\uc774\ud134\uc2dc. rt - urt \ucc28\uc774\uac00 \ud06c\uba74 Nginx \uad6c\uac04 \uc9c0\uc5f0",
       "fieldConfig": {
@@ -170,7 +170,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -182,7 +182,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -194,7 +194,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -210,7 +210,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "description": "upstream_response_time \uae30\ubc18. Spring/Next/FastAPI \uc2e4\uc81c \ucc98\ub9ac \uc2dc\uac04",
       "fieldConfig": {
@@ -343,7 +343,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -355,7 +355,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -367,7 +367,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -383,7 +383,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "description": "API \uacbd\ub85c\ubcc4 \ub808\uc774\ud134\uc2dc. \uc815\uc801 \ub9ac\uc18c\uc2a4 \uc81c\uc678\ud558\uace0 /api/, /ai/ \uacbd\ub85c\ub9cc \ud45c\uc2dc",
       "fieldConfig": {
@@ -500,7 +500,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "builder",
@@ -512,7 +512,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -541,7 +541,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "description": "SLO \uae30\uc900\uc120: 0.1% (\ud29c\ub2dd \ud0c0\uac9f), 1% (\uc6b4\uc601 SLO)",
       "fieldConfig": {
@@ -633,7 +633,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -650,7 +650,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "description": "\uc0c1\ud0dc\ucf54\ub4dc\ubcc4 \uc694\uccad \uc218 \ucd94\uc774",
       "fieldConfig": {
@@ -797,7 +797,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -809,7 +809,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -821,7 +821,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -833,7 +833,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -1577,7 +1577,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "cfc7vb3nrhipsf"
+            "uid": "loki"
           },
           "expr": "{job=\"nginx-access\"}",
           "refId": "A"
@@ -1612,7 +1612,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "cfc7vb3nrhipsf"
+            "uid": "loki"
           },
           "expr": "{job=\"nginx-error\"}",
           "refId": "A"

@@ -3553,7 +3553,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "gridPos": {
         "h": 12,
@@ -3576,7 +3576,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
