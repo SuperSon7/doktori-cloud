@@ -104,3 +104,248 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
+---
+# ============================================================
+# Egress Policies
+# ============================================================
+
+# 7. default-deny-egress — prod namespace 전체 아웃바운드 차단
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# 8. DNS Egress 허용 — prod namespace 모든 Pod → kube-dns:53
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# 9. api → 같은 namespace 내 통신 + VPC 내부 AWS 서비스
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-egress
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      component: api
+  policyTypes:
+    - Egress
+  egress:
+    # 같은 namespace 내 Pod 통신 (api ↔ chat)
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
+    # RDS MySQL
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 3306
+          protocol: TCP
+    # Redis
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6379
+          protocol: TCP
+    # RabbitMQ
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 5672
+          protocol: TCP
+    # MongoDB
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 27017
+          protocol: TCP
+---
+# 10. chat → 같은 namespace 내 통신 + VPC 내부 AWS 서비스
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-chat-egress
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      component: chat
+  policyTypes:
+    - Egress
+  egress:
+    # 같은 namespace 내 Pod 통신
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
+    # RDS MySQL
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 3306
+          protocol: TCP
+    # Redis
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6379
+          protocol: TCP
+    # RabbitMQ
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 5672
+          protocol: TCP
+    # MongoDB
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 27017
+          protocol: TCP
+---
+# 11. monitoring namespace — default-deny-egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# 12. monitoring namespace — DNS Egress 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# 13. Alloy → prod namespace 메트릭 스크래핑 + 외부 remote_write
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alloy-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: alloy
+  policyTypes:
+    - Egress
+  egress:
+    # prod namespace Pod 메트릭 스크래핑
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: prod
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
+    # kube-state-metrics 스크래핑 (같은 namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kube-state-metrics
+      ports:
+        - port: 8080
+          protocol: TCP
+    # kubelet 메트릭 (모든 노드)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 10250
+          protocol: TCP
+    # kube-apiserver 메트릭
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6443
+          protocol: TCP
+    # Prometheus/Loki remote_write — HTTPS 외부 전송
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # VPC 내부 Loki/Prometheus (prod VPC)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 3100
+          protocol: TCP
+        - port: 9090
+          protocol: TCP
+    # mgmt VPC (monitoring.mgmt.doktori.internal) — Prometheus/Loki remote_write
+    - to:
+        - ipBlock:
+            cidr: 172.31.0.0/16
+      ports:
+        - port: 3100
+          protocol: TCP
+        - port: 9090
+          protocol: TCP

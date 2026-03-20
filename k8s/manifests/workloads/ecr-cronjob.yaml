@@ -12,7 +12,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "create", "delete"]
+    verbs: ["get", "create", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -49,26 +49,37 @@ spec:
                 - /bin/sh
                 - -c
                 - |
-                  set -e
-                  ECR_TOKEN=$(aws ecr get-login-password --region ap-northeast-2)
-                  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-                  API_SERVER="https://kubernetes.default.svc"
+                  set -euo pipefail
+
                   SECRET_NAME="ecr-credentials"
                   NS="prod"
+                  ECR_REGISTRY="250857930609.dkr.ecr.ap-northeast-2.amazonaws.com"
 
-                  curl -s -k -X DELETE "${API_SERVER}/api/v1/namespaces/${NS}/secrets/${SECRET_NAME}" \
-                    -H "Authorization: Bearer ${TOKEN}" || true
+                  # kubectl 설치
+                  echo "[1/3] Installing kubectl..."
+                  KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+                  curl -sLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/arm64/kubectl"
+                  chmod +x kubectl
+                  mv kubectl /usr/local/bin/
+                  echo "kubectl ${KUBECTL_VERSION} installed"
 
-                  DOCKER_CONFIG=$(echo -n "{\"auths\":{\"250857930609.dkr.ecr.ap-northeast-2.amazonaws.com\":{\"username\":\"AWS\",\"password\":\"${ECR_TOKEN}\"}}}" | base64 | tr -d '\n')
-                  curl -s -k -X POST "${API_SERVER}/api/v1/namespaces/${NS}/secrets" \
-                    -H "Authorization: Bearer ${TOKEN}" \
-                    -H "Content-Type: application/json" \
-                    -d "{
-                      \"apiVersion\": \"v1\",
-                      \"kind\": \"Secret\",
-                      \"metadata\": {\"name\": \"${SECRET_NAME}\", \"namespace\": \"${NS}\"},
-                      \"type\": \"kubernetes.io/dockerconfigjson\",
-                      \"data\": {\".dockerconfigjson\": \"${DOCKER_CONFIG}\"}
-                    }"
-                  echo "ECR token refreshed"
+                  # ECR 토큰 발급
+                  echo "[2/3] Fetching ECR token..."
+                  ECR_TOKEN=$(aws ecr get-login-password --region ap-northeast-2)
+                  if [ -z "${ECR_TOKEN}" ]; then
+                    echo "ERROR: Failed to get ECR token"
+                    exit 1
+                  fi
+                  echo "ECR token obtained (length: ${#ECR_TOKEN})"
+
+                  # kubectl로 Secret 생성/업데이트
+                  echo "[3/3] Updating secret ${SECRET_NAME}..."
+                  kubectl create secret docker-registry "${SECRET_NAME}" \
+                    --namespace="${NS}" \
+                    --docker-server="${ECR_REGISTRY}" \
+                    --docker-username=AWS \
+                    --docker-password="${ECR_TOKEN}" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
+                  echo "ECR token refreshed successfully"
           restartPolicy: OnFailure

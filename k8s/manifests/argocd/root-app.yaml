@@ -1,0 +1,31 @@
+# ArgoCD Root Application — App of Apps 패턴
+# k8s/manifests/argocd/apps/ 폴더의 자식 Application들을 관리
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: doktori-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: __GIT_REPO_URL__
+    targetRevision: main
+    path: k8s/manifests/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -42,7 +42,7 @@ notifications:
   enabled: false
 
 applicationSet:
-  enabled: false
+  enabled: true
 
 configs:
   params:
