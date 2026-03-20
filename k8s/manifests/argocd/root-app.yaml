@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: __GIT_REPO_URL__
+    repoURL: https://github.com/100-hours-a-week/5-team-service-cloud.git
     targetRevision: main
     path: k8s/manifests/argocd/apps
   destination:

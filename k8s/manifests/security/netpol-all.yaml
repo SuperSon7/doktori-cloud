@@ -120,6 +120,24 @@ spec:
   policyTypes:
     - Egress
 ---
+# 7-1. IMDS Egress 허용 — EC2 Instance Metadata (IAM credentials)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-imds-egress
+  namespace: prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - port: 80
+          protocol: TCP
+---
 # 8. DNS Egress 허용 — prod namespace 모든 Pod → kube-dns:53
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -190,6 +208,13 @@ spec:
       ports:
         - port: 27017
           protocol: TCP
+    # AWS VPC Endpoints (SSM, ECR, CloudWatch Logs 등)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
 ---
 # 10. chat → 같은 namespace 내 통신 + VPC 내부 AWS 서비스
 apiVersion: networking.k8s.io/v1
@@ -240,6 +265,13 @@ spec:
       ports:
         - port: 27017
           protocol: TCP
+    # AWS VPC Endpoints (SSM, ECR, CloudWatch Logs 등)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
 ---
 # 11. monitoring namespace — default-deny-egress
 apiVersion: networking.k8s.io/v1
@@ -251,6 +283,24 @@ spec:
   podSelector: {}
   policyTypes:
     - Egress
+---
+# 11-1. monitoring namespace — IMDS Egress 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-imds-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - port: 80
+          protocol: TCP
 ---
 # 12. monitoring namespace — DNS Egress 허용
 apiVersion: networking.k8s.io/v1
