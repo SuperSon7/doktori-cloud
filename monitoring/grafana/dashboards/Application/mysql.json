@@ -2587,6 +2587,7 @@
       },
       {
         "current": {
+          "selected": false,
           "text": "prod",
           "value": "prod"
         },
@@ -2594,14 +2595,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(mysql_up{instance=\"mysql\"}, env)",
+        "definition": "label_values(mysql_up, env)",
         "description": "Environment",
         "includeAll": false,
         "label": "Environment",
         "name": "env",
         "options": [],
         "query": {
-          "query": "label_values(mysql_up{instance=\"mysql\"}, env)",
+          "query": "label_values(mysql_up, env)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

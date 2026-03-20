@@ -249,7 +249,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "nginx_up{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "nginx_up{env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -324,7 +324,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_up{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "mysql_up{env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -399,7 +399,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "up{app=\"rabbitmq\", env=\"$env\", pod=~\"$pod\"}",
+          "expr": "up{app=\"rabbitmq\", env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -549,7 +549,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "probe_success{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "probe_success{env=\"$env\"}",
           "legendFormat": "{{pod}} {{instance}}",
           "refId": "A"
         }
@@ -817,7 +817,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", env=\"$env\", pod=~\"$pod\"}[5m]))",
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", env=\"$env\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -884,7 +884,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - (avg(node_memory_MemAvailable_bytes{env=\"$env\", pod=~\"$pod\"}) / avg(node_memory_MemTotal_bytes{env=\"$env\", pod=~\"$pod\"}))",
+          "expr": "1 - (avg(node_memory_MemAvailable_bytes{env=\"$env\"}) / avg(node_memory_MemTotal_bytes{env=\"$env\"}))",
           "legendFormat": "",
           "refId": "A"
         }
