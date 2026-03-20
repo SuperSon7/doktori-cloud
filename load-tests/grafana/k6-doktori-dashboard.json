@@ -1,0 +1,181 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "doktori-k6-loadtest",
+    "title": "Doktori Load Test",
+    "tags": ["k6", "loadtest"],
+    "timezone": "Asia/Seoul",
+    "refresh": "5s",
+    "time": { "from": "now-30m", "to": "now" },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Virtual Users",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+        "targets": [{ "expr": "k6_vus", "legendFormat": "VUs" }],
+        "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short" } }
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Rate (req/s)",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+        "targets": [{ "expr": "rate(k6_http_reqs_total[1m])", "legendFormat": "req/s" }],
+        "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "unit": "reqps" } }
+      },
+      {
+        "id": 3,
+        "title": "Iterations Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+        "targets": [{ "expr": "rate(k6_iterations_total[1m])", "legendFormat": "iter/s" }],
+        "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" }, "unit": "short" } }
+      },
+      {
+        "id": 4,
+        "title": "Response Time (P50 / P90 / P95 / P99)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "targets": [
+          { "expr": "histogram_quantile(0.50, k6_http_req_duration_seconds)", "legendFormat": "P50" },
+          { "expr": "histogram_quantile(0.90, k6_http_req_duration_seconds)", "legendFormat": "P90" },
+          { "expr": "histogram_quantile(0.95, k6_http_req_duration_seconds)", "legendFormat": "P95" },
+          { "expr": "histogram_quantile(0.99, k6_http_req_duration_seconds)", "legendFormat": "P99" }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+          "overrides": [
+            { "matcher": { "id": "byName", "options": "P95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+            { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Rates",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+        "targets": [
+          { "expr": "k6_http_req_failed_rate", "legendFormat": "HTTP Failed (4xx+5xx)" },
+          { "expr": "k6_errors_rate", "legendFormat": "5xx Errors (SLO-1)" },
+          { "expr": "k6_client_errors_rate", "legendFormat": "4xx Client Errors" }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "percentunit", "max": 0.1, "custom": { "fillOpacity": 20 } },
+          "overrides": [
+            { "matcher": { "id": "byName", "options": "5xx Errors (SLO-1)" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+            { "matcher": { "id": "byName", "options": "4xx Client Errors" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Response Time by Endpoint (P95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, sum by (le, name) (k6_http_req_duration_seconds))", "legendFormat": "{{name}}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 5 } } }
+      },
+      {
+        "id": 7,
+        "title": "Request Count by Endpoint",
+        "type": "bargauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+        "targets": [
+          { "expr": "sum by (name) (increase(k6_http_reqs_total[5m]))", "legendFormat": "{{name}}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "short" } },
+        "options": { "orientation": "horizontal", "displayMode": "gradient" }
+      },
+      {
+        "id": 8,
+        "title": "Failed Requests by Status Code",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+        "targets": [
+          { "expr": "sum by (status) (rate(k6_http_reqs_total{expected_response=\"false\"}[1m]))", "legendFormat": "HTTP {{status}}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 30 } } }
+      },
+      {
+        "id": 9,
+        "title": "Data Transfer",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 30 },
+        "targets": [
+          { "expr": "rate(k6_data_received_total[1m])", "legendFormat": "Received" },
+          { "expr": "rate(k6_data_sent_total[1m])", "legendFormat": "Sent" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "Bps" } }
+      },
+      {
+        "id": 10,
+        "title": "HTTP Timing Breakdown",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 12, "y": 30 },
+        "targets": [
+          { "expr": "histogram_quantile(0.5, k6_http_req_blocked_seconds)", "legendFormat": "Blocked" },
+          { "expr": "histogram_quantile(0.5, k6_http_req_connecting_seconds)", "legendFormat": "Connecting" },
+          { "expr": "histogram_quantile(0.5, k6_http_req_tls_handshaking_seconds)", "legendFormat": "TLS" },
+          { "expr": "histogram_quantile(0.5, k6_http_req_sending_seconds)", "legendFormat": "Sending" },
+          { "expr": "histogram_quantile(0.5, k6_http_req_waiting_seconds)", "legendFormat": "Waiting (TTFB)" },
+          { "expr": "histogram_quantile(0.5, k6_http_req_receiving_seconds)", "legendFormat": "Receiving" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s", "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 50 } } }
+      },
+      {
+        "id": 11,
+        "title": "SLO: API Availability (target: 99.5%)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 36 },
+        "targets": [
+          { "expr": "1 - k6_errors_rate", "legendFormat": "Availability" }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.99 }, { "color": "green", "value": 0.995 }] }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "SLO: P95 Latency (target: ≤1s)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 36 },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, k6_http_req_duration_seconds)", "legendFormat": "P95" }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "red", "value": 1 }] }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Check Pass Rate",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 36 },
+        "targets": [
+          { "expr": "k6_checks_rate", "legendFormat": "Checks" }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.95 }, { "color": "green", "value": 0.99 }] }
+          }
+        }
+      }
+    ],
+    "templating": { "list": [] },
+    "annotations": { "list": [] },
+    "schemaVersion": 39
+  },
+  "overwrite": true,
+  "folderId": 0
+}
