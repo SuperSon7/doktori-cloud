@@ -3,12 +3,13 @@
 # =============================================================================
 
 # --- etcd Encryption at Rest (master only) ---
+# 키를 첫 번째 마스터에서 1회 생성 → 전체 마스터에 동일 키 배포
 
 - name: Check if encryption config exists
   stat:
     path: /etc/kubernetes/enc/encryption-config.yaml
   register: enc_config
-  when: enable_etcd_encryption
+  when: enable_etcd_encryption and inventory_hostname in groups.get('k8s_master', [])
 
 - name: Create encryption config directory
   file:
@@ -16,16 +17,43 @@
     state: directory
     mode: "0700"
   become: true
-  when: enable_etcd_encryption and not enc_config.stat.exists
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
 
-- name: Generate encryption key
+# 첫 번째 마스터에서만 키 생성 (다른 마스터에 config이 없을 때)
+- name: Generate encryption key (first master only)
   shell: head -c 32 /dev/urandom | base64
-  register: enc_key
-  when: enable_etcd_encryption and not enc_config.stat.exists
+  register: enc_key_generated
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname == groups['k8s_master'][0]
+    - not enc_config.stat.exists
   no_log: true
   changed_when: false
 
-- name: Create EncryptionConfiguration
+# 첫 번째 마스터에 이미 config이 있으면 기존 키 읽기
+- name: Read existing encryption key (first master)
+  shell: "grep 'secret:' /etc/kubernetes/enc/encryption-config.yaml | awk '{print $2}'"
+  register: enc_key_existing
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname == groups['k8s_master'][0]
+    - enc_config.stat.exists
+  no_log: true
+  changed_when: false
+
+# 키를 fact로 설정 (새로 생성 or 기존)
+- name: Set encryption key fact on first master
+  set_fact:
+    etcd_encryption_key: "{{ enc_key_generated.stdout if enc_key_generated is not skipped and enc_key_generated.stdout is defined else enc_key_existing.stdout }}"
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname == groups['k8s_master'][0]
+  no_log: true
+
+# 전체 마스터에 키 배포 (첫 번째 마스터의 키를 사용)
+- name: Create EncryptionConfiguration (all masters, same key)
   copy:
     dest: /etc/kubernetes/enc/encryption-config.yaml
     content: |
@@ -38,11 +66,14 @@
             - aescbc:
                 keys:
                   - name: key1
-                    secret: {{ enc_key.stdout }}
+                    secret: {{ hostvars[groups['k8s_master'][0]]['etcd_encryption_key'] }}
             - identity: {}
     mode: "0600"
   become: true
-  when: enable_etcd_encryption and not enc_config.stat.exists
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
+    - not enc_config.stat.exists
   no_log: true
 
 - name: Check if apiserver has encryption flag
@@ -50,7 +81,9 @@
   register: enc_flag_check
   changed_when: false
   become: true
-  when: enable_etcd_encryption
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
 
 - name: Backup kube-apiserver manifest
   copy:
@@ -58,7 +91,10 @@
     dest: /etc/kubernetes/manifests/kube-apiserver.yaml.backup
     remote_src: true
   become: true
-  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
+    - enc_flag_check.stdout == "0"
 
 - name: Patch kube-apiserver for encryption
   shell: |
@@ -73,15 +109,21 @@
 
     # Add volume (before k8s-certs volume definition)
     sed -i '/- hostPath:/,/name: k8s-certs/{/- hostPath:/{i\  - hostPath:\n      path: /etc/kubernetes/enc\n      type: DirectoryOrCreate\n    name: encryption-config
-}}' "$MANIFEST"
+    }}' "$MANIFEST"
   become: true
-  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
+    - enc_flag_check.stdout == "0"
   changed_when: true
   notify: wait for apiserver
 
 - name: Flush handlers (wait for apiserver restart)
   meta: flush_handlers
-  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname in groups.get('k8s_master', [])
+    - enc_flag_check.stdout == "0"
 
 - name: Re-encrypt existing secrets
   shell: |
@@ -90,7 +132,10 @@
     done
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
-  when: enable_etcd_encryption and enc_flag_check.stdout == "0"
+  when:
+    - enable_etcd_encryption
+    - inventory_hostname == groups['k8s_master'][0]
+    - enc_flag_check.stdout == "0"
   changed_when: false
 
 # --- kubelet Hardening (all nodes) ---

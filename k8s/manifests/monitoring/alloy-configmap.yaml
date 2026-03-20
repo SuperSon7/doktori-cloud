@@ -313,6 +313,24 @@ data:
       forward_to = [loki.write.monitoring.receiver]
     }
 
+    // =============================================================
+    // 9. Kubernetes Events → Loki
+    // =============================================================
+    loki.source.kubernetes_events "events" {
+      namespaces = ["prod", "kube-system", "monitoring"]
+      forward_to = [loki.process.k8s_events.receiver]
+    }
+
+    loki.process "k8s_events" {
+      stage.static_labels {
+        values = {
+          env    = "prod",
+          source = "k8s-events",
+        }
+      }
+      forward_to = [loki.write.monitoring.receiver]
+    }
+
     loki.write "monitoring" {
       endpoint {
         url = "http://monitoring.mgmt.doktori.internal:3100/loki/api/v1/push"

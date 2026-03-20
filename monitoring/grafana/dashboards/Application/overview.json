@@ -14,7 +14,7 @@
       }
     ]
   },
-  "description": "Service Overview — 전체 서비스 상태 한눈에 보기",
+  "description": "Service Overview \u2014 \uc804\uccb4 \uc11c\ube44\uc2a4 \uc0c1\ud0dc \ud55c\ub208\uc5d0 \ubcf4\uae30",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -75,7 +75,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 1
       },
@@ -150,8 +150,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 6,
+        "x": 6,
         "y": 1
       },
       "id": 2,
@@ -225,8 +225,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 1
       },
       "id": 3,
@@ -249,7 +249,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "nginx_up{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "nginx_up{env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -300,8 +300,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 11,
+        "w": 6,
+        "x": 18,
         "y": 1
       },
       "id": 4,
@@ -324,7 +324,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_up{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "mysql_up{env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -375,9 +375,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 14,
-        "y": 1
+        "w": 6,
+        "x": 0,
+        "y": 5
       },
       "id": 8,
       "options": {
@@ -399,7 +399,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "up{app=\"rabbitmq\", env=\"$env\", pod=~\"$pod\"}",
+          "expr": "up{app=\"rabbitmq\", env=\"$env\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -450,9 +450,84 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 17,
-        "y": 1
+        "w": 6,
+        "x": 6,
+        "y": 5
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "redis_up{env=\"$env\"}",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Redis Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 5
       },
       "id": 5,
       "options": {
@@ -474,7 +549,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "probe_success{env=\"$env\", pod=~\"$pod\"}",
+          "expr": "probe_success{env=\"$env\"}",
           "legendFormat": "{{pod}} {{instance}}",
           "refId": "A"
         }
@@ -507,9 +582,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 1
+        "w": 6,
+        "x": 18,
+        "y": 5
       },
       "id": 6,
       "options": {
@@ -545,7 +620,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 9
       },
       "id": 101,
       "title": "Error & Response",
@@ -588,7 +663,7 @@
         "h": 5,
         "w": 4,
         "x": 0,
-        "y": 6
+        "y": 10
       },
       "id": 7,
       "options": {
@@ -653,7 +728,7 @@
         "h": 5,
         "w": 4,
         "x": 4,
-        "y": 6
+        "y": 10
       },
       "id": 8,
       "options": {
@@ -720,7 +795,7 @@
         "h": 5,
         "w": 4,
         "x": 8,
-        "y": 6
+        "y": 10
       },
       "id": 9,
       "options": {
@@ -742,7 +817,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", env=\"$env\", pod=~\"$pod\"}[5m]))",
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", env=\"$env\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -787,7 +862,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 6
+        "y": 10
       },
       "id": 10,
       "options": {
@@ -809,7 +884,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - (avg(node_memory_MemAvailable_bytes{env=\"$env\", pod=~\"$pod\"}) / avg(node_memory_MemTotal_bytes{env=\"$env\", pod=~\"$pod\"}))",
+          "expr": "1 - (avg(node_memory_MemAvailable_bytes{env=\"$env\"}) / avg(node_memory_MemTotal_bytes{env=\"$env\"}))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -823,7 +898,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 15
       },
       "id": 102,
       "title": "Traffic",
@@ -889,7 +964,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 16
       },
       "id": 11,
       "options": {
@@ -985,7 +1060,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 16
       },
       "id": 12,
       "options": {
@@ -1023,7 +1098,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "id": 103,
       "title": "Dashboard Links",
@@ -1038,7 +1113,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 25
       },
       "id": 13,
       "options": {

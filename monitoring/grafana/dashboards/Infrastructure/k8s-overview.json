@@ -374,7 +374,7 @@
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
       "targets": [
         {
-          "expr": "1 - avg by (node) (rate(node_cpu_seconds_total{mode=\"idle\", env=\"prod-k8s\"}[5m]))",
+          "expr": "1 - avg by (node) (rate(node_cpu_seconds_total{mode=\"idle\", env=\"prod\"}[5m]))",
           "legendFormat": "{{ node }}"
         }
       ],
@@ -403,7 +403,7 @@
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
       "targets": [
         {
-          "expr": "1 - (node_memory_MemAvailable_bytes{env=\"prod-k8s\"} / node_memory_MemTotal_bytes{env=\"prod-k8s\"})",
+          "expr": "1 - (node_memory_MemAvailable_bytes{env=\"prod\"} / node_memory_MemTotal_bytes{env=\"prod\"})",
           "legendFormat": "{{ instance }}"
         }
       ],
@@ -475,6 +475,59 @@
           "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
           "unit": "bytes"
         }
+      }
+    }
+    {
+      "id": 50,
+      "title": "Kubernetes Events",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }
+    },
+    {
+      "id": 51,
+      "title": "K8s Events (Warning)",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "targets": [
+        {
+          "expr": "{source=\"k8s-events\"} |= \"Warning\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 52,
+      "title": "K8s Events (All)",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "targets": [
+        {
+          "expr": "{source=\"k8s-events\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
       }
     }
   ],
