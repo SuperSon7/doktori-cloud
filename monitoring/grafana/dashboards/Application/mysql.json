@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "The Dashboard display Visualization Data from MySQL Exporter configured with Prometheus Database",
+  "description": "MySQL metrics from dev (local) and prod (RDS) via Alloy mysql exporter",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -127,7 +127,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (command) (\n  rate(mysql_global_status_commands_total{\n    instance=\"$host\",\n    command=~\"select|insert|update|delete\"\n  }[5m])\n)",
+          "expr": "sum by (command) (\n  rate(mysql_global_status_commands_total{\n    env=\"$env\", instance=\"mysql\",\n    command=~\"select|insert|update|delete\"\n  }[5m])\n)",
           "legendFormat": "{{command}}",
           "range": true,
           "refId": "A"
@@ -202,7 +202,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (command) (\n  increase(mysql_global_status_commands_total{\n    instance=\"$host\",\n    command=~\"select|insert|update|delete\"\n  }[1h])\n)",
+          "expr": "sum by (command) (\n  increase(mysql_global_status_commands_total{\n    env=\"$env\", instance=\"mysql\",\n    command=~\"select|insert|update|delete\"\n  }[1h])\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -267,7 +267,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(increase(mysql_global_status_queries{instance=\"$host\"}[1h]))",
+          "expr": "sum(increase(mysql_global_status_queries{env=\"$env\", instance=\"mysql\"}[1h]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -332,7 +332,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(mysql_global_status_queries{instance=\"$host\"}[5m]))",
+          "expr": "sum(rate(mysql_global_status_queries{env=\"$env\", instance=\"mysql\"}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -394,7 +394,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(mysql_global_status_commands_total{\n  instance=\"$host\",\n  command=\"select\"\n}[5m]))",
+          "expr": "sum(rate(mysql_global_status_commands_total{\n  env=\"$env\", instance=\"mysql\",\n  command=\"select\"\n}[5m]))",
           "legendFormat": "select",
           "range": true,
           "refId": "A"
@@ -405,7 +405,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mysql_global_status_commands_total{\n  instance=\"$host\",\n  command=~\"insert|update|delete\"\n}[5m]))",
+          "expr": "sum(rate(mysql_global_status_commands_total{\n  env=\"$env\", instance=\"mysql\",\n  command=~\"insert|update|delete\"\n}[5m]))",
           "hide": false,
           "instant": false,
           "legendFormat": "write",
@@ -472,7 +472,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "mysql_global_status_threads_connected{instance=\"$host\"}",
+          "expr": "mysql_global_status_threads_connected{env=\"$env\", instance=\"mysql\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -567,7 +567,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_queries{instance=\"$host\"}[5m])",
+          "expr": "rate(mysql_global_status_queries{env=\"$env\", instance=\"mysql\"}[5m])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -663,7 +663,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(mysql_global_variables_innodb_buffer_pool_size{instance=\"$host\"} * 100) / on (instance) node_memory_MemTotal_bytes{instance=\"$host\"}",
+          "expr": "(mysql_global_variables_innodb_buffer_pool_size{env=\"$env\", instance=\"mysql\"} * 100) / on (instance) node_memory_MemTotal_bytes{env=\"$env\", instance=\"mysql\"}",
           "interval": "5m",
           "legendFormat": "",
           "refId": "A"
@@ -737,7 +737,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_status_uptime{instance=\"$host\"}",
+          "expr": "mysql_global_status_uptime{env=\"$env\", instance=\"mysql\"}",
           "interval": "5m",
           "legendFormat": "",
           "refId": "A"
@@ -817,7 +817,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_variables_innodb_buffer_pool_size{instance=\"$host\"}",
+          "expr": "mysql_global_variables_innodb_buffer_pool_size{env=\"$env\", instance=\"mysql\"}",
           "interval": "$interval",
           "legendFormat": "",
           "refId": "A"
@@ -891,7 +891,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mysql_global_status_queries{instance=\"$host\"}[$interval]) or irate(mysql_global_status_queries{instance=\"$host\"}[5m])",
+          "expr": "rate(mysql_global_status_queries{env=\"$env\", instance=\"mysql\"}[$interval]) or irate(mysql_global_status_queries{env=\"$env\", instance=\"mysql\"}[5m])",
           "interval": "$interval",
           "legendFormat": "",
           "refId": "A"
@@ -1014,7 +1014,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(max_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[$interval])  or mysql_global_status_threads_connected{instance=\"$host\"} )",
+          "expr": "max(max_over_time(mysql_global_status_threads_connected{env=\"$env\", instance=\"mysql\"}[$interval])  or mysql_global_status_threads_connected{env=\"$env\", instance=\"mysql\"} )",
           "interval": "$interval",
           "legendFormat": "Connections",
           "refId": "A"
@@ -1024,7 +1024,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_status_max_used_connections{instance=\"$host\"}",
+          "expr": "mysql_global_status_max_used_connections{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Max Used Connections",
@@ -1035,7 +1035,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_variables_max_connections{instance=\"$host\"}",
+          "expr": "mysql_global_variables_max_connections{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Max Connections",
@@ -1183,7 +1183,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_connected{instance=\"$host\"}[5m])",
+          "expr": "max_over_time(mysql_global_status_threads_connected{env=\"$env\", instance=\"mysql\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_connected{env=\"$env\", instance=\"mysql\"}[5m])",
           "interval": "$interval",
           "legendFormat": "Peak Threads Connected",
           "refId": "A"
@@ -1193,7 +1193,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max_over_time(mysql_global_status_threads_running{instance=\"$host\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_running{instance=\"$host\"}[5m])",
+          "expr": "max_over_time(mysql_global_status_threads_running{env=\"$env\", instance=\"mysql\"}[$interval]) or\r\nmax_over_time(mysql_global_status_threads_running{env=\"$env\", instance=\"mysql\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Peak Threads Running",
@@ -1204,7 +1204,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "avg_over_time(mysql_global_status_threads_running{instance=\"$host\"}[$interval]) or \r\navg_over_time(mysql_global_status_threads_running{instance=\"$host\"}[5m])",
+          "expr": "avg_over_time(mysql_global_status_threads_running{env=\"$env\", instance=\"mysql\"}[$interval]) or \r\navg_over_time(mysql_global_status_threads_running{env=\"$env\", instance=\"mysql\"}[5m])",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Avg Threads Running",
@@ -1328,7 +1328,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, rate(mysql_global_status_commands_total{instance=\"$host\"}[$interval])>0) or topk(5, irate(mysql_global_status_commands_total{instance=\"$host\"}[5m])>0)",
+          "expr": "topk(5, rate(mysql_global_status_commands_total{env=\"$env\", instance=\"mysql\"}[$interval])>0) or topk(5, irate(mysql_global_status_commands_total{env=\"$env\", instance=\"mysql\"}[5m])>0)",
           "interval": "$interval",
           "legendFormat": "Com_{{ command }}",
           "refId": "A"
@@ -1440,7 +1440,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, increase(mysql_global_status_commands_total{instance=\"$host\"}[1h])>0)",
+          "expr": "topk(5, increase(mysql_global_status_commands_total{env=\"$env\", instance=\"mysql\"}[1h])>0)",
           "interval": "15m",
           "legendFormat": "Com_{{ command }}",
           "refId": "A"
@@ -1544,7 +1544,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mysql_global_status_handlers_total{instance=\"$host\", handler!~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{instance=\"$host\", handler!~\"commit|rollback|savepoint.*|prepare\"}[5m])",
+          "expr": "rate(mysql_global_status_handlers_total{env=\"$env\", instance=\"mysql\", handler!~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{env=\"$env\", instance=\"mysql\", handler!~\"commit|rollback|savepoint.*|prepare\"}[5m])",
           "interval": "$interval",
           "legendFormat": "{{ handler }}",
           "refId": "A"
@@ -1648,7 +1648,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mysql_global_status_handlers_total{instance=\"$host\", handler=~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{instance=\"$host\", handler=~\"commit|rollback|savepoint.*|prepare\"}[5m])\r",
+          "expr": "rate(mysql_global_status_handlers_total{env=\"$env\", instance=\"mysql\", handler=~\"commit|rollback|savepoint.*|prepare\"}[$interval]) or irate(mysql_global_status_handlers_total{env=\"$env\", instance=\"mysql\", handler=~\"commit|rollback|savepoint.*|prepare\"}[5m])\r",
           "interval": "$interval",
           "legendFormat": "{{ handler }}",
           "refId": "A"
@@ -1766,7 +1766,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_slow_queries{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_slow_queries{env=\"$env\", instance=\"mysql\"}[$interval])",
           "legendFormat": "Slow Queries",
           "range": true,
           "refId": "A"
@@ -1871,7 +1871,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_innodb_rows_read{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_innodb_rows_read{env=\"$env\", instance=\"mysql\"}[$interval])",
           "legendFormat": "Rows Read",
           "range": true,
           "refId": "A"
@@ -1882,7 +1882,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_innodb_rows_inserted{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_innodb_rows_inserted{env=\"$env\", instance=\"mysql\"}[$interval])",
           "hide": false,
           "legendFormat": "Rows Inserted",
           "range": true,
@@ -1894,7 +1894,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_innodb_rows_updated{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_innodb_rows_updated{env=\"$env\", instance=\"mysql\"}[$interval])",
           "hide": false,
           "legendFormat": "Rows Updated",
           "range": true,
@@ -1906,7 +1906,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_innodb_rows_deleted{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_innodb_rows_deleted{env=\"$env\", instance=\"mysql\"}[$interval])",
           "hide": false,
           "legendFormat": "Rows Deleted",
           "range": true,
@@ -2012,7 +2012,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_select_scan{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_select_scan{env=\"$env\", instance=\"mysql\"}[$interval])",
           "legendFormat": "Full Table Scan",
           "range": true,
           "refId": "A"
@@ -2023,7 +2023,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_select_full_join{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_select_full_join{env=\"$env\", instance=\"mysql\"}[$interval])",
           "hide": false,
           "legendFormat": "Full Join (no index)",
           "range": true,
@@ -2035,7 +2035,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_created_tmp_disk_tables{instance=\"$host\"}[$interval])",
+          "expr": "rate(mysql_global_status_created_tmp_disk_tables{env=\"$env\", instance=\"mysql\"}[$interval])",
           "hide": false,
           "legendFormat": "Tmp Tables on Disk",
           "range": true,
@@ -2179,7 +2179,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_status_innodb_page_size{instance=\"$host\"} * on (instance) mysql_global_status_buffer_pool_pages{instance=\"$host\",state=\"data\"}",
+          "expr": "mysql_global_status_innodb_page_size{env=\"$env\", instance=\"mysql\"} * on (instance) mysql_global_status_buffer_pool_pages{env=\"$env\", instance=\"mysql\",state=\"data\"}",
           "interval": "",
           "legendFormat": "InnoDB Buffer Pool Data",
           "refId": "A"
@@ -2189,7 +2189,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "node_memory_MemTotal_bytes{instance=\"$host\"}",
+          "expr": "node_memory_MemTotal_bytes{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "intervalFactor": 2,
@@ -2201,7 +2201,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_variables_innodb_log_buffer_size{instance=\"$host\"}",
+          "expr": "mysql_global_variables_innodb_log_buffer_size{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "InnoDB Log Buffer Size",
@@ -2212,7 +2212,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_variables_innodb_additional_mem_pool_size{instance=\"$host\"}",
+          "expr": "mysql_global_variables_innodb_additional_mem_pool_size{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "intervalFactor": 2,
@@ -2224,7 +2224,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_status_innodb_mem_dictionary{instance=\"$host\"}",
+          "expr": "mysql_global_status_innodb_mem_dictionary{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "InnoDB Dictionary Size",
@@ -2235,7 +2235,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_variables_key_buffer_size{instance=\"$host\"}",
+          "expr": "mysql_global_variables_key_buffer_size{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Key Buffer Size",
@@ -2246,7 +2246,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mysql_global_status_innodb_mem_adaptive_hash{instance=\"$host\"}",
+          "expr": "mysql_global_status_innodb_mem_adaptive_hash{env=\"$env\", instance=\"mysql\"}",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Adaptive Hash Index Size",
@@ -2364,7 +2364,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mysql_global_status_bytes_received{instance=\"$host\"}[$interval]) or irate(mysql_global_status_bytes_received{instance=\"$host\"}[5m])",
+          "expr": "rate(mysql_global_status_bytes_received{env=\"$env\", instance=\"mysql\"}[$interval]) or irate(mysql_global_status_bytes_received{env=\"$env\", instance=\"mysql\"}[5m])",
           "interval": "$interval",
           "legendFormat": "Inbound",
           "refId": "A"
@@ -2374,7 +2374,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mysql_global_status_bytes_sent{instance=\"$host\"}[$interval]) or irate(mysql_global_status_bytes_sent{instance=\"$host\"}[5m])",
+          "expr": "rate(mysql_global_status_bytes_sent{env=\"$env\", instance=\"mysql\"}[$interval]) or irate(mysql_global_status_bytes_sent{env=\"$env\", instance=\"mysql\"}[5m])",
           "hide": false,
           "interval": "$interval",
           "legendFormat": "Outbound",
@@ -2501,7 +2501,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "increase(mysql_global_status_bytes_received{instance=\"$host\"}[1h])",
+          "expr": "increase(mysql_global_status_bytes_received{env=\"$env\", instance=\"mysql\"}[1h])",
           "interval": "30m",
           "legendFormat": "Received",
           "refId": "A"
@@ -2511,7 +2511,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "increase(mysql_global_status_bytes_sent{instance=\"$host\"}[1h])",
+          "expr": "increase(mysql_global_status_bytes_sent{env=\"$env\", instance=\"mysql\"}[1h])",
           "hide": false,
           "interval": "30m",
           "legendFormat": "Sent",
@@ -2587,25 +2587,24 @@
       },
       {
         "current": {
-          "text": "3.37.180.158:9104",
-          "value": "3.37.180.158:9104"
+          "text": "prod",
+          "value": "prod"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(mysql_up, instance)",
-        "description": "Server to Monitor",
+        "definition": "label_values(mysql_up{instance=\"mysql\"}, env)",
+        "description": "Environment",
         "includeAll": false,
-        "label": "Server",
-        "name": "host",
+        "label": "Environment",
+        "name": "env",
         "options": [],
         "query": {
-          "query": "label_values(mysql_up, instance)",
+          "query": "label_values(mysql_up{instance=\"mysql\"}, env)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "",
         "type": "query"
       }
     ]
@@ -2616,7 +2615,7 @@
   },
   "timepicker": {},
   "timezone": "Asia/Seoul",
-  "title": "MySQL Dashboard",
+  "title": "MySQL / RDS",
   "uid": "r4uc0hUGk",
   "version": 5,
   "weekStart": ""

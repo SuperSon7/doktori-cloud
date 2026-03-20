@@ -21,8 +21,38 @@
   ],
   "panels": [
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 200,
+      "title": "Trace Lookup — traceId를 입력하면 해당 요청의 전체 로그를 조회합니다",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "description": "traceId 변수에 값을 입력하면 해당 요청의 전체 로그 흐름을 시간순으로 조회합니다. ERROR 로그에서 traceId를 복사 → 이 패널에서 전체 요청 추적.",
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 1 },
+          "id": 201,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": true,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=~\"api|chat\", env=\"$env\", traceId=\"$traceId\"}", "legendFormat": "", "refId": "A" }
+          ],
+          "title": "Request Trace — traceId: $traceId",
+          "type": "logs"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
       "id": 100,
       "title": "Overview",
       "type": "row"
@@ -375,6 +405,16 @@
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
+      },
+      {
+        "current": { "selected": false, "text": "", "value": "" },
+        "hide": 0,
+        "label": "Trace ID",
+        "name": "traceId",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
       }
     ]
   },

@@ -293,9 +293,9 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }
       },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(20, histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{env=\"$env\", app=~\"$app\"}[5m]))) > 1)", "format": "table", "instant": true, "legendFormat": "", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(20, histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{env=\"$env\", app=~\"$app\"}[5m]))))", "format": "table", "instant": true, "legendFormat": "", "refId": "A" }
       ],
-      "title": "Slow Endpoints (p99 > 1s)",
+      "title": "Slow Endpoints (p99 Top 20)",
       "type": "table",
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "method": "Method", "uri": "URI", "Value": "p99 Duration" } } }

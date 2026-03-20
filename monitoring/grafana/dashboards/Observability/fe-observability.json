@@ -1,0 +1,1426 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 49,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` [5m])) / 300",
+          "legendFormat": "frontend rps",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" [5m])) / 300",
+          "legendFormat": "image rps",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "프론트엔드 요청 수",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.50, {app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p50",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p95",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "expr": "quantile_over_time(0.99, {app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p99",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "title": "프론트엔드 응답 시간 p50 / p95 / p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.50, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p50",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p95",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "expr": "quantile_over_time(0.99, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m])",
+          "legendFormat": "p99",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "title": "이미지 최적화 응답 시간",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "100 * (sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" [5m])) or vector(0)) / ((sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" [5m])) or vector(0)) + (sum(count_over_time({app=\"nginx\", env=\"dev\"} | regexp `\\\"(?P<method>[A-Z]+) (?P<path>[^ ]+) HTTP/[0-9.]+\\\"` | path !~ `/_next/image.*` | path =~ `.*\\.(jpg|jpeg|png|webp|gif|avif|svg)(\\?.*)?$` [5m])) or vector(0)))",
+          "legendFormat": "최적화 적용률",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "최적화 적용 비율",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` |~ `\\\" 2\\d{2} ` [5m]))",
+          "legendFormat": "2xx",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` |~ `\\\" 3\\d{2} ` [5m]))",
+          "legendFormat": "3xx",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` |~ `\\\" 4\\d{2} ` [5m]))",
+          "legendFormat": "4xx",
+          "queryType": "range",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/` |~ `\\\" 5\\d{2} ` [5m]))",
+          "legendFormat": "5xx",
+          "queryType": "range",
+          "refId": "D"
+        }
+      ],
+      "title": "프론트엔드 상태 코드 분포",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" [5m]))",
+          "legendFormat": "image requests",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |~ `\\\" 4\\d{2} ` [5m]))",
+          "legendFormat": "image 4xx",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |~ `\\\" 5\\d{2} ` [5m]))",
+          "legendFormat": "image 5xx",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "title": "이미지 최적화 상태",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "showControls": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "{app=\"nginx\", env=\"dev\"} |~ `\\\"(GET|HEAD|POST|PUT|DELETE|OPTIONS) ` !~ `\\\"[A-Z]+ /api/`",
+          "refId": "A"
+        }
+      ],
+      "title": "프론트엔드 접근 로그",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"nginx\", env=\"dev\"} | regexp `\"(?P<method>[A-Z]+) (?P<path>[^ ]+) HTTP/[0-9.]+\"` | path !~ `/_next/image.*` | path =~ `.*\\.(jpg|jpeg|png|webp|gif|avif|svg)(\\?.*)?$` [5m]))",
+          "legendFormat": "직접 이미지 요청",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "최적화 미적용 이미지 요청",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "showControls": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "expr": "{app=\"nginx\", env=\"dev\"} |= \"/_next/image\"",
+          "refId": "A"
+        }
+      ],
+      "title": "이미지 최적화 로그",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "시간"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "상태코드"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답크기"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답시간"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "요청경로"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 1200
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "시간"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "{app=\"nginx\", env=\"dev\"} |= \"/_next/image\" | regexp `.*\"[A-Z]+ (?P<path>[^ ]+) HTTP/[0-9.]+\" (?P<status>[0-9]{3}) (?P<bytes>[0-9]+) \".*\" \".*\" rt=(?P<request_time>[0-9.]+).*` | line_format `{\"status\":\"{{.status}}\",\"bytes\":\"{{.bytes}}\",\"request_time\":\"{{.request_time}}\",\"path\":\"{{.path}}\"}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "이미지 요청 상세",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "replace": true,
+            "source": "Line"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "app": true,
+              "detected_level": true,
+              "env": true,
+              "id": true,
+              "instance": true,
+              "labelTypes": true,
+              "labels": true,
+              "service_name": true,
+              "tsNs": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "bytes": 2,
+              "path": 4,
+              "request_time": 3,
+              "status": 1
+            },
+            "renameByName": {
+              "Time": "시간",
+              "bytes": "응답크기",
+              "path": "요청경로",
+              "request_time": "응답시간",
+              "status": "상태코드"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=HIT\" [5m])) or vector(0)) / ((sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=HIT\" [5m])) or vector(0)) + (sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=MISS\" [5m])) or vector(0)) + (sum(count_over_time({app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=STALE\" [5m])) or vector(0)))",
+          "legendFormat": "HIT 비율",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "이미지 캐시 적중률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.95, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=HIT\" | regexp `rt=(?P<request_time>[0-9.]+)` | unwrap request_time [5m])",
+          "legendFormat": "HIT p95",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=MISS\" | regexp `rt=(?P<request_time>[0-9.]+)` | unwrap request_time [5m])",
+          "legendFormat": "MISS p95",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=STALE\" | regexp `rt=(?P<request_time>[0-9.]+)` | unwrap request_time [5m])",
+          "legendFormat": "STALE p95",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "title": "캐시 상태별 응답 시간",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "시간"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "캐시상태"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "상태코드"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답크기"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답시간"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "요청경로"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 900
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "시간"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "{app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=HIT\" | regexp `.*\"[A-Z]+ (?P<path>[^ ]+) HTTP/[0-9.]+\" (?P<status>[0-9]{3}) (?P<bytes>[0-9]+) \".*\" \".*\" rt=(?P<request_time>[0-9.]+).* xnc=(?P<cache_state>[A-Z]+)` | line_format `{\"status\":\"{{.status}}\",\"bytes\":\"{{.bytes}}\",\"request_time\":\"{{.request_time}}\",\"path\":\"{{.path}}\",\"cache_state\":\"{{.cache_state}}\"}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "이미지 캐시 HIT 상세",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "replace": true,
+            "source": "Line"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "app": true,
+              "detected_level": true,
+              "env": true,
+              "id": true,
+              "instance": true,
+              "labelTypes": true,
+              "labels": true,
+              "service_name": true,
+              "tsNs": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "bytes": 3,
+              "cache_state": 1,
+              "path": 5,
+              "request_time": 4,
+              "status": 2
+            },
+            "renameByName": {
+              "Time": "시간",
+              "bytes": "응답크기",
+              "cache_state": "캐시상태",
+              "path": "요청경로",
+              "request_time": "응답시간",
+              "status": "상태코드"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "시간"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "캐시상태"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "상태코드"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답크기"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "응답시간"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "요청경로"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 900
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "id": 16,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "시간"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "{app=\"nginx\", env=\"dev\"} |= \"/_next/image\" |= \"xnc=MISS\" | regexp `.*\"[A-Z]+ (?P<path>[^ ]+) HTTP/[0-9.]+\" (?P<status>[0-9]{3}) (?P<bytes>[0-9]+) \".*\" \".*\" rt=(?P<request_time>[0-9.]+).* xnc=(?P<cache_state>[A-Z]+)` | line_format `{\"status\":\"{{.status}}\",\"bytes\":\"{{.bytes}}\",\"request_time\":\"{{.request_time}}\",\"path\":\"{{.path}}\",\"cache_state\":\"{{.cache_state}}\"}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "이미지 캐시 MISS 상세",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "replace": true,
+            "source": "Line"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "app": true,
+              "detected_level": true,
+              "env": true,
+              "id": true,
+              "instance": true,
+              "labelTypes": true,
+              "labels": true,
+              "service_name": true,
+              "tsNs": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "bytes": 3,
+              "cache_state": 1,
+              "path": 5,
+              "request_time": 4,
+              "status": 2
+            },
+            "renameByName": {
+              "Time": "시간",
+              "bytes": "응답크기",
+              "cache_state": "캐시상태",
+              "path": "요청경로",
+              "request_time": "응답시간",
+              "status": "상태코드"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 42,
+  "tags": [
+    "frontend",
+    "nginx",
+    "loki",
+    "dev",
+    "edge"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FE Observability",
+  "uid": "dev-frontend-edge-lens",
+  "version": 20,
+  "weekStart": ""
+}

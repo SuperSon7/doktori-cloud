@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 1,
+  "id": 34,
   "links": [],
   "panels": [
     {
@@ -115,7 +115,7 @@
           "refId": "A"
         }
       ],
-      "title": "API p95 \uc751\ub2f5\uc2dc\uac04 Top 10",
+      "title": "API p95 응답시간 Top 10",
       "type": "timeseries"
     },
     {
@@ -211,7 +211,7 @@
           "refId": "A"
         }
       ],
-      "title": "API p99 \uc751\ub2f5\uc2dc\uac04 Top 10",
+      "title": "API p99 응답시간 Top 10",
       "type": "timeseries"
     },
     {
@@ -219,7 +219,7 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "\ud604\uc7ac/\ud65c\uc131/\ucd5c\ub300 Tomcat \uc2a4\ub808\ub4dc \uc218. Busy\uac00 Max\uc5d0 \uadfc\uc811\ud558\uba74 \uc694\uccad \ucc98\ub9ac \ubcd1\ubaa9 \ubc1c\uc0dd \uac00\ub2a5",
+      "description": "현재/활성/최대 Tomcat 스레드 수. Busy가 Max에 근접하면 요청 처리 병목 발생 가능",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -332,7 +332,7 @@
           "refId": "C"
         }
       ],
-      "title": "Tomcat \uc2a4\ub808\ub4dc",
+      "title": "Tomcat 스레드",
       "type": "timeseries"
     },
     {
@@ -340,7 +340,7 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "JVM \uc2a4\ub808\ub4dc \uc0c1\ud0dc \ubd84\ud3ec. BLOCKED \uae09\uc99d \uc2dc \ub370\ub4dc\ub77d \ub610\ub294 \ub77d \uacbd\ud569 \uc758\uc2ec",
+      "description": "JVM 스레드 상태 분포. BLOCKED 급증 시 데드락 또는 락 경합 의심",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -469,7 +469,7 @@
           "refId": "D"
         }
       ],
-      "title": "JVM \uc2a4\ub808\ub4dc \uc0c1\ud0dc",
+      "title": "JVM 스레드 상태",
       "type": "timeseries"
     },
     {
@@ -545,7 +545,7 @@
               "refId": "A"
             }
           ],
-          "title": "\ub514\uc2a4\ud06c \uc0ac\uc6a9\ub7c9 (Root)",
+          "title": "디스크 사용량 (Root)",
           "type": "gauge"
         },
         {
@@ -653,7 +653,7 @@
               "refId": "B"
             }
           ],
-          "title": "CPU \uc0ac\uc6a9\ub960",
+          "title": "CPU 사용률",
           "type": "timeseries"
         },
         {
@@ -753,7 +753,7 @@
             },
             {
               "editorMode": "builder",
-              "expr": "sum(jvm_memory_max_bytes{instance=\"$instance\", area=\"heap\"})",
+              "expr": "sum(jvm_memory_max_bytes{instance=\"$instance\", area=\"heap\"} != -1)",
               "legendFormat": "Max",
               "range": true,
               "refId": "C"
@@ -861,11 +861,11 @@
               "refId": "B"
             }
           ],
-          "title": "\ub124\ud2b8\uc6cc\ud06c \ud2b8\ub798\ud53d",
+          "title": "네트워크 트래픽",
           "type": "timeseries"
         }
       ],
-      "title": "\ud83d\udcbb \uc2dc\uc2a4\ud15c \ub9ac\uc18c\uc2a4 & \uc778\ud504\ub77c (EC2)",
+      "title": "💻 시스템 리소스 & 인프라 (EC2)",
       "type": "row"
     },
     {
@@ -948,7 +948,7 @@
               "refId": "A"
             }
           ],
-          "title": "\ud3c9\uade0 \uc751\ub2f5\uc2dc\uac04",
+          "title": "평균 응답시간",
           "type": "stat"
         },
         {
@@ -1018,7 +1018,7 @@
               "refId": "A"
             }
           ],
-          "title": "CPU \uc0ac\uc6a9\ub960",
+          "title": "CPU 사용률",
           "type": "gauge"
         },
         {
@@ -1085,12 +1085,12 @@
                 "uid": "dfbmr1jzdpukgb"
               },
               "editorMode": "code",
-              "expr": "(\n  sum by (instance) (\n    jvm_memory_used_bytes{application=\"$application\", instance=\"$instance\", area=\"heap\"}\n  )\n/\n  sum by (instance) (\n    jvm_memory_max_bytes{application=\"$application\", instance=\"$instance\", area=\"heap\"}\n  )\n) * 100\n",
+              "expr": "(\n  sum by (instance) (\n    jvm_memory_used_bytes{application=\"$application\", instance=\"$instance\", area=\"heap\"}\n  )\n/\n  clamp_min(\n    sum by (instance) (\n      jvm_memory_max_bytes{application=\"$application\", instance=\"$instance\", area=\"heap\"} != -1\n    ), 1\n  )\n) * 100\n",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Heap \uc0ac\uc6a9\ub960",
+          "title": "Heap 사용률",
           "type": "gauge"
         },
         {
@@ -1189,7 +1189,7 @@
               "refId": "A"
             }
           ],
-          "title": "\uc694\uccad/\ucd08(RPS)",
+          "title": "요청/초(RPS)",
           "type": "timeseries"
         },
         {
@@ -1253,7 +1253,7 @@
               "refId": "A"
             }
           ],
-          "title": "\ud65c\uc131 Thread",
+          "title": "활성 Thread",
           "type": "stat"
         },
         {
@@ -1321,11 +1321,11 @@
               "refId": "A"
             }
           ],
-          "title": "\uc5d0\ub7ec\uc728 (5xx %)",
+          "title": "에러율 (5xx %)",
           "type": "stat"
         }
       ],
-      "title": "\ud83c\udfaf \ud575\uc2ec \uc9c0\ud45c",
+      "title": "🎯 핵심 지표",
       "type": "row"
     },
     {
@@ -1338,7 +1338,7 @@
       },
       "id": 300,
       "panels": [],
-      "title": "\ud83d\udcca HTTP \uc131\ub2a5",
+      "title": "📊 HTTP 성능",
       "type": "row"
     },
     {
@@ -1515,7 +1515,7 @@
           "refId": "D"
         }
       ],
-      "title": "HTTP \uc0c1\ud0dc \ucf54\ub4dc\ubcc4 \uc694\uccad\ub960",
+      "title": "HTTP 상태 코드별 요청률",
       "type": "timeseries"
     },
     {
@@ -1616,7 +1616,7 @@
           },
           "editorMode": "builder",
           "expr": "sum(rate(http_server_requests_seconds_sum{instance=~\"$instance\", status!~\"5..\"}[$__rate_interval])) / (sum(rate(http_server_requests_seconds_count{instance=~\"$instance\", status!~\"5..\"}[$__rate_interval])))",
-          "legendFormat": "\ud3c9\uade0 \uc751\ub2f5\uc2dc\uac04",
+          "legendFormat": "평균 응답시간",
           "range": true,
           "refId": "A"
         },
@@ -1627,7 +1627,7 @@
           },
           "editorMode": "builder",
           "expr": "histogram_quantile(0.95, sum by(le) (rate(http_server_requests_seconds_bucket{instance=~\"$instance\", status!~\"5..\"}[$__rate_interval])))",
-          "legendFormat": "P95 \uc751\ub2f5\uc2dc\uac04",
+          "legendFormat": "P95 응답시간",
           "range": true,
           "refId": "B"
         },
@@ -1638,12 +1638,12 @@
           },
           "editorMode": "builder",
           "expr": "max(http_server_requests_seconds_max{instance=~\"$instance\", status!~\"5..\"})",
-          "legendFormat": "\ucd5c\ub300 \uc751\ub2f5\uc2dc\uac04",
+          "legendFormat": "최대 응답시간",
           "range": true,
           "refId": "C"
         }
       ],
-      "title": "\uc751\ub2f5 \uc2dc\uac04",
+      "title": "응답 시간",
       "type": "timeseries"
     },
     {
@@ -1742,7 +1742,7 @@
           "refId": "A"
         }
       ],
-      "title": "\uc5d4\ub4dc\ud3ec\uc778\ud2b8\ubcc4 \uc694\uccad Top 10",
+      "title": "엔드포인트별 요청 Top 10",
       "type": "timeseries"
     },
     {
@@ -1841,7 +1841,7 @@
           "refId": "A"
         }
       ],
-      "title": "\uac00\uc7a5 \ub290\ub9b0 \uc5d4\ub4dc\ud3ec\uc778\ud2b8 Top 10",
+      "title": "가장 느린 엔드포인트 Top 10",
       "type": "timeseries"
     },
     {
@@ -1854,7 +1854,7 @@
       },
       "id": 802,
       "panels": [],
-      "title": "\ud83d\udea8 P0 API Critical Monitor",
+      "title": "🚨 P0 API Critical Monitor",
       "type": "row"
     },
     {
@@ -1945,12 +1945,12 @@
         {
           "editorMode": "builder",
           "expr": "(sum(increase(http_server_requests_seconds_count{uri=\"/users/me/meetings/{meetingId}\"}[1m])) or on() vector(0))",
-          "legendFormat": "\uc694\uccad\ub7c9",
+          "legendFormat": "요청량",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "\ubaa8\uc784 \ud398\uc774\uc9c0 RPS",
+      "title": "모임 페이지 RPS",
       "type": "timeseries"
     },
     {
@@ -2050,12 +2050,12 @@
           },
           "editorMode": "builder",
           "expr": "(\n  (sum(rate(http_server_requests_seconds_count{uri=\"/users/me/meetings/{meetingId}\", status=~\"5..\"}[1m])) or on() vector(0))\n  / \n  (sum(rate(http_server_requests_seconds_count{uri=\"/users/me/meetings/{meetingId}\"}[1m])) or on() vector(0))\n) * 100 or on() vector(0)",
-          "legendFormat": "\uc5d0\ub7ec\uc728",
+          "legendFormat": "에러율",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "\ubaa8\uc784 \uc9c4\uc785 \uc5d0\ub7ec\uc728 (%)",
+      "title": "모임 진입 에러율 (%)",
       "type": "timeseries"
     },
     {
@@ -2145,12 +2145,12 @@
         {
           "editorMode": "code",
           "expr": "sum(rate(http_requests_total{uri=\"/auth/tokens\", method=\"GET\"}[5m])) or vector(0)",
-          "legendFormat": "\uc694\uccad\ub7c9",
+          "legendFormat": "요청량",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "OAuth \ub85c\uadf8\uc778 RPS",
+      "title": "OAuth 로그인 RPS",
       "type": "timeseries"
     },
     {
@@ -2240,12 +2240,12 @@
         {
           "editorMode": "code",
           "expr": "sum(rate(http_requests_total{uri=\"/auth/tokens\", method=\"GET\", status=~\"5..\"}[5m])) \n/ \nsum(rate(http_requests_total{uri=\"/auth/tokens\", method=\"GET\"}[5m]))or vector(0)",
-          "legendFormat": "\uc5d0\ub7ec\uc728",
+          "legendFormat": "에러율",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "OAuth \ub85c\uadf8\uc778 \uc5d0\ub7ec\uc728 (%)",
+      "title": "OAuth 로그인 에러율 (%)",
       "type": "timeseries"
     },
     {
@@ -2258,7 +2258,7 @@
       },
       "id": 500,
       "panels": [],
-      "title": "\ud83d\uddc4\ufe0f \ub370\uc774\ud130\ubca0\uc774\uc2a4 (HikariCP)",
+      "title": "🗄️ 데이터베이스 (HikariCP)",
       "type": "row"
     },
     {
@@ -2420,7 +2420,7 @@
           "refId": "C"
         }
       ],
-      "title": "Connection Pool \uc0c1\ud0dc",
+      "title": "Connection Pool 상태",
       "type": "timeseries"
     },
     {
@@ -2491,7 +2491,7 @@
           "refId": "A"
         }
       ],
-      "title": "\uc804\uccb4 Connection \uc218",
+      "title": "전체 Connection 수",
       "type": "stat"
     },
     {
@@ -2585,7 +2585,7 @@
           "refId": "A"
         }
       ],
-      "title": "Connection \ud68d\ub4dd \uc2dc\uac04",
+      "title": "Connection 획득 시간",
       "type": "timeseries"
     },
     {
@@ -2652,7 +2652,7 @@
           "refId": "A"
         }
       ],
-      "title": "Timeout \ud69f\uc218",
+      "title": "Timeout 횟수",
       "type": "stat"
     },
     {
@@ -2746,7 +2746,7 @@
           "refId": "A"
         }
       ],
-      "title": "Connection \uc0ac\uc6a9 \uc2dc\uac04",
+      "title": "Connection 사용 시간",
       "type": "timeseries"
     },
     {
@@ -2840,7 +2840,7 @@
           "refId": "A"
         }
       ],
-      "title": "DB Connection \ucd5c\ub300\uac12",
+      "title": "DB Connection 최대값",
       "type": "timeseries"
     },
     {
@@ -2934,7 +2934,7 @@
           "refId": "A"
         }
       ],
-      "title": "DB Connection \uc0ac\uc6a9\ub7c9",
+      "title": "DB Connection 사용량",
       "type": "timeseries"
     },
     {
@@ -3028,7 +3028,7 @@
           "refId": "A"
         }
       ],
-      "title": "DB \ud480 \uc0ac\uc6a9\ub960 (%)",
+      "title": "DB 풀 사용률 (%)",
       "type": "timeseries"
     },
     {
@@ -3135,7 +3135,7 @@
       },
       "id": 600,
       "panels": [],
-      "title": "\ud83d\udd27 JVM \uc0c1\uc138 (GC)",
+      "title": "🔧 JVM 상세 (GC)",
       "type": "row"
     },
     {
@@ -3337,7 +3337,7 @@
       },
       "id": 700,
       "panels": [],
-      "title": "\ud83d\udcdd \ub85c\uadf8 \ud1b5\uacc4",
+      "title": "📝 로그 통계",
       "type": "row"
     },
     {
@@ -3440,7 +3440,7 @@
           "refId": "B"
         }
       ],
-      "title": "\uc5d0\ub7ec & \uacbd\uace0 \ub85c\uadf8",
+      "title": "에러 & 경고 로그",
       "type": "timeseries"
     },
     {
@@ -3534,7 +3534,7 @@
           "refId": "A"
         }
       ],
-      "title": "INFO \ub85c\uadf8",
+      "title": "INFO 로그",
       "type": "timeseries"
     },
     {
@@ -3547,7 +3547,7 @@
       },
       "id": 800,
       "panels": [],
-      "title": "\ud83d\udccb \uc2e4\uc2dc\uac04 \ub85c\uadf8",
+      "title": "📋 실시간 로그",
       "type": "row"
     },
     {
@@ -3585,7 +3585,7 @@
           "refId": "A"
         }
       ],
-      "title": "\uc2e4\uc2dc\uac04 \ub85c\uadf8",
+      "title": "실시간 로그",
       "type": "logs"
     }
   ],
@@ -3684,6 +3684,6 @@
   "timezone": "",
   "title": "[Prod&DEV] doktori-monitoring-service",
   "uid": "dornkpm",
-  "version": 24,
+  "version": 2,
   "weekStart": ""
 }
