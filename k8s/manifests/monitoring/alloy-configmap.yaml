@@ -58,6 +58,11 @@ data:
         replacement   = "${1}:8081"
         target_label  = "__address__"
       }
+      // component → instance 매핑: EC2 환경과 동일한 instance 라벨 유지
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_component"]
+        target_label  = "instance"
+      }
       rule {
         replacement  = "prod-k8s"
         target_label = "env"
@@ -114,6 +119,10 @@ data:
         source_labels = ["__meta_kubernetes_node_name"]
         target_label  = "node"
       }
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
     }
 
     prometheus.scrape "cadvisor" {
@@ -136,12 +145,63 @@ data:
 
     prometheus.scrape "host_metrics" {
       targets    = prometheus.exporter.unix.host.targets
-      forward_to = [prometheus.remote_write.monitoring.receiver]
+      forward_to = [prometheus.relabel.host_env.receiver]
       scrape_interval = "30s"
     }
 
+    prometheus.relabel "host_env" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
+    }
+
     // =============================================================
-    // 5. remote_write → Prometheus
+    // 5. CoreDNS 메트릭
+    // =============================================================
+    prometheus.scrape "coredns" {
+      targets = [{
+        __address__ = "kube-dns.kube-system.svc.cluster.local:9153",
+      }]
+      forward_to = [prometheus.relabel.coredns_env.receiver]
+      scrape_interval = "30s"
+    }
+
+    prometheus.relabel "coredns_env" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
+    }
+
+    // =============================================================
+    // 6. API Server 메트릭
+    // =============================================================
+    prometheus.scrape "apiserver" {
+      targets = [{
+        __address__ = "kubernetes.default.svc.cluster.local:443",
+      }]
+      forward_to = [prometheus.relabel.apiserver_env.receiver]
+      scrape_interval = "60s"
+      scheme     = "https"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        insecure_skip_verify = true
+      }
+    }
+
+    prometheus.relabel "apiserver_env" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      rule {
+        replacement  = "prod-k8s"
+        target_label = "env"
+      }
+    }
+
+    // =============================================================
+    // 7. remote_write → Prometheus
     // =============================================================
     prometheus.remote_write "monitoring" {
       endpoint {
@@ -159,7 +219,7 @@ data:
     }
 
     // =============================================================
-    // 6. 로그 → Loki
+    // 8. 로그 → Loki
     // =============================================================
 
     // prod namespace 로그
