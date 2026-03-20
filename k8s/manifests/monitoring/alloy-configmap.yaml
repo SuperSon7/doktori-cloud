@@ -64,7 +64,7 @@ data:
         target_label  = "instance"
       }
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
       rule {
@@ -97,7 +97,7 @@ data:
     prometheus.relabel "kube_state_env" {
       forward_to = [prometheus.remote_write.monitoring.receiver]
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -120,7 +120,7 @@ data:
         target_label  = "node"
       }
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -152,7 +152,7 @@ data:
     prometheus.relabel "host_env" {
       forward_to = [prometheus.remote_write.monitoring.receiver]
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -171,7 +171,7 @@ data:
     prometheus.relabel "coredns_env" {
       forward_to = [prometheus.remote_write.monitoring.receiver]
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -195,7 +195,7 @@ data:
     prometheus.relabel "apiserver_env" {
       forward_to = [prometheus.remote_write.monitoring.receiver]
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -252,7 +252,7 @@ data:
         target_label  = "app"
       }
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
@@ -280,7 +280,7 @@ data:
         target_label  = "container"
       }
       rule {
-        replacement  = "prod-k8s"
+        replacement  = "prod"
         target_label = "env"
       }
     }
