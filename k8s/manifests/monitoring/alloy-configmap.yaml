@@ -137,6 +137,87 @@ data:
     }
 
     // =============================================================
+    // 3-2. kubelet 메트릭 (/metrics — cAdvisor와 별도)
+    // kubelet_running_pods, kubelet_pod_start_duration 등 kubelet 자체 메트릭
+    // =============================================================
+    discovery.relabel "kubelet" {
+      targets = discovery.kubernetes.nodes.targets
+      rule {
+        replacement  = "/metrics"
+        target_label = "__metrics_path__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_node_name"]
+        target_label  = "node"
+      }
+      rule {
+        replacement  = "prod"
+        target_label = "env"
+      }
+      rule {
+        replacement  = "kubelet"
+        target_label = "job"
+      }
+    }
+
+    prometheus.scrape "kubelet" {
+      targets    = discovery.relabel.kubelet.output
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "30s"
+      scheme     = "https"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        insecure_skip_verify = true
+      }
+    }
+
+    // =============================================================
+    // 3-3. etcd 메트릭 (control-plane 노드만)
+    // listen-metrics-urls=http://<nodeIP>:2381 설정 필요 (기본 127.0.0.1)
+    // 3개 master에서 /etc/kubernetes/manifests/etcd.yaml 수정 필요
+    // =============================================================
+    discovery.relabel "etcd" {
+      targets = discovery.kubernetes.nodes.targets
+      // control-plane 노드만 유지
+      rule {
+        source_labels = ["__meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane"]
+        regex         = "true"
+        action        = "keep"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_node_name"]
+        target_label  = "node"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_node_name"]
+        target_label  = "instance"
+      }
+      // etcd 메트릭 포트는 2381 (데이터 2379와 별도)
+      rule {
+        source_labels = ["__address__"]
+        regex         = "(.+?)(?::\\d+)?"
+        replacement   = "${1}:2381"
+        target_label  = "__address__"
+      }
+      rule {
+        replacement  = "prod"
+        target_label = "env"
+      }
+      rule {
+        replacement  = "etcd"
+        target_label = "job"
+      }
+    }
+
+    prometheus.scrape "etcd" {
+      targets    = discovery.relabel.etcd.output
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      scrape_interval = "60s"
+      // etcd metrics endpoint는 HTTP (TLS 불필요)
+      scheme     = "http"
+    }
+
+    // =============================================================
     // 4. 호스트 메트릭
     // =============================================================
     prometheus.exporter.unix "host" {
