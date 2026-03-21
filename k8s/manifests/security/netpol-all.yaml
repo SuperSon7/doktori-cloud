@@ -376,6 +376,14 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
+    # NGF 메트릭 (nginx-gateway namespace)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway
+      ports:
+        - port: 9113
+          protocol: TCP
     # kubelet 메트릭 (모든 노드)
     - to:
         - ipBlock:

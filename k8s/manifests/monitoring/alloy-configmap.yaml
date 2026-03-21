@@ -218,6 +218,29 @@ data:
     }
 
     // =============================================================
+    // 3-4. Nginx Gateway Fabric 메트릭
+    // =============================================================
+    prometheus.scrape "ngf" {
+      targets = [{
+        __address__ = "nginx-gateway-nginx.nginx-gateway.svc.cluster.local:9113",
+      }]
+      forward_to = [prometheus.relabel.ngf_env.receiver]
+      scrape_interval = "30s"
+    }
+
+    prometheus.relabel "ngf_env" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      rule {
+        replacement  = "prod"
+        target_label = "env"
+      }
+      rule {
+        replacement  = "ngf"
+        target_label = "job"
+      }
+    }
+
+    // =============================================================
     // 4. 호스트 메트릭
     // =============================================================
     prometheus.exporter.unix "host" {
