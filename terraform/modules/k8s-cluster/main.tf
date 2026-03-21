@@ -194,6 +194,16 @@ resource "aws_vpc_security_group_ingress_rule" "worker_kubelet" {
   referenced_security_group_id = aws_security_group.master.id
 }
 
+# kubelet from workers (metrics-server → kubelet 메트릭 수집)
+resource "aws_vpc_security_group_ingress_rule" "worker_kubelet_from_self" {
+  security_group_id            = aws_security_group.worker.id
+  description                  = "kubelet API from workers (metrics-server)"
+  from_port                    = 10250
+  to_port                      = 10250
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.worker.id
+}
+
 # NodePort from VPC
 resource "aws_vpc_security_group_ingress_rule" "worker_nodeport" {
   security_group_id = aws_security_group.worker.id
