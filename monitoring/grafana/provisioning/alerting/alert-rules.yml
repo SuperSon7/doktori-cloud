@@ -22,7 +22,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: max by (app, instance, env, job) (up{env=~"prod|prod-k8s"})
+              expr: max by (app, instance, env, job) (up{env=~"prod|prod-k8s", app=~".+"})
               instant: true
               refId: A
           - refId: C
