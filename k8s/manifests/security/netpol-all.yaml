@@ -215,6 +215,17 @@ spec:
       ports:
         - port: 443
           protocol: TCP
+    # 외부 HTTPS (카카오 OAuth, Firebase FCM 등)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
 ---
 # 10. chat → 같은 namespace 내 통신 + VPC 내부 AWS 서비스
 apiVersion: networking.k8s.io/v1
@@ -269,6 +280,17 @@ spec:
     - to:
         - ipBlock:
             cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # 외부 HTTPS (Firebase FCM 등)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
       ports:
         - port: 443
           protocol: TCP
