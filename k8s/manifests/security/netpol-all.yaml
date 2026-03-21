@@ -414,3 +414,24 @@ spec:
           protocol: TCP
         - port: 9090
           protocol: TCP
+---
+# 14. kube-state-metrics → kube-apiserver (list/watch)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ksm-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Egress
+  egress:
+    # kube-apiserver
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6443
+          protocol: TCP
