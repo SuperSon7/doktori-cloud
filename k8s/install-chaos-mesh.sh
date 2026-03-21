@@ -1,108 +1,123 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Chaos Mesh 설치 스크립트
-# k8s 클러스터에 Chaos Mesh를 설치하고 FI 실험용 namespace를 구성한다.
 #
 # 사용법: master 노드에서 실행
-#   chmod +x install-chaos-mesh.sh
-#   ./install-chaos-mesh.sh
+#   ./install-chaos-mesh.sh            # 기본 설치
+#   ./install-chaos-mesh.sh --force    # 기존 설치 제거 후 재설치
 # =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/config.env"
 
-CHAOS_MESH_VERSION="2.7.1"
+CHAOS_MESH_VERSION="${CHAOS_MESH_VERSION:-2.7.1}"
+CHAOS_NS="chaos-testing"
+INSTALL_TIMEOUT="5m"
+FORCE=false
+
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 echo "============================================="
-echo " Chaos Mesh 설치"
+echo " Chaos Mesh v${CHAOS_MESH_VERSION} 설치"
 echo "============================================="
 
-# -----------------------------------------------------------------------------
-# 0. Helm 확인
-# -----------------------------------------------------------------------------
-if ! command -v helm &>/dev/null; then
-  echo "[ERROR] Helm이 설치되어 있지 않습니다."
-  exit 1
+# 0. 사전 확인
+if ! command -v helm &>/dev/null; then echo "[ERROR] Helm 필요"; exit 1; fi
+if ! kubectl cluster-info &>/dev/null; then echo "[ERROR] kubectl 연결 불가"; exit 1; fi
+
+# --force 시 기존 설치 제거
+if $FORCE; then
+  echo ""
+  echo "[0/4] --force: 기존 설치 제거..."
+  "${SCRIPT_DIR}/uninstall-chaos-mesh.sh" --force || true
+  sleep 10
 fi
 
-# -----------------------------------------------------------------------------
-# 1. chaos-testing namespace
-# -----------------------------------------------------------------------------
+# 이미 설치 확인
+if helm status chaos-mesh -n "$CHAOS_NS" &>/dev/null 2>&1; then
+  echo "Chaos Mesh 이미 설치됨. 재설치: $0 --force"
+  kubectl get pods -n "$CHAOS_NS"
+  exit 0
+fi
+
+# 1. namespace
 echo ""
-echo "[1/3] chaos-testing 네임스페이스..."
+echo "[1/4] namespace..."
+if kubectl get ns "$CHAOS_NS" &>/dev/null 2>&1; then
+  NS_PHASE=$(kubectl get ns "$CHAOS_NS" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  if [[ "$NS_PHASE" == "Terminating" ]]; then
+    echo "  Terminating 상태 강제 정리..."
+    kubectl get ns "$CHAOS_NS" -o json | jq '.spec.finalizers = []' \
+      | kubectl replace --raw "/api/v1/namespaces/${CHAOS_NS}/finalize" -f -
+    sleep 5
+    kubectl create namespace "$CHAOS_NS"
+  fi
+else
+  kubectl create namespace "$CHAOS_NS"
+fi
+kubectl label namespace "$CHAOS_NS" kubernetes.io/metadata.name="$CHAOS_NS" --overwrite
 
-kubectl create namespace chaos-testing 2>/dev/null || echo "  → 이미 존재"
-kubectl label namespace chaos-testing kubernetes.io/metadata.name=chaos-testing --overwrite
-
-# -----------------------------------------------------------------------------
-# 2. Chaos Mesh 설치 (Helm)
-# -----------------------------------------------------------------------------
+# 2. Helm 설치
 echo ""
-echo "[2/3] Chaos Mesh v${CHAOS_MESH_VERSION} 설치..."
-
+echo "[2/4] Helm install (--wait --timeout ${INSTALL_TIMEOUT})..."
 helm repo add chaos-mesh https://charts.chaos-mesh.org 2>/dev/null || true
 helm repo update chaos-mesh
 
-if helm status chaos-mesh -n chaos-testing &>/dev/null; then
-  echo "  → 이미 설치됨. 업그레이드 확인..."
-  helm upgrade chaos-mesh chaos-mesh/chaos-mesh \
-    --namespace chaos-testing \
-    --version "${CHAOS_MESH_VERSION}" \
-    --set chaosDaemon.runtime=containerd \
-    --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
-    --set dashboard.securityMode=false \
-    --set controllerManager.resources.requests.cpu=100m \
-    --set controllerManager.resources.requests.memory=128Mi \
-    --set controllerManager.resources.limits.memory=512Mi \
-    --set chaosDaemon.resources.requests.cpu=100m \
-    --set chaosDaemon.resources.requests.memory=128Mi \
-    --set chaosDaemon.resources.limits.memory=256Mi
-else
-  helm install chaos-mesh chaos-mesh/chaos-mesh \
-    --namespace chaos-testing \
-    --version "${CHAOS_MESH_VERSION}" \
-    --set chaosDaemon.runtime=containerd \
-    --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
-    --set dashboard.securityMode=false \
-    --set controllerManager.resources.requests.cpu=100m \
-    --set controllerManager.resources.requests.memory=128Mi \
-    --set controllerManager.resources.limits.memory=512Mi \
-    --set chaosDaemon.resources.requests.cpu=100m \
-    --set chaosDaemon.resources.requests.memory=128Mi \
-    --set chaosDaemon.resources.limits.memory=256Mi
+helm install chaos-mesh chaos-mesh/chaos-mesh \
+  --namespace "$CHAOS_NS" \
+  --version "${CHAOS_MESH_VERSION}" \
+  --set chaosDaemon.runtime=containerd \
+  --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
+  --set dashboard.securityMode=false \
+  --set controllerManager.replicaCount=1 \
+  --set controllerManager.resources.requests.cpu=100m \
+  --set controllerManager.resources.requests.memory=128Mi \
+  --set controllerManager.resources.limits.memory=512Mi \
+  --set chaosDaemon.resources.requests.cpu=100m \
+  --set chaosDaemon.resources.requests.memory=128Mi \
+  --set chaosDaemon.resources.limits.memory=256Mi \
+  --wait --timeout "$INSTALL_TIMEOUT"
+
+if [[ $? -ne 0 ]]; then
+  echo ""
+  echo "[ERROR] 설치 실패. Pod/이벤트 확인:"
+  kubectl get pods -n "$CHAOS_NS" -o wide
+  kubectl get events -n "$CHAOS_NS" --sort-by='.lastTimestamp' | tail -15
+  echo ""
+  echo "정리 후 재시도: ./uninstall-chaos-mesh.sh --force && ./install-chaos-mesh.sh"
+  exit 1
 fi
 
-# -----------------------------------------------------------------------------
-# 3. RBAC — chaos-testing에서 prod namespace 접근 허용
-# -----------------------------------------------------------------------------
+# 3. RBAC
 echo ""
-echo "[3/3] RBAC 설정..."
-
+echo "[3/4] RBAC..."
 kubectl apply -f "${SCRIPT_DIR}/manifests/chaos/chaos-rbac.yaml"
 
-# -----------------------------------------------------------------------------
-# 검증
-# -----------------------------------------------------------------------------
+# 4. 검증
 echo ""
-echo "============================================="
-echo " 설치 완료 — 검증"
-echo "============================================="
+echo "[4/4] 검증..."
+kubectl get pods -n "$CHAOS_NS" -o wide
+echo ""
+
+CRD_COUNT=$(kubectl get crd 2>/dev/null | grep -c chaos-mesh || true)
+echo "CRD: ${CRD_COUNT}개"
+
+FAIL=0
+for f in "${SCRIPT_DIR}"/manifests/chaos/fi-*.yaml; do
+  [[ ! -f "$f" ]] && continue
+  if kubectl apply -f "$f" --dry-run=server &>/dev/null 2>&1; then
+    echo "  OK $(basename "$f")"
+  else
+    echo "  FAIL $(basename "$f")"
+    FAIL=$((FAIL + 1))
+  fi
+done
 
 echo ""
-echo "--- chaos-testing namespace pods ---"
-kubectl get pods -n chaos-testing
-
-echo ""
-echo "--- Chaos Mesh CRDs ---"
-kubectl get crd | grep chaos-mesh || echo "  CRD 아직 생성 중..."
-
-echo ""
 echo "============================================="
-echo " 다음 단계:"
-echo "   1. Pod 전부 Running 확인: kubectl get pods -n chaos-testing -w"
-echo "   2. Dashboard 접속: kubectl port-forward -n chaos-testing svc/chaos-dashboard 2333:2333"
-echo "   3. 실험 적용: kubectl apply -f manifests/chaos/fi-1-api-pod-kill.yaml"
-echo "   4. 실험 확인: kubectl get podchaos,networkchaos,stresschaos -n chaos-testing"
-echo "   5. 실험 중단: kubectl delete -f manifests/chaos/<파일>.yaml"
+echo " 설치 완료 (dry-run 실패: ${FAIL}건)"
+echo ""
+echo " 실험: cd manifests/chaos && ./run-experiment.sh apply fi-1"
+echo " 제거: ./uninstall-chaos-mesh.sh"
 echo "============================================="
