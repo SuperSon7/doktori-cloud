@@ -22,7 +22,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: max by (app, instance, env, job) (up{env=~"prod|prod-k8s", app=~".+"})
+              expr: max by (app, env, job) (up{env=~"prod|prod-k8s", app=~".+"})
               instant: true
               refId: A
           - refId: C
@@ -42,11 +42,11 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ or $labels.app $labels.job }}({{ $labels.instance }}) 서비스가 다운됨"
+          summary: "{{ or $labels.app $labels.job }}({{ $labels.env }}) 서비스가 다운됨"
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ or $labels.app $labels.job }}&var-env=prod&var-level=ERROR&from=now-15m&to=now"
           runbook_url: "https://github.com/100-hours-a-week/5-team-service-cloud/blob/main/runbooks/alerting/service-down.md"
-          action: "1) 컨테이너 상태 확인 (docker ps)  2) 로그에서 OOM/crash 원인 확인  3) 필요시 컨테이너 재시작"
+          action: "prod: docker ps → 로그 확인 → 재시작 / prod-k8s: kubectl get pods -n prod → kubectl logs -n prod"
         noDataState: OK
         execErrState: Alerting
 
@@ -99,12 +99,9 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                (
-                  sum by (app, instance) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s", status=~"5.."}[5m]))
-                  /
-                  sum by (app, instance) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s"}[5m]))
-                )
-                and on(instance) up{env=~"prod|prod-k8s"} == 1
+                sum by (app, env) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s", status=~"5.."}[5m]))
+                /
+                sum by (app, env) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s"}[5m]))
               instant: true
               refId: A
           - refId: C
@@ -124,7 +121,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.app }}({{ $labels.instance }}) 에러율 50% 초과"
+          summary: "{{ $labels.app }}({{ $labels.env }}) 에러율 50% 초과"
           dashboard_url: "http://13.125.29.187:3000/d/application"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ $labels.app }}&var-env=prod&var-level=ERROR&from=now-15m&to=now"
           runbook_url: "https://github.com/100-hours-a-week/5-team-service-cloud/blob/main/runbooks/alerting/error-rate-critical.md"
@@ -171,7 +168,7 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} 디스크 95% 초과 ({{ $labels.mountpoint }})"
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
-          action: "1) docker system df로 미사용 이미지/볼륨 확인  2) 오래된 로그 파일 정리  3) 디스크 증설 검토"
+          action: "1) du -sh /var/lib/docker /var/log 대용량 확인  2) docker system prune / crictl rmi 미사용 이미지 정리  3) 디스크 증설 검토"
         noDataState: OK
         execErrState: Alerting
 
@@ -210,7 +207,7 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} 메모리 90% 초과"
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
-          action: "1) 컨테이너별 메모리 사용량 확인 (cAdvisor)  2) OOM 위험 컨테이너 특정  3) 메모리 제한 조정 또는 스케일아웃 검토"
+          action: "prod: cAdvisor로 컨테이너 메모리 확인 / prod-k8s: kubectl top pods -n prod → OOM 위험 Pod 특정 → limit 조정 또는 스케일아웃"
         noDataState: OK
         execErrState: Alerting
 
@@ -249,7 +246,7 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} CPU 80% 초과"
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
-          action: "1) cAdvisor에서 CPU 소비 높은 컨테이너 특정  2) 해당 앱 로그에서 과부하 원인 확인  3) 일시적 스파이크 vs 지속적 부하 판단"
+          action: "prod: cAdvisor CPU 확인 / prod-k8s: kubectl top pods -n prod → 과부하 Pod 특정 → 일시적 스파이크 vs 지속 부하 판단"
         noDataState: OK
         execErrState: Alerting
 
@@ -292,7 +289,7 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} 디스크 80% 초과 ({{ $labels.mountpoint }})"
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
-          action: "1) du -sh로 대용량 디렉토리 확인  2) docker image prune으로 미사용 이미지 정리  3) 95% 도달 전 선제 대응"
+          action: "1) du -sh 대용량 디렉토리 확인  2) docker system prune / crictl rmi 미사용 이미지 정리  3) 95% 도달 전 선제 대응"
         noDataState: OK
         execErrState: Alerting
 
@@ -316,12 +313,9 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                (
-                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s", status=~"5.."}[5m]))
-                  /
-                  sum by (application, app, instance) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s"}[5m]))
-                )
-                and on(instance) up{env=~"prod|prod-k8s"} == 1
+                sum by (app, env) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s", status=~"5.."}[5m]))
+                /
+                sum by (app, env) (rate(http_server_requests_seconds_count{env=~"prod|prod-k8s"}[5m]))
               instant: true
               refId: A
           - refId: C
@@ -341,7 +335,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) 에러율 10% 초과"
+          summary: "{{ $labels.app }}({{ $labels.env }}) 에러율 10% 초과"
           dashboard_url: "http://13.125.29.187:3000/d/application"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ or $labels.app $labels.application }}&var-env=prod&var-level=ERROR&from=now-15m&to=now"
           action: "1) 로그 대시보드에서 에러 로그 확인  2) 에러 집중 API 엔드포인트 특정  3) traceId로 요청 흐름 추적"
@@ -361,11 +355,10 @@ groups:
             model:
               expr: |
                 histogram_quantile(0.99,
-                  sum by (le, application, app, instance) (
+                  sum by (le, app, env) (
                     rate(http_server_requests_seconds_bucket{env=~"prod|prod-k8s"}[5m])
                   )
                 )
-                and on(instance) up{env=~"prod|prod-k8s"} == 1
               instant: true
               refId: A
           - refId: C
@@ -385,7 +378,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) p99 지연시간 5초 초과"
+          summary: "{{ $labels.app }}({{ $labels.env }}) p99 지연시간 5초 초과"
           dashboard_url: "http://13.125.29.187:3000/d/application"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ or $labels.app $labels.application }}&var-env=prod&from=now-15m&to=now"
           action: "1) HTTP RED 대시보드에서 느린 엔드포인트 특정  2) 로그에서 해당 시간대 slow query/timeout 확인  3) 개발팀에 병목 API 전달"
@@ -403,9 +396,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: |
-                hikaricp_connections_pending{env=~"prod|prod-k8s"}
-                and on(instance) up{env=~"prod|prod-k8s"} == 1
+              expr: hikaricp_connections_pending{env=~"prod|prod-k8s"}
               instant: true
               refId: A
           - refId: C
@@ -425,7 +416,7 @@ groups:
         labels:
           severity: high
         annotations:
-          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) HikariCP 대기 커넥션 발생"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.env }}) HikariCP 대기 커넥션 발생"
           dashboard_url: "http://13.125.29.187:3000/d/application"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ or $labels.app $labels.application }}&var-env=prod&var-level=ERROR&from=now-15m&to=now"
           action: "1) DB 커넥션 풀 사용량 확인 (active/idle/max)  2) MySQL 대시보드에서 slow query 확인  3) 커넥션 풀 크기 조정 또는 개발팀에 쿼리 최적화 요청"
@@ -443,9 +434,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: |
-                jvm_gc_pause_seconds_max{env=~"prod|prod-k8s"}
-                and on(instance) up{env=~"prod|prod-k8s"} == 1
+              expr: jvm_gc_pause_seconds_max{env=~"prod|prod-k8s"}
               instant: true
               refId: A
           - refId: C
@@ -465,7 +454,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ or $labels.app $labels.application }}({{ $labels.instance }}) GC pause 500ms 초과"
+          summary: "{{ or $labels.app $labels.application }}({{ $labels.env }}) GC pause 500ms 초과"
           dashboard_url: "http://13.125.29.187:3000/d/application"
           log_url: "http://13.125.29.187:3000/d/logs?var-app={{ or $labels.app $labels.application }}&var-env=prod&from=now-15m&to=now"
           action: "1) JVM 대시보드에서 힙 메모리 추이 확인  2) Old Gen 비율 확인 → 메모리 누수 여부 판단  3) 필요시 힙 덤프 또는 JVM 옵션 조정"
@@ -481,8 +470,8 @@ groups:
     interval: 1m
     rules:
       # --- Service Restarted (info) ---
-      # 앱 서비스만 대상 (cadvisor 등 모니터링 인프라는 process_start_time_seconds
-      # 부동소수점 정밀도 미세 변동으로 changes()가 오보 발생하므로 제외)
+      # Docker(prod) 환경만 대상. K8s(prod-k8s)는 rolling update/HPA/liveness
+      # restart가 정상이므로 k8s_container_restarts 룰이 커버
       - uid: service_restarted
         title: Service Restarted
         condition: C
@@ -493,7 +482,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: changes(process_start_time_seconds{env=~"prod|prod-k8s", app=~"api|chat"}[5m]) > 0
+              expr: changes(process_start_time_seconds{env="prod", app=~"api|chat"}[5m]) > 0
               instant: true
               refId: A
           - refId: C
@@ -697,7 +686,7 @@ groups:
           dashboard_url: "http://13.125.29.187:3000/d/infrastructure"
           log_url: "http://13.125.29.187:3000/d/logs?var-app=chat&var-env=prod&var-level=ERROR&from=now-15m&to=now"
           runbook_url: "https://github.com/100-hours-a-week/5-team-service-cloud/blob/main/runbooks/alerting/chat-probe-failure.md"
-          action: "1) Chat 컨테이너 상태 확인 (docker ps | grep chat)  2) Chat 서버 로그에서 OOM/crash 확인  3) WebSocket 연결 복구 여부 확인  4) 필요시 docker restart chat"
+          action: "prod: docker ps | grep chat → 로그 확인 → docker restart chat / prod-k8s: kubectl get pods -n prod -l component=chat → kubectl logs"
         noDataState: OK
         execErrState: Alerting
 
@@ -1222,6 +1211,131 @@ groups:
           summary: "{{ $labels.horizontalpodautoscaler }} HPA 최대치 도달 — 추가 스케일아웃 불가"
           dashboard_url: "http://13.125.29.187:3000/d/k8s-overview"
           action: "1) kubectl get hpa -n prod  2) CPU 사용률 확인  3) max replicas 상향 또는 리소스 최적화 검토"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- CoreDNS Down (critical) ---
+      # 모든 CoreDNS Pod가 죽으면 K8s 서비스 디스커버리 전면 장애
+      - uid: k8s_coredns_down
+        title: "CoreDNS Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: kube_deployment_status_replicas_available{namespace="kube-system", deployment="coredns"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+              refId: C
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CoreDNS 전체 다운 — K8s 서비스 디스커버리 불가"
+          dashboard_url: "http://13.125.29.187:3000/d/k8s-overview"
+          action: "1) kubectl -n kube-system get pods -l k8s-app=kube-dns  2) kubectl -n kube-system describe deploy coredns  3) 노드 상태 확인"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Pod CPU Throttling (warning) ---
+      # Pod CPU limit에 걸려 throttling 발생 → 레이턴시 저하. 노드 레벨에서는 감지 불가
+      - uid: k8s_cpu_throttling
+        title: "Pod CPU Throttling > 50%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum by (pod, container, namespace) (
+                  rate(container_cpu_cfs_throttled_periods_total{namespace="prod"}[5m])
+                )
+                /
+                sum by (pod, container, namespace) (
+                  rate(container_cpu_cfs_periods_total{namespace="prod"}[5m])
+                ) > 0.5
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.pod }}/{{ $labels.container }} CPU throttling 50% 초과 — 응답 지연 발생 가능"
+          dashboard_url: "http://13.125.29.187:3000/d/k8s-pods"
+          action: "1) kubectl top pod {{ $labels.pod }} -n prod  2) CPU limit 상향 검토  3) 앱 CPU 사용 패턴 확인"
+        noDataState: OK
+        execErrState: Alerting
+
+      # --- Pod Memory Near Limit (warning) ---
+      # OOMKill 전 선제 감지. 메모리 limit의 90% 초과 시 경고
+      - uid: k8s_memory_near_limit
+        title: "Pod Memory > 90% of Limit"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                container_memory_working_set_bytes{namespace="prod", container!=""}
+                /
+                kube_pod_container_resource_limits{namespace="prod", resource="memory"}
+                > 0.9
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.pod }}/{{ $labels.container }} 메모리 limit 90% 초과 — OOMKill 위험"
+          dashboard_url: "http://13.125.29.187:3000/d/k8s-pods"
+          action: "1) kubectl top pod {{ $labels.pod }} -n prod  2) JVM -Xmx 확인  3) memory limit 상향 또는 메모리 누수 점검"
         noDataState: OK
         execErrState: Alerting
 
