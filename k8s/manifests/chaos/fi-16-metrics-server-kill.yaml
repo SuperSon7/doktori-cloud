@@ -34,6 +34,6 @@ spec:
     namespaces:
       - kube-system
     labelSelectors:
-      k8s-app: metrics-server
+      app.kubernetes.io/name: metrics-server
   gracePeriod: 0
   duration: '60s'

@@ -71,7 +71,8 @@ case "$ACTION" in
     kubectl get pods -n prod -o wide
     echo ""
     echo "--- kube-system 핵심 컴포넌트 ---"
-    kubectl get pods -n kube-system -l 'k8s-app in (kube-dns,metrics-server)' -o wide 2>/dev/null
+    kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide 2>/dev/null
+    kubectl get pods -n kube-system -l app.kubernetes.io/name=metrics-server -o wide 2>/dev/null
     echo ""
     echo "--- HPA ---"
     kubectl get hpa -n prod
