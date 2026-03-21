@@ -10,7 +10,7 @@ metadata:
   name: alloy
 rules:
   - apiGroups: [""]
-    resources: ["nodes", "nodes/metrics", "nodes/proxy", "services", "endpoints", "pods", "pods/log"]
+    resources: ["nodes", "nodes/metrics", "nodes/proxy", "services", "endpoints", "pods", "pods/log", "events"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]

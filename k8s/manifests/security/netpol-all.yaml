@@ -215,6 +215,17 @@ spec:
       ports:
         - port: 443
           protocol: TCP
+    # 외부 HTTPS (카카오 OAuth, Firebase FCM 등)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
 ---
 # 10. chat → 같은 namespace 내 통신 + VPC 내부 AWS 서비스
 apiVersion: networking.k8s.io/v1
@@ -269,6 +280,17 @@ spec:
     - to:
         - ipBlock:
             cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # 외부 HTTPS (Firebase FCM 등)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
       ports:
         - port: 443
           protocol: TCP
@@ -354,6 +376,14 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
+    # NGF 메트릭 (nginx-gateway namespace)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway
+      ports:
+        - port: 9113
+          protocol: TCP
     # kubelet 메트릭 (모든 노드)
     - to:
         - ipBlock:
@@ -413,4 +443,25 @@ spec:
         - port: 3100
           protocol: TCP
         - port: 9090
+          protocol: TCP
+---
+# 14. kube-state-metrics → kube-apiserver (list/watch)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ksm-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Egress
+  egress:
+    # kube-apiserver
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6443
           protocol: TCP

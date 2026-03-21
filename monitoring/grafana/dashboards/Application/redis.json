@@ -24,7 +24,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
       "id": 1,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_up{env=\"\\"}", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_up{env=\"$env\"}", "refId": "A"}],
       "title": "Status",
       "type": "stat"
     },
@@ -34,7 +34,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
       "id": 2,
       "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_uptime_in_seconds{env=\"\\"}", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_uptime_in_seconds{env=\"$env\"}", "refId": "A"}],
       "title": "Uptime",
       "type": "stat"
     },
@@ -44,7 +44,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
       "id": 3,
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients{env=\"\\"}", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients{env=\"$env\"}", "refId": "A"}],
       "title": "Connected Clients",
       "type": "stat"
     },
@@ -54,7 +54,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 12, "y": 1},
       "id": 4,
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes{env=\"\\"}", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes{env=\"$env\"}", "refId": "A"}],
       "title": "Memory Used",
       "type": "stat"
     },
@@ -64,7 +64,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 16, "y": 1},
       "id": 5,
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total{env=\"\\"}[5m])", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total{env=\"$env\"}[5m])", "refId": "A"}],
       "title": "Commands/sec",
       "type": "stat"
     },
@@ -74,7 +74,7 @@
       "gridPos": {"h": 4, "w": 4, "x": 20, "y": 1},
       "id": 6,
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_keyspace_hits_total{env=\"\\"} / (redis_keyspace_hits_total{env=\"\\"} + redis_keyspace_misses_total{env=\"\\"})", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_keyspace_hits_total{env=\"$env\"} / (redis_keyspace_hits_total{env=\"$env\"} + redis_keyspace_misses_total{env=\"$env\"})", "refId": "A"}],
       "title": "Hit Rate",
       "type": "stat"
     },
@@ -91,10 +91,10 @@
       "id": 7,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes{env=\"\\"}", "legendFormat": "Used", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_rss_bytes{env=\"\\"}", "legendFormat": "RSS", "refId": "B"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_peak_bytes{env=\"\\"}", "legendFormat": "Peak", "refId": "C"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_max_bytes{env=\"\\"}", "legendFormat": "Max", "refId": "D"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes{env=\"$env\"}", "legendFormat": "Used", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_rss_bytes{env=\"$env\"}", "legendFormat": "RSS", "refId": "B"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_peak_bytes{env=\"$env\"}", "legendFormat": "Peak", "refId": "C"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_max_bytes{env=\"$env\"}", "legendFormat": "Max", "refId": "D"}
       ],
       "title": "Memory Usage",
       "type": "timeseries"
@@ -106,7 +106,7 @@
       "id": 8,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_mem_fragmentation_ratio{env=\"\\"}", "legendFormat": "Fragmentation Ratio", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_mem_fragmentation_ratio{env=\"$env\"}", "legendFormat": "Fragmentation Ratio", "refId": "A"}
       ],
       "title": "Memory Fragmentation Ratio",
       "type": "timeseries"
@@ -124,7 +124,7 @@
       "id": 9,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total{env=\"\\"}[5m])", "legendFormat": "Commands/sec", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total{env=\"$env\"}[5m])", "legendFormat": "Commands/sec", "refId": "A"}
       ],
       "title": "Commands per Second",
       "type": "timeseries"
@@ -136,7 +136,7 @@
       "id": 10,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "irate(redis_keyspace_hits_total{env=\"\\"}[5m]) / (irate(redis_keyspace_hits_total{env=\"\\"}[5m]) + irate(redis_keyspace_misses_total{env=\"\\"}[5m]))", "legendFormat": "Hit Rate", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "irate(redis_keyspace_hits_total{env=\"$env\"}[5m]) / (irate(redis_keyspace_hits_total{env=\"$env\"}[5m]) + irate(redis_keyspace_misses_total{env=\"$env\"}[5m]))", "legendFormat": "Hit Rate", "refId": "A"}
       ],
       "title": "Cache Hit Rate",
       "type": "timeseries"
@@ -154,8 +154,8 @@
       "id": 11,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients{env=\"\\"}", "legendFormat": "Connected", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_blocked_clients{env=\"\\"}", "legendFormat": "Blocked", "refId": "B"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients{env=\"$env\"}", "legendFormat": "Connected", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_blocked_clients{env=\"$env\"}", "legendFormat": "Blocked", "refId": "B"}
       ],
       "title": "Clients",
       "type": "timeseries"
@@ -167,8 +167,8 @@
       "id": 12,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_net_input_bytes_total{env=\"\\"}[5m])", "legendFormat": "Input", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_net_output_bytes_total{env=\"\\"}[5m])", "legendFormat": "Output", "refId": "B"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_net_input_bytes_total{env=\"$env\"}[5m])", "legendFormat": "Input", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_net_output_bytes_total{env=\"$env\"}[5m])", "legendFormat": "Output", "refId": "B"}
       ],
       "title": "Network I/O",
       "type": "timeseries"
@@ -180,8 +180,8 @@
       "id": 13,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_connections_received_total{env=\"\\"}[5m])", "legendFormat": "New Connections/sec", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_rejected_connections_total{env=\"\\"}[5m])", "legendFormat": "Rejected/sec", "refId": "B"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_connections_received_total{env=\"$env\"}[5m])", "legendFormat": "New Connections/sec", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_rejected_connections_total{env=\"$env\"}[5m])", "legendFormat": "Rejected/sec", "refId": "B"}
       ],
       "title": "Connections Rate",
       "type": "timeseries"
@@ -199,7 +199,7 @@
       "id": 14,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_db_keys{env=\"\\"}", "legendFormat": "{{db}} keys", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_db_keys{env=\"$env\"}", "legendFormat": "{{db}} keys", "refId": "A"}
       ],
       "title": "Keys by DB",
       "type": "timeseries"
@@ -211,8 +211,8 @@
       "id": 15,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_evicted_keys_total{env=\"\\"}[5m])", "legendFormat": "Evicted/sec", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_expired_keys_total{env=\"\\"}[5m])", "legendFormat": "Expired/sec", "refId": "B"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_evicted_keys_total{env=\"$env\"}[5m])", "legendFormat": "Evicted/sec", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_expired_keys_total{env=\"$env\"}[5m])", "legendFormat": "Expired/sec", "refId": "B"}
       ],
       "title": "Evicted & Expired Keys",
       "type": "timeseries"
@@ -224,7 +224,7 @@
       "id": 16,
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_rdb_changes_since_last_save{env=\"\\"}", "legendFormat": "Changes since save", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_rdb_changes_since_last_save{env=\"$env\"}", "legendFormat": "Changes since save", "refId": "A"}
       ],
       "title": "RDB Changes Since Last Save",
       "type": "timeseries"
