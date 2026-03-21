@@ -1,3 +1,7 @@
+storage:
+  tsdb:
+    out_of_order_time_window: 1h
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
