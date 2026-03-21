@@ -24,6 +24,10 @@ spec:
           env:
             - name: TZ
               value: Asia/Seoul
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           args:
             - run
             - /etc/alloy/config.alloy

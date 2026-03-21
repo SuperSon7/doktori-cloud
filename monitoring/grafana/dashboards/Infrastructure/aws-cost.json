@@ -3,7 +3,9 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "uid": "-- Grafana --" },
+        "datasource": {
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -20,23 +22,45 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "title": "비용 요약 (Month-to-Date)",
       "type": "row"
     },
     {
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch-account1"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "orange", "value": 100 },
-              { "color": "red", "value": 200 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
             ]
           },
           "unit": "currencyUSD",
@@ -44,19 +68,37 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
-          "dimensions": { "Currency": ["USD"] },
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch-account1"
+          },
+          "dimensions": {
+            "Currency": [
+              "USD"
+            ]
+          },
           "expression": "",
           "id": "",
           "matchExact": true,
@@ -74,17 +116,34 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch-account1"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "blue", "value": null },
-              { "color": "yellow", "value": 100 },
-              { "color": "orange", "value": 200 },
-              { "color": "red", "value": 400 }
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "orange",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 400
+              }
             ]
           },
           "unit": "currencyUSD",
@@ -92,19 +151,37 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
       "id": 4,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "none",
         "justifyMode": "center",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
-          "dimensions": { "Currency": ["USD"] },
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch-account1"
+          },
+          "dimensions": {
+            "Currency": [
+              "USD"
+            ]
+          },
           "expression": "",
           "id": "",
           "matchExact": true,
@@ -124,33 +201,73 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
       "id": 200,
       "title": "서비스별 비용 분포",
       "type": "row"
     },
     {
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch-account1"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "unit": "currencyUSD",
           "decimals": 2
         },
         "overrides": []
       },
-      "gridPos": { "h": 10, "w": 10, "x": 0, "y": 8 },
+      "gridPos": {
+        "h": 10,
+        "w": 10,
+        "x": 0,
+        "y": 8
+      },
       "id": 5,
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single" }
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
-          "dimensions": { "ServiceName": ["*"], "Currency": ["USD"] },
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch-account1"
+          },
+          "dimensions": {
+            "ServiceName": [
+              "*"
+            ],
+            "Currency": [
+              "USD"
+            ]
+          },
           "expression": "",
           "id": "",
           "matchExact": false,
@@ -168,47 +285,95 @@
       "type": "piechart"
     },
     {
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch-account1"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           },
           "unit": "currencyUSD",
           "decimals": 2,
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "color-background" },
+            "cellOptions": {
+              "type": "color-background"
+            },
             "filterable": true,
             "inspect": false
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "ServiceName" },
+            "matcher": {
+              "id": "byName",
+              "options": "ServiceName"
+            },
             "properties": [
-              { "id": "custom.width", "value": 250 }
+              {
+                "id": "custom.width",
+                "value": 250
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 10, "w": 14, "x": 10, "y": 8 },
+      "gridPos": {
+        "h": 10,
+        "w": 14,
+        "x": 10,
+        "y": 8
+      },
       "id": 6,
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "EstimatedCharges", "desc": true }],
-        "footer": { "show": true, "reducer": ["sum"], "countRows": false }
+        "sortBy": [
+          {
+            "displayName": "EstimatedCharges",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
-          "dimensions": { "ServiceName": ["*"], "Currency": ["USD"] },
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch-account1"
+          },
+          "dimensions": {
+            "ServiceName": [
+              "*"
+            ],
+            "Currency": [
+              "USD"
+            ]
+          },
           "expression": "",
           "id": "",
           "matchExact": false,
@@ -227,7 +392,9 @@
         {
           "id": "reduce",
           "options": {
-            "reducers": ["lastNotNull"],
+            "reducers": [
+              "lastNotNull"
+            ],
             "mode": "reduceFields",
             "includeTimeField": false
           }
@@ -237,16 +404,27 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
       "id": 300,
       "title": "비용 추이",
       "type": "row"
     },
     {
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch-account1"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
           "unit": "currencyUSD",
           "decimals": 2,
           "custom": {
@@ -261,25 +439,54 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "auto",
             "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
       "id": 9,
       "options": {
-        "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "cloudwatch", "uid": "cloudwatch-account1" },
-          "dimensions": { "Currency": ["USD"] },
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch-account1"
+          },
+          "dimensions": {
+            "Currency": [
+              "USD"
+            ]
+          },
           "expression": "",
           "id": "",
           "matchExact": true,
@@ -298,12 +505,29 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["aws", "cost", "billing"],
-  "templating": { "list": [] },
-  "time": { "from": "now/M", "to": "now" },
+  "tags": [
+    "aws",
+    "cost",
+    "billing"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now/M",
+    "to": "now"
+  },
   "timepicker": {
-    "refresh_intervals": ["6h", "12h", "1d"],
-    "time_options": ["7d", "30d", "90d"]
+    "refresh_intervals": [
+      "6h",
+      "12h",
+      "1d"
+    ],
+    "time_options": [
+      "7d",
+      "30d",
+      "90d"
+    ]
   },
   "timezone": "Asia/Seoul",
   "title": "AWS Cost Tracking",
