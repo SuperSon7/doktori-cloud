@@ -368,6 +368,14 @@ spec:
       ports:
         - port: 6443
           protocol: TCP
+    # CoreDNS 메트릭 스크래핑 (kube-system namespace)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 9153
+          protocol: TCP
     # Prometheus/Loki remote_write — HTTPS 외부 전송
     - to:
         - ipBlock:

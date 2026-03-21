@@ -1,6 +1,4 @@
 {
-  "__inputs": [],
-  "__requires": [],
   "description": "A dashboard that monitors Kubernetes and focuses on giving a overview for horizontal pod autoscalers. It is created using the [kubernetes-autoscaling-mixin](https://github.com/adinhodovic/kubernetes-autoscaling-mixin).",
   "editable": true,
   "links": [
@@ -70,7 +68,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_status_desired_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n"
         }
@@ -119,7 +117,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_status_current_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n"
         }
@@ -168,7 +166,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_min_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n"
         }
@@ -217,7 +215,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_max_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n"
         }
@@ -254,7 +252,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_target_metric{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\",\n      metric_name=~\"$metric_name\"\n    }\n  ) by (job, namespace, horizontalpodautoscaler, metric_name, metric_target_type)\n)\n",
           "format": "table",
@@ -335,7 +333,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_status_target_metric{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\",\n      metric_name=~\"$metric_name\",\n      metric_target_type=\"utilization\"\n    }\n  ) by (job, namespace, horizontalpodautoscaler, metric_name, metric_target_type)\n)\n",
           "legendFormat": "Utilization / {{ metric_name }}"
@@ -343,7 +341,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_target_metric{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\",\n      metric_name=~\"$metric_name\",\n      metric_target_type=\"utilization\"\n    }\n  ) by (job, namespace, horizontalpodautoscaler, metric_name, metric_target_type)\n)\n",
           "legendFormat": "Threshold / {{ metric_name }}"
@@ -395,7 +393,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_status_desired_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n",
           "legendFormat": "Desired Replicas"
@@ -403,7 +401,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_status_current_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n",
           "legendFormat": "Current Replicas"
@@ -411,7 +409,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_min_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n",
           "legendFormat": "Min Replicas"
@@ -419,7 +417,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "prometheus"
           },
           "expr": "round(\n  sum(\n    kube_horizontalpodautoscaler_spec_max_replicas{\n      job=~\"$job\",\n      namespace=~\"$namespace\",\n      horizontalpodautoscaler=\"$hpa\"\n    }\n  )\n)\n",
           "legendFormat": "Max Replicas"
@@ -439,15 +437,9 @@
   "templating": {
     "list": [
       {
-        "label": "Data source",
-        "name": "datasource",
-        "query": "prometheus",
-        "type": "datasource"
-      },
-      {
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "prometheus"
         },
         "label": "Job",
         "name": "job",
@@ -459,7 +451,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "prometheus"
         },
         "label": "Namespace",
         "multi": true,
@@ -472,7 +464,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "prometheus"
         },
         "label": "Horitzontal Pod Autoscaler",
         "name": "hpa",
@@ -484,7 +476,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "prometheus"
         },
         "includeAll": true,
         "label": "Metric Name",
