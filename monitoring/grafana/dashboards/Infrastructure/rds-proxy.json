@@ -9,26 +9,7 @@
   },
   "refresh": "30s",
   "templating": {
-    "list": [
-      {
-        "name": "proxy",
-        "type": "constant",
-        "query": "doktori-prod-proxy",
-        "current": {
-          "text": "doktori-prod-proxy",
-          "value": "doktori-prod-proxy"
-        },
-<<<<<<< Updated upstream
-        "query": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)",
-        "refresh": 1,
-        "includeAll": false,
-        "sort": 1,
-        "definition": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)"
-=======
-        "hide": 2
->>>>>>> Stashed changes
-      }
-    ]
+    "list": []
   },
   "panels": [
     {
@@ -66,20 +47,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "AvailabilityPercentage",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "AvailabilityPercentage",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -136,20 +116,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "ClientConnections",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "ClientConnections",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -157,6 +136,15 @@
           "unit": "",
           "color": {
             "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           }
         }
       },
@@ -189,20 +177,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnections",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -210,6 +197,15 @@
           "unit": "",
           "color": {
             "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           }
         }
       },
@@ -242,20 +238,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -263,6 +258,15 @@
           "unit": "",
           "color": {
             "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           }
         }
       },
@@ -295,20 +299,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "QueryRequests",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "QueryRequests",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Sum"
+          "statistic": "Sum",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -316,6 +319,15 @@
           "unit": "ops",
           "color": {
             "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           }
         }
       },
@@ -348,20 +360,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsSetupFailed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsSetupFailed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "Sum"
+          "statistic": "Sum",
+          "matchExact": true
         }
       ],
       "fieldConfig": {
@@ -434,20 +445,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "ClientConnections",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "ClientConnections",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "Client (App→Proxy)"
         },
         {
@@ -456,20 +466,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnections",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "DB (Proxy→RDS)"
         },
         {
@@ -478,21 +487,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "label": "Borrowed (active)"
+          "matchExact": true,
+          "label": "Borrowed"
         }
       ],
       "fieldConfig": {
@@ -534,20 +542,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "ClientConnectionsReceived",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "ClientConnectionsReceived",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
+          "matchExact": true,
           "label": "received"
         },
         {
@@ -556,43 +563,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
-          },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
           "metricName": "ClientConnectionsClosed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
-          "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
-          "region": "ap-northeast-2",
-          "statistic": "Sum",
-          "label": "closed"
-        },
-        {
-          "refId": "C",
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "ClientConnectionsNoTLS",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "no_tls"
+          "matchExact": true,
+          "label": "closed"
         }
       ],
       "fieldConfig": {
@@ -634,20 +618,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsSetupSucceeded",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsSetupSucceeded",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
+          "matchExact": true,
           "label": "success"
         },
         {
@@ -656,20 +639,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsSetupFailed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsSetupFailed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
+          "matchExact": true,
           "label": "failed"
         }
       ],
@@ -700,7 +682,7 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "Connection Pool Saturation",
+      "title": "Pool Saturation",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -712,20 +694,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "borrowed"
         },
         {
@@ -734,20 +715,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsCurrentlySessionPinned",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsCurrentlySessionPinned",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "pinned"
         },
         {
@@ -756,21 +736,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnectionsCurrentlyInTransaction",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnectionsCurrentlyInTransaction",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "label": "in_transaction"
+          "matchExact": true,
+          "label": "in_txn"
         }
       ],
       "fieldConfig": {
@@ -800,7 +779,7 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Max DB Connections Allowed",
+      "title": "Max Allowed vs Current",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -812,20 +791,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "MaxDatabaseConnectionsAllowed",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "MaxDatabaseConnectionsAllowed",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "max_allowed"
         },
         {
@@ -834,20 +812,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnections",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "current"
         }
       ],
@@ -910,20 +887,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "QueryRequests",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "QueryRequests",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
+          "matchExact": true,
           "label": "queries"
         }
       ],
@@ -966,20 +942,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "QueryDatabaseResponseLatency",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "QueryDatabaseResponseLatency",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "avg"
         },
         {
@@ -988,21 +963,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "QueryResponseLatency",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "QueryDatabaseResponseLatency",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
-          "statistic": "p99",
-          "label": "p99"
+          "statistic": "Average",
+          "matchExact": true,
+          "label": "total avg"
         }
       ],
       "fieldConfig": {
@@ -1044,20 +1018,19 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
+          "queryMode": "Metrics",
+          "type": "timeSeriesQuery",
+          "namespace": "AWS/RDS",
+          "metricName": "AvailabilityPercentage",
           "dimensions": {
             "ProxyName": [
               "doktori-prod-proxy"
             ]
           },
-          "metricName": "AvailabilityPercentage",
-          "namespace": "AWS/RDS",
-<<<<<<< Updated upstream
           "period": "60",
-=======
-          "period": "300",
->>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
+          "matchExact": true,
           "label": "availability %"
         }
       ],

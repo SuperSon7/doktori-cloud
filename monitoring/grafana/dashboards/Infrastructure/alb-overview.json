@@ -10,32 +10,28 @@
   "templating": {
     "list": [
       {
-<<<<<<< Updated upstream
-        "current": {},
+        "name": "alb",
+        "type": "query",
         "datasource": {
           "type": "cloudwatch",
           "uid": "cloudwatch"
         },
-        "definition": "dimension_values(ap-northeast-2, AWS/ApplicationELB, RequestCount, LoadBalancer)",
-        "includeAll": false,
-        "label": "ALB",
-        "name": "alb",
-        "options": [],
         "query": "dimension_values(ap-northeast-2, AWS/ApplicationELB, RequestCount, LoadBalancer)",
         "refresh": 1,
-        "regex": "",
+        "includeAll": false,
         "sort": 1,
-        "type": "query"
-=======
-        "name": "alb",
-        "type": "constant",
-        "query": "app/doktori-prod-fe-alb/d6f5d7972b202965",
         "current": {
-          "text": "doktori-prod-fe-alb",
+          "selected": true,
+          "text": "app/doktori-prod-fe-alb/d6f5d7972b202965",
           "value": "app/doktori-prod-fe-alb/d6f5d7972b202965"
         },
-        "hide": 2
->>>>>>> Stashed changes
+        "options": [
+          {
+            "selected": true,
+            "text": "app/doktori-prod-fe-alb/d6f5d7972b202965",
+            "value": "app/doktori-prod-fe-alb/d6f5d7972b202965"
+          }
+        ]
       }
     ]
   },
@@ -66,21 +62,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -111,21 +100,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HealthyHostCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -167,21 +149,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "UnHealthyHostCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -223,21 +198,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -263,21 +231,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -308,21 +269,14 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": "",
           "label": ""
         }
@@ -376,22 +330,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "avg",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         },
         {
@@ -399,22 +346,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "p99",
           "label": "p99",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
@@ -447,22 +387,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "requests",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
@@ -507,22 +440,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_2XX_Count",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "2xx",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         },
         {
@@ -530,22 +456,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_4XX_Count",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "4xx",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         },
         {
@@ -553,22 +472,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "5xx",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
@@ -601,22 +513,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_ELB_5XX_Count",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "ELB 5xx",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         },
         {
@@ -624,22 +529,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RejectedConnectionCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "Rejected",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
@@ -684,22 +582,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "Active",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         },
         {
@@ -707,22 +598,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "NewConnectionCount",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "New",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
@@ -755,22 +639,15 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ProcessedBytes",
           "dimensions": {
-<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
-=======
-            "LoadBalancer": [
-              "app/doktori-prod-fe-alb/d6f5d7972b202965"
-            ]
->>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "bytes",
-          "matchExact": false,
-          "id": "",
           "metricQueryType": 0,
           "metricEditorMode": 0,
+          "matchExact": false,
           "expression": ""
         }
       ],
