@@ -14,7 +14,7 @@
       }
     ]
   },
-  "description": "AWS Cost Tracking — 메인 계정 비용 추적",
+  "description": "AWS Cost Tracking \u2014 \uba54\uc778 \uacc4\uc815 \ube44\uc6a9 \ucd94\uc801",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -29,7 +29,7 @@
         "y": 0
       },
       "id": 100,
-      "title": "비용 요약 (Month-to-Date)",
+      "title": "\ube44\uc6a9 \uc694\uc57d (Month-to-Date)",
       "type": "row"
     },
     {
@@ -95,24 +95,23 @@
             "uid": "cloudwatch-account1"
           },
           "dimensions": {
-            "Currency": [
-              "USD"
-            ]
+            "Currency": "USD"
           },
           "expression": "",
           "id": "",
-          "matchExact": true,
+          "matchExact": false,
           "metricEditorMode": 0,
           "metricName": "EstimatedCharges",
           "metricQueryType": 0,
           "namespace": "AWS/Billing",
-          "period": "86400",
+          "period": "",
           "refId": "A",
           "region": "us-east-1",
-          "statistic": "Maximum"
+          "statistic": "Maximum",
+          "label": ""
         }
       ],
-      "title": "MTD 비용",
+      "title": "MTD \ube44\uc6a9",
       "type": "stat"
     },
     {
@@ -178,25 +177,24 @@
             "uid": "cloudwatch-account1"
           },
           "dimensions": {
-            "Currency": [
-              "USD"
-            ]
+            "Currency": "USD"
           },
           "expression": "",
           "id": "",
-          "matchExact": true,
+          "matchExact": false,
           "metricEditorMode": 0,
           "metricName": "EstimatedCharges",
           "metricQueryType": 0,
           "namespace": "AWS/Billing",
-          "period": "86400",
+          "period": "",
           "refId": "A",
           "region": "us-east-1",
-          "statistic": "Maximum"
+          "statistic": "Maximum",
+          "label": ""
         }
       ],
-      "title": "월말 예측 (일평균 x 30)",
-      "description": "현재 MTD / 경과 일수 * 30",
+      "title": "\uc6d4\ub9d0 \uc608\uce21 (\uc77c\ud3c9\uade0 x 30)",
+      "description": "\ud604\uc7ac MTD / \uacbd\uacfc \uc77c\uc218 * 30",
       "type": "stat"
     },
     {
@@ -208,7 +206,7 @@
         "y": 7
       },
       "id": 200,
-      "title": "서비스별 비용 분포",
+      "title": "\uc11c\ube44\uc2a4\ubcc4 \ube44\uc6a9 \ubd84\ud3ec",
       "type": "row"
     },
     {
@@ -261,12 +259,8 @@
             "uid": "cloudwatch-account1"
           },
           "dimensions": {
-            "ServiceName": [
-              "*"
-            ],
-            "Currency": [
-              "USD"
-            ]
+            "ServiceName": "*",
+            "Currency": "USD"
           },
           "expression": "",
           "id": "",
@@ -275,13 +269,14 @@
           "metricName": "EstimatedCharges",
           "metricQueryType": 0,
           "namespace": "AWS/Billing",
-          "period": "86400",
+          "period": "",
           "refId": "A",
           "region": "us-east-1",
-          "statistic": "Maximum"
+          "statistic": "Maximum",
+          "label": ""
         }
       ],
-      "title": "서비스별 비용 비율",
+      "title": "\uc11c\ube44\uc2a4\ubcc4 \ube44\uc6a9 \ube44\uc728",
       "type": "piechart"
     },
     {
@@ -367,12 +362,8 @@
             "uid": "cloudwatch-account1"
           },
           "dimensions": {
-            "ServiceName": [
-              "*"
-            ],
-            "Currency": [
-              "USD"
-            ]
+            "ServiceName": "*",
+            "Currency": "USD"
           },
           "expression": "",
           "id": "",
@@ -381,13 +372,14 @@
           "metricName": "EstimatedCharges",
           "metricQueryType": 0,
           "namespace": "AWS/Billing",
-          "period": "86400",
+          "period": "",
           "refId": "A",
           "region": "us-east-1",
-          "statistic": "Maximum"
+          "statistic": "Maximum",
+          "label": ""
         }
       ],
-      "title": "서비스별 비용 상세",
+      "title": "\uc11c\ube44\uc2a4\ubcc4 \ube44\uc6a9 \uc0c1\uc138",
       "transformations": [
         {
           "id": "reduce",
@@ -411,7 +403,7 @@
         "y": 18
       },
       "id": 300,
-      "title": "비용 추이",
+      "title": "\ube44\uc6a9 \ucd94\uc774",
       "type": "row"
     },
     {
@@ -483,24 +475,23 @@
             "uid": "cloudwatch-account1"
           },
           "dimensions": {
-            "Currency": [
-              "USD"
-            ]
+            "Currency": "USD"
           },
           "expression": "",
           "id": "",
-          "matchExact": true,
+          "matchExact": false,
           "metricEditorMode": 0,
           "metricName": "EstimatedCharges",
           "metricQueryType": 0,
           "namespace": "AWS/Billing",
-          "period": "21600",
+          "period": "",
           "refId": "A",
           "region": "us-east-1",
-          "statistic": "Maximum"
+          "statistic": "Maximum",
+          "label": ""
         }
       ],
-      "title": "MTD 비용 추이",
+      "title": "MTD \ube44\uc6a9 \ucd94\uc774",
       "type": "timeseries"
     }
   ],

@@ -34,7 +34,7 @@
     },
     {
       "id": 2,
-      "type": "stat",
+      "type": "gauge",
       "title": "Availability",
       "datasource": {
         "type": "cloudwatch",
@@ -47,19 +47,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "AvailabilityPercentage",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -98,12 +99,13 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
       "id": 3,
-      "type": "stat",
+      "type": "gauge",
       "title": "Client Connections",
       "datasource": {
         "type": "cloudwatch",
@@ -116,19 +118,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "ClientConnections",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -159,12 +162,13 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
       "id": 4,
-      "type": "stat",
+      "type": "gauge",
       "title": "DB Connections",
       "datasource": {
         "type": "cloudwatch",
@@ -177,19 +181,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnections",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -220,12 +225,13 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
       "id": 5,
-      "type": "stat",
+      "type": "gauge",
       "title": "Borrowed",
       "datasource": {
         "type": "cloudwatch",
@@ -238,19 +244,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -281,12 +288,13 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
       "id": 6,
-      "type": "stat",
+      "type": "gauge",
       "title": "Query Requests",
       "datasource": {
         "type": "cloudwatch",
@@ -299,19 +307,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "QueryRequests",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -342,12 +351,13 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
       "id": 7,
-      "type": "stat",
+      "type": "gauge",
       "title": "Setup Failed",
       "datasource": {
         "type": "cloudwatch",
@@ -360,19 +370,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsSetupFailed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -407,7 +418,8 @@
           "calcs": [
             "lastNotNull"
           ]
-        }
+        },
+        "showThresholdMarkers": false
       }
     },
     {
@@ -420,7 +432,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "## Connections — Pooling Effect"
+        "content": "## Connections \u2014 Pooling Effect"
       },
       "gridPos": {
         "x": 0,
@@ -445,20 +457,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "ClientConnections",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "Client (App→Proxy)"
+          "matchExact": false,
+          "label": "Client (App\u2192Proxy)",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -466,20 +478,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnections",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "DB (Proxy→RDS)"
+          "matchExact": false,
+          "label": "DB (Proxy\u2192RDS)",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "C",
@@ -487,20 +499,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "Borrowed"
+          "matchExact": false,
+          "label": "Borrowed",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -542,20 +554,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "ClientConnectionsReceived",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true,
-          "label": "received"
+          "matchExact": false,
+          "label": "received",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -563,20 +575,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "ClientConnectionsClosed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true,
-          "label": "closed"
+          "matchExact": false,
+          "label": "closed",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -618,20 +630,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsSetupSucceeded",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true,
-          "label": "success"
+          "matchExact": false,
+          "label": "success",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -639,20 +651,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsSetupFailed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true,
-          "label": "failed"
+          "matchExact": false,
+          "label": "failed",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -694,20 +706,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "borrowed"
+          "matchExact": false,
+          "label": "borrowed",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -715,20 +727,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsCurrentlySessionPinned",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "pinned"
+          "matchExact": false,
+          "label": "pinned",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "C",
@@ -736,20 +748,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnectionsCurrentlyInTransaction",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "in_txn"
+          "matchExact": false,
+          "label": "in_txn",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -791,20 +803,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "MaxDatabaseConnectionsAllowed",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "max_allowed"
+          "matchExact": false,
+          "label": "max_allowed",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -812,20 +824,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnections",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "current"
+          "matchExact": false,
+          "label": "current",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -887,20 +899,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "QueryRequests",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "matchExact": true,
-          "label": "queries"
+          "matchExact": false,
+          "label": "queries",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -942,20 +954,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "QueryDatabaseResponseLatency",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "avg"
+          "matchExact": false,
+          "label": "avg",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
@@ -963,20 +975,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "QueryResponseLatency",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "total avg"
+          "matchExact": false,
+          "label": "total avg",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -1018,20 +1030,20 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "queryMode": "Metrics",
           "type": "timeSeriesQuery",
           "namespace": "AWS/RDS",
           "metricName": "AvailabilityPercentage",
           "dimensions": {
-            "ProxyName": [
-              "doktori-prod-proxy"
-            ]
+            "ProxyName": "doktori-prod-proxy"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "matchExact": true,
-          "label": "availability %"
+          "matchExact": false,
+          "label": "availability %",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
