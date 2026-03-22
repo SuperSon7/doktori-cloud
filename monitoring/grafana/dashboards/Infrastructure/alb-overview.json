@@ -10,16 +10,21 @@
   "templating": {
     "list": [
       {
-        "name": "alb",
-        "type": "query",
+        "current": {},
         "datasource": {
           "type": "cloudwatch",
           "uid": "cloudwatch"
         },
+        "definition": "dimension_values(ap-northeast-2, AWS/ApplicationELB, RequestCount, LoadBalancer)",
+        "includeAll": false,
+        "label": "ALB",
+        "name": "alb",
+        "options": [],
         "query": "dimension_values(ap-northeast-2, AWS/ApplicationELB, RequestCount, LoadBalancer)",
         "refresh": 1,
-        "includeAll": false,
-        "sort": 1
+        "regex": "",
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -50,13 +55,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Sum"
+          "statistic": "Sum",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -85,13 +94,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HealthyHostCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -131,13 +144,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "UnHealthyHostCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -177,13 +194,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Sum"
+          "statistic": "Sum",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "gridPos": {
@@ -207,13 +228,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Average"
+          "statistic": "Average",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -242,13 +267,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
-          "statistic": "Sum"
+          "statistic": "Sum",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": "",
+          "label": ""
         }
       ],
       "fieldConfig": {
@@ -300,28 +329,34 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Average",
-          "label": "avg"
+          "label": "avg",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "p99",
-          "label": "p99"
+          "label": "p99",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -353,14 +388,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "requests"
+          "label": "requests",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -404,42 +442,51 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_2XX_Count",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "2xx"
+          "label": "2xx",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_4XX_Count",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "4xx"
+          "label": "4xx",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "C",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "5xx"
+          "label": "5xx",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -471,28 +518,34 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_ELB_5XX_Count",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "ELB 5xx"
+          "label": "ELB 5xx",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RejectedConnectionCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "Rejected"
+          "label": "Rejected",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -536,28 +589,34 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "Active"
+          "label": "Active",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "NewConnectionCount",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "New"
+          "label": "New",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {
@@ -589,14 +648,17 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ProcessedBytes",
           "dimensions": {
-            "LoadBalancer": [
-              "$alb"
-            ]
+            "LoadBalancer": "$alb"
           },
-          "period": "60",
+          "period": "",
           "region": "ap-northeast-2",
           "statistic": "Sum",
-          "label": "bytes"
+          "label": "bytes",
+          "matchExact": false,
+          "id": "",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "expression": ""
         }
       ],
       "fieldConfig": {

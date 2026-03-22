@@ -11,16 +11,21 @@
   "templating": {
     "list": [
       {
-        "name": "proxy",
-        "type": "query",
+        "current": {},
         "datasource": {
           "type": "cloudwatch",
           "uid": "cloudwatch"
         },
+        "definition": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
+        "includeAll": false,
+        "label": "Proxy",
+        "name": "proxy",
+        "options": [],
         "query": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
         "refresh": 1,
-        "includeAll": false,
-        "sort": 1
+        "regex": "",
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
