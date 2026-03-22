@@ -1,0 +1,991 @@
+{
+  "uid": "rds-proxy",
+  "title": "RDS Proxy",
+  "editable": true,
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "proxy",
+        "type": "query",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "query": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
+        "refresh": 1,
+        "includeAll": false,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Overview"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "transparent": true
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Availability",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "AvailabilityPercentage",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Client Connections",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "ClientConnections",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "DB Connections",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnections",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Borrowed",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Query Requests",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "QueryRequests",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Setup Failed",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsSetupFailed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 2,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "text",
+      "title": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Connections — Pooling Effect"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 2
+      },
+      "transparent": true
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Client vs DB Connections",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "ClientConnections",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "Client (App→Proxy)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnections",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "DB (Proxy→RDS)"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "Borrowed (active)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Connection Lifecycle",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "ClientConnectionsReceived",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "received"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "ClientConnectionsClosed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "closed"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "ClientConnectionsNoTLS",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "no_tls"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "DB Connection Setup",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsSetupSucceeded",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "success"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsSetupFailed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "failed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Connection Pool Saturation",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsCurrentlyBorrowed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "borrowed"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsCurrentlySessionPinned",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "pinned"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnectionsCurrentlyInTransaction",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "in_transaction"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Max DB Connections Allowed",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "MaxDatabaseConnectionsAllowed",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "max_allowed"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "DatabaseConnections",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "current"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "text",
+      "title": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Performance"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 2
+      },
+      "transparent": true
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Query Requests",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "QueryRequests",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Sum",
+          "label": "queries"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Query Response Latency",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "QueryDatabaseResponseLatency",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "QueryDatabaseResponseLatency",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "p99",
+          "label": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 26,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Availability",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "dimensions": {
+            "ProxyName": [
+              "$proxy"
+            ]
+          },
+          "metricName": "AvailabilityPercentage",
+          "namespace": "AWS/RDSProxy",
+          "period": "60",
+          "region": "ap-northeast-2",
+          "statistic": "Average",
+          "label": "availability %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": true
+          }
+        }
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 26,
+        "w": 8,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}
