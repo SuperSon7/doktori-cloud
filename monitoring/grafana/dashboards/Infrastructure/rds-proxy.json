@@ -11,21 +11,17 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "name": "proxy",
+        "type": "query",
         "datasource": {
           "type": "cloudwatch",
           "uid": "cloudwatch"
         },
-        "definition": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
-        "includeAll": false,
-        "label": "Proxy",
-        "name": "proxy",
-        "options": [],
-        "query": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
+        "query": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)",
         "refresh": 1,
-        "regex": "",
+        "includeAll": false,
         "sort": 1,
-        "type": "query"
+        "definition": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)"
       }
     ]
   },
@@ -71,7 +67,7 @@
             ]
           },
           "metricName": "AvailabilityPercentage",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average"
@@ -137,7 +133,7 @@
             ]
           },
           "metricName": "ClientConnections",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average"
@@ -186,7 +182,7 @@
             ]
           },
           "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average"
@@ -235,7 +231,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average"
@@ -284,7 +280,7 @@
             ]
           },
           "metricName": "QueryRequests",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum"
@@ -333,7 +329,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsSetupFailed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum"
@@ -415,7 +411,7 @@
             ]
           },
           "metricName": "ClientConnections",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -433,7 +429,7 @@
             ]
           },
           "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -451,7 +447,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -503,7 +499,7 @@
             ]
           },
           "metricName": "ClientConnectionsReceived",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -521,7 +517,7 @@
             ]
           },
           "metricName": "ClientConnectionsClosed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -539,7 +535,7 @@
             ]
           },
           "metricName": "ClientConnectionsNoTLS",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -591,7 +587,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsSetupSucceeded",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -609,7 +605,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsSetupFailed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -661,7 +657,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -679,7 +675,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlySessionPinned",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -697,7 +693,7 @@
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyInTransaction",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -749,7 +745,7 @@
             ]
           },
           "metricName": "MaxDatabaseConnectionsAllowed",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -767,7 +763,7 @@
             ]
           },
           "metricName": "DatabaseConnections",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -839,7 +835,7 @@
             ]
           },
           "metricName": "QueryRequests",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Sum",
@@ -891,7 +887,7 @@
             ]
           },
           "metricName": "QueryDatabaseResponseLatency",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
@@ -909,7 +905,7 @@
             ]
           },
           "metricName": "QueryDatabaseResponseLatency",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "p99",
@@ -961,7 +957,7 @@
             ]
           },
           "metricName": "AvailabilityPercentage",
-          "namespace": "AWS/RDSProxy",
+          "namespace": "AWS/RDS",
           "period": "60",
           "region": "ap-northeast-2",
           "statistic": "Average",
