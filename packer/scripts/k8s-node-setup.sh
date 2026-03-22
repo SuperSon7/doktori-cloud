@@ -19,8 +19,18 @@ echo "============================================="
 # 1. 시스템 업데이트 + 필수 패키지
 # -----------------------------------------------------------------------------
 echo "[1/7] 필수 패키지 설치..."
-apt-get update -qq
-apt-get install -y -qq \
+
+# cloud-init이 apt lock을 잡고 있을 수 있음 — 최대 60초 대기
+for i in $(seq 1 12); do
+  if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then break; fi
+  echo "  → apt lock 대기 중... ($i/12)"
+  sleep 5
+done
+
+# universe repo 활성화 (conntrack, socat 등)
+add-apt-repository -y universe 2>/dev/null || true
+apt-get update
+apt-get install -y \
   ca-certificates curl gnupg apt-transport-https \
   conntrack socat \
   unzip jq htop net-tools

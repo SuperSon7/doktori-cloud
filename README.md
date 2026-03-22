@@ -100,7 +100,7 @@ main push → ArgoCD sync → K8s cluster apply
 | Terraform | 1.14.x | 로컬 설치 |
 | Helm | 3.x | 노드 설치 스크립트 |
 | Chaos Mesh | 2.7.2 | `k8s/install-chaos-mesh.sh` |
-| ECR credential provider | cloud-provider-aws | `ansible/roles/k8s-post-bootstrap/tasks/ecr-credential-provider.yml` |
+| ECR credential provider | v1.31.0 | `ansible/roles/k8s-post-bootstrap/tasks/ecr-credential-provider.yml` |
 
 ## 디렉토리 구조
 
