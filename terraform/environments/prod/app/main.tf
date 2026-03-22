@@ -349,7 +349,7 @@ module "k8s_cluster" {
     local.net.subnet_ids["private_app_b"],
   ]
 
-  ami_id                    = "ami-0ef978e3253fc81b2"
+  ami_id                    = "ami-0e13e9e82acf3c6fc"  # K8s 1.34.6 + containerd 1.7.25
   iam_instance_profile_name = module.compute.iam_instance_profile_name
 
   master_instance_type = "t4g.medium"

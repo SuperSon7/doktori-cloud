@@ -74,12 +74,23 @@ if kubectl get installation default &>/dev/null 2>&1; then
 else
   kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
 
+  # Operator CRD 등록 대기
+  echo "  → Calico Operator CRD 등록 대기..."
+  for i in $(seq 1 30); do
+    if kubectl get crd installations.operator.tigera.io &>/dev/null; then
+      echo "  → CRD 등록 완료"
+      break
+    fi
+    echo "  → 대기 중... ($i/30)"
+    sleep 5
+  done
+
   # custom-resources.yaml 다운로드 + AWS용 수정
   curl -sO "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
   sed -i 's/encapsulation: .*/encapsulation: VXLAN/' custom-resources.yaml
   sed -i '/calicoNetwork:/a\    bgp: Disabled' custom-resources.yaml
 
-  kubectl create -f custom-resources.yaml
+  kubectl apply -f custom-resources.yaml
   rm -f custom-resources.yaml
 
   echo "  → Calico 설치됨. VXLAN 모드, BGP Disabled."
@@ -140,7 +151,11 @@ else
     --set nginx.config.rewriteClientIP.mode=XForwardedFor \
     --set nginx.config.rewriteClientIP.setIPRecursively=false \
     --set "nginx.config.rewriteClientIP.trustedAddresses[0].type=CIDR" \
-    --set "nginx.config.rewriteClientIP.trustedAddresses[0].value=10.0.0.0/8"
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].value=10.0.0.0/8" \
+    --set "certGenerator.tolerations[0].key=node-role.kubernetes.io/control-plane" \
+    --set "certGenerator.tolerations[0].effect=NoSchedule" \
+    --set "nginxGateway.tolerations[0].key=node-role.kubernetes.io/control-plane" \
+    --set "nginxGateway.tolerations[0].effect=NoSchedule"
   echo "  → NGF 설치 완료 (NodePort 30080/30443, externalTrafficPolicy=Cluster)"
 fi
 
