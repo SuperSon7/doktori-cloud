@@ -24,7 +24,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: nginx-gateway-fabric
+              app.kubernetes.io/name: doktori-gateway-nginx
       ports:
         - port: 8080
           protocol: TCP
@@ -51,7 +51,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: nginx-gateway-fabric
+              app.kubernetes.io/name: doktori-gateway-nginx
       ports:
         - port: 8081
           protocol: TCP
@@ -164,7 +164,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nginx-gateway-fabric
+      app.kubernetes.io/name: doktori-gateway-nginx
   policyTypes:
     - Egress
   egress:
