@@ -17,15 +17,10 @@
           "type": "cloudwatch",
           "uid": "cloudwatch"
         },
-        "query": {
-          "queryType": "dimensionValues",
-          "region": "ap-northeast-2",
-          "namespace": "AWS/RDSProxy",
-          "dimensionKey": "ProxyName",
-          "metricName": "ClientConnections"
-        },
+        "query": "dimension_values(ap-northeast-2, AWS/RDSProxy, ClientConnections, ProxyName)",
         "refresh": 1,
-        "includeAll": false
+        "includeAll": false,
+        "sort": 1
       }
     ]
   },
