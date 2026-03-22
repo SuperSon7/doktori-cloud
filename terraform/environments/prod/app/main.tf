@@ -46,9 +46,9 @@ locals {
     control_plane_endpoint = "k8s.${var.environment}.doktori.internal"
     pod_cidr               = "192.168.0.0/16"
     service_cidr           = "172.16.0.0/16"
-    calico_version         = "v3.29.3"
+    calico_version         = "v3.31.4"
     gateway_api_version    = "v1.4.1"
-    ngf_version            = "1.6.2"
+    ngf_version            = "2.4.2"
   })
 
   k8s_worker_user_data = templatefile("${path.module}/templates/k8s_worker_user_data.sh.tftpl", {
@@ -304,7 +304,7 @@ resource "aws_codedeploy_deployment_group" "frontend_prod" {
   deployment_group_name  = local.frontend_codedeploy_deployment_group_name
   service_role_arn       = aws_iam_role.frontend_codedeploy_service.arn
   autoscaling_groups     = [module.frontend.asg_name]
-  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+  deployment_config_name = "CodeDeployDefault.HalfAtATime"
 
   deployment_style {
     deployment_option = "WITH_TRAFFIC_CONTROL"

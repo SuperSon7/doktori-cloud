@@ -18,7 +18,7 @@ if [ $# -lt 1 ]; then
 fi
 
 NODE_HOSTNAME="$1"
-K8S_VERSION="v1.31"
+K8S_VERSION="v1.34"
 
 echo "============================================="
 echo " 노드 초기화: ${NODE_HOSTNAME}"

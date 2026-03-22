@@ -39,13 +39,13 @@ variable "subnet_filter_name" {
 variable "k8s_version" {
   description = "Kubernetes minor version (apt repo)"
   type        = string
-  default     = "v1.31"
+  default     = "v1.34"
 }
 
 variable "containerd_version" {
   description = "containerd.io 패키지 버전"
   type        = string
-  default     = "1.7.24-1"
+  default     = "1.7.25-1"
 }
 
 variable "docker_version" {

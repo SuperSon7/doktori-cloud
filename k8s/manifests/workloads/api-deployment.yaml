@@ -23,8 +23,6 @@ spec:
         app: doktori
         component: api
     spec:
-      imagePullSecrets:
-        - name: ecr-credentials
       priorityClassName: high-priority
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:

@@ -219,10 +219,13 @@ data:
 
     // =============================================================
     // 3-4. Nginx Gateway Fabric 메트릭
+    // NGF v2.x: data plane Service = <gateway-name>-nginx (prod ns)
+    // Gateway 이름이 doktori-gateway이므로 Service = doktori-gateway-nginx
+    // 부트스트랩 후 확인: kubectl get svc -A | grep nginx
     // =============================================================
     prometheus.scrape "ngf" {
       targets = [{
-        __address__ = "nginx-gateway-nginx.nginx-gateway.svc.cluster.local:9113",
+        __address__ = "doktori-gateway-nginx.prod.svc.cluster.local:9113",
       }]
       forward_to = [prometheus.relabel.ngf_env.receiver]
       scrape_interval = "30s"

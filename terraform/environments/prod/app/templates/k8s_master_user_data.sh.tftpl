@@ -149,15 +149,20 @@ if [ "$${IS_FIRST}" = true ]; then
   echo "[Gateway API] CRD $${GATEWAY_API_VERSION} 설치..."
   kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
 
-  # --- NGINX Gateway Fabric ---
+  # --- NGINX Gateway Fabric v2.x ---
   echo "[NGF] $${NGF_VERSION} 설치..."
   helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
     --version "$${NGF_VERSION}" \
     --namespace nginx-gateway \
     --create-namespace \
-    --set service.type=NodePort \
-    --set "service.ports[0].port=80,service.ports[0].targetPort=80,service.ports[0].nodePort=30080,service.ports[0].protocol=TCP,service.ports[0].name=http" \
-    --set "service.ports[1].port=443,service.ports[1].targetPort=443,service.ports[1].nodePort=30443,service.ports[1].protocol=TCP,service.ports[1].name=https"
+    --set nginx.service.type=NodePort \
+    --set nginx.service.externalTrafficPolicy=Cluster \
+    --set "nginx.service.nodePorts[0].port=30080,nginx.service.nodePorts[0].listenerPort=80" \
+    --set "nginx.service.nodePorts[1].port=30443,nginx.service.nodePorts[1].listenerPort=443" \
+    --set nginx.config.rewriteClientIP.mode=XForwardedFor \
+    --set nginx.config.rewriteClientIP.setIPRecursively=false \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].type=CIDR" \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].value=10.0.0.0/8"
 
   echo "  → 클러스터 초기화 완료"
 

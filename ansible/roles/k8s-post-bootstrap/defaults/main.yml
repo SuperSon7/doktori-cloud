@@ -17,15 +17,15 @@ loki_port: "3100"
 # --- Helm 차트 버전 ---
 metrics_server_version: "3.12.2"
 kube_state_metrics_version: "5.28.1"
-argocd_chart_version: "7.8.13"
+argocd_chart_version: "8.0.14"
 
 # --- 컨테이너 이미지 ---
-alloy_version: "v1.9.0"
+alloy_version: "v1.14.1"
 
 # --- HPA ---
 hpa_cpu_target: 60
 hpa_min_replicas: 2
-hpa_max_replicas: 4
+hpa_max_replicas: 8
 
 # --- ArgoCD ---
 argocd_nodeport: 31443

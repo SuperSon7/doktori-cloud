@@ -7,8 +7,8 @@
 # =============================================================================
 set -euo pipefail
 
-K8S_VERSION="${K8S_VERSION:-v1.31}"
-CONTAINERD_VERSION="${CONTAINERD_VERSION:-1.7.24-1}"
+K8S_VERSION="${K8S_VERSION:-v1.34}"
+CONTAINERD_VERSION="${CONTAINERD_VERSION:-1.7.25-1}"
 
 echo "============================================="
 echo " K8s Node AMI Build"
