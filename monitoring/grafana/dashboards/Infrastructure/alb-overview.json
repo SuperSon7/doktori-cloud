@@ -10,6 +10,7 @@
   "templating": {
     "list": [
       {
+<<<<<<< Updated upstream
         "current": {},
         "datasource": {
           "type": "cloudwatch",
@@ -25,6 +26,16 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+=======
+        "name": "alb",
+        "type": "constant",
+        "query": "app/doktori-prod-fe-alb/d6f5d7972b202965",
+        "current": {
+          "text": "doktori-prod-fe-alb",
+          "value": "app/doktori-prod-fe-alb/d6f5d7972b202965"
+        },
+        "hide": 2
+>>>>>>> Stashed changes
       }
     ]
   },
@@ -55,7 +66,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -94,7 +111,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HealthyHostCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -144,7 +167,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "UnHealthyHostCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -194,7 +223,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -228,7 +263,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -267,7 +308,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -329,7 +376,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -346,7 +399,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -388,7 +447,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -442,7 +507,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_2XX_Count",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -459,7 +530,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_4XX_Count",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -476,7 +553,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -518,7 +601,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_ELB_5XX_Count",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -535,7 +624,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RejectedConnectionCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -589,7 +684,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ActiveConnectionCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -606,7 +707,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "NewConnectionCount",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",
@@ -648,7 +755,13 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "ProcessedBytes",
           "dimensions": {
+<<<<<<< Updated upstream
             "LoadBalancer": "$alb"
+=======
+            "LoadBalancer": [
+              "app/doktori-prod-fe-alb/d6f5d7972b202965"
+            ]
+>>>>>>> Stashed changes
           },
           "period": "",
           "region": "ap-northeast-2",

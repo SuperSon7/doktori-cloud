@@ -139,3 +139,146 @@ resource "aws_db_instance" "main" {
     prevent_destroy = true
   }
 }
+
+# =============================================================================
+# RDS Proxy
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Secrets Manager — Proxy가 RDS 인증에 사용
+# -----------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "db_credentials" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  name        = "${var.project_name}-${var.environment}-db-credentials"
+  description = "RDS credentials for RDS Proxy authentication"
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-db-credentials"
+    Service = "db"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "db_credentials" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.db_credentials[0].id
+  secret_string = jsonencode({
+    username = aws_db_instance.main.username
+    password = random_password.db.result
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# IAM Role — Proxy → Secrets Manager 읽기 권한
+# -----------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "rds_proxy" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-rds-proxy"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "rds.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-rds-proxy-role"
+    Service = "db"
+  }
+}
+
+resource "aws_iam_role_policy" "rds_proxy_secrets" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  name = "secrets-manager-read"
+  role = aws_iam_role.rds_proxy[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecretVersionIds",
+        ]
+        Resource = [aws_secretsmanager_secret.db_credentials[0].arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = ["*"]
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# RDS Proxy 인스턴스
+# -----------------------------------------------------------------------------
+resource "aws_db_proxy" "main" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  name                   = "${var.project_name}-${var.environment}-proxy"
+  engine_family          = "MYSQL"
+  role_arn               = aws_iam_role.rds_proxy[0].arn
+  vpc_subnet_ids         = var.db_subnet_ids
+  vpc_security_group_ids = [aws_security_group.rds.id]
+
+  auth {
+    auth_scheme = "SECRETS"
+    secret_arn  = aws_secretsmanager_secret.db_credentials[0].arn
+    iam_auth    = "DISABLED"
+  }
+
+  idle_client_timeout = var.rds_proxy_idle_client_timeout
+  require_tls         = false
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-proxy"
+    Service = "db"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Target Group & Target
+# -----------------------------------------------------------------------------
+resource "aws_db_proxy_default_target_group" "main" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  db_proxy_name = aws_db_proxy.main[0].name
+
+  connection_pool_config {
+    max_connections_percent      = var.rds_proxy_max_connections_percent
+    max_idle_connections_percent = var.rds_proxy_max_idle_connections_percent
+    connection_borrow_timeout    = var.rds_proxy_connection_borrow_timeout
+  }
+}
+
+resource "aws_db_proxy_target" "main" {
+  count = var.enable_rds_proxy ? 1 : 0
+
+  db_proxy_name          = aws_db_proxy.main[0].name
+  target_group_name      = aws_db_proxy_default_target_group.main[0].name
+  db_instance_identifier = aws_db_instance.main.identifier
+}

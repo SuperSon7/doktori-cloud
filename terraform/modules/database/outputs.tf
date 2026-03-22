@@ -37,3 +37,19 @@ output "rds_sg_id" {
   description = "RDS security group ID"
   value       = aws_security_group.rds.id
 }
+
+# RDS Proxy
+output "proxy_endpoint" {
+  description = "RDS Proxy endpoint (host:port)"
+  value       = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : null
+}
+
+output "proxy_host" {
+  description = "RDS Proxy hostname"
+  value       = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : null
+}
+
+output "proxy_arn" {
+  description = "RDS Proxy ARN"
+  value       = var.enable_rds_proxy ? aws_db_proxy.main[0].arn : null
+}

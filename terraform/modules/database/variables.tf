@@ -84,3 +84,36 @@ variable "db_extra_parameters" {
   }))
   default = []
 }
+
+# -----------------------------------------------------------------------------
+# RDS Proxy
+# -----------------------------------------------------------------------------
+variable "enable_rds_proxy" {
+  description = "Enable RDS Proxy for connection pooling"
+  type        = bool
+  default     = false
+}
+
+variable "rds_proxy_idle_client_timeout" {
+  description = "Idle client timeout in seconds"
+  type        = number
+  default     = 1800
+}
+
+variable "rds_proxy_max_connections_percent" {
+  description = "Max connections as percentage of RDS max_connections"
+  type        = number
+  default     = 90
+}
+
+variable "rds_proxy_max_idle_connections_percent" {
+  description = "Max idle connections as percentage"
+  type        = number
+  default     = 50
+}
+
+variable "rds_proxy_connection_borrow_timeout" {
+  description = "Connection borrow timeout in seconds"
+  type        = number
+  default     = 120
+}

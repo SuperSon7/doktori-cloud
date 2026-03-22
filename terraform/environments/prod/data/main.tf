@@ -26,6 +26,14 @@ resource "aws_route53_record" "rds" {
   records = [module.database.db_host]
 }
 
+resource "aws_route53_record" "rds_proxy" {
+  zone_id = local.net.internal_zone_id
+  name    = "db-proxy.${local.net.internal_zone_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [module.database.proxy_host]
+}
+
 module "database" {
   source = "../../../modules/database"
 
@@ -55,4 +63,7 @@ module "database" {
     { name = "enforce_gtid_consistency", value = "ON", apply_method = "pending-reboot" },
     { name = "gtid-mode", value = "ON", apply_method = "pending-reboot" },
   ]
+
+  # RDS Proxy
+  enable_rds_proxy = true
 }

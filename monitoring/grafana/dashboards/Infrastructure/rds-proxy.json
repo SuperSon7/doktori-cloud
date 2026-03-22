@@ -12,16 +12,21 @@
     "list": [
       {
         "name": "proxy",
-        "type": "query",
-        "datasource": {
-          "type": "cloudwatch",
-          "uid": "cloudwatch"
+        "type": "constant",
+        "query": "doktori-prod-proxy",
+        "current": {
+          "text": "doktori-prod-proxy",
+          "value": "doktori-prod-proxy"
         },
+<<<<<<< Updated upstream
         "query": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)",
         "refresh": 1,
         "includeAll": false,
         "sort": 1,
         "definition": "dimension_values(ap-northeast-2, AWS/RDS, ClientConnections, ProxyName)"
+=======
+        "hide": 2
+>>>>>>> Stashed changes
       }
     ]
   },
@@ -63,12 +68,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "AvailabilityPercentage",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average"
         }
@@ -129,12 +138,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "ClientConnections",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average"
         }
@@ -178,12 +191,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnections",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average"
         }
@@ -227,12 +244,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average"
         }
@@ -276,12 +297,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "QueryRequests",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum"
         }
@@ -325,12 +350,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsSetupFailed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum"
         }
@@ -407,12 +436,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "ClientConnections",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "Client (App→Proxy)"
@@ -425,12 +458,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnections",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "DB (Proxy→RDS)"
@@ -443,12 +480,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "Borrowed (active)"
@@ -495,12 +536,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "ClientConnectionsReceived",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "received"
@@ -513,12 +558,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "ClientConnectionsClosed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "closed"
@@ -531,12 +580,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "ClientConnectionsNoTLS",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "no_tls"
@@ -583,12 +636,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsSetupSucceeded",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "success"
@@ -601,12 +658,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsSetupFailed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "failed"
@@ -653,12 +714,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyBorrowed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "borrowed"
@@ -671,12 +736,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlySessionPinned",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "pinned"
@@ -689,12 +758,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnectionsCurrentlyInTransaction",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "in_transaction"
@@ -741,12 +814,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "MaxDatabaseConnectionsAllowed",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "max_allowed"
@@ -759,12 +836,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "DatabaseConnections",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "current"
@@ -831,12 +912,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "QueryRequests",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Sum",
           "label": "queries"
@@ -883,12 +968,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "QueryDatabaseResponseLatency",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "avg"
@@ -901,12 +990,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "QueryDatabaseResponseLatency",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "p99",
           "label": "p99"
@@ -953,12 +1046,16 @@
           },
           "dimensions": {
             "ProxyName": [
-              "$proxy"
+              "doktori-prod-proxy"
             ]
           },
           "metricName": "AvailabilityPercentage",
           "namespace": "AWS/RDS",
+<<<<<<< Updated upstream
           "period": "60",
+=======
+          "period": "300",
+>>>>>>> Stashed changes
           "region": "ap-northeast-2",
           "statistic": "Average",
           "label": "availability %"

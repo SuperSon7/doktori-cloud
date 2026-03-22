@@ -1,4 +1,4 @@
-#!/bin/bash
+내가#!/bin/bash
 set -e
 
 SSH_KEY="${WIREMOCK_SSH_KEY:-~/.ssh/doktori-dev.pem}"
