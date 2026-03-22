@@ -4,6 +4,19 @@
 
 ---
 
+## Phase -1 — Pre-Bootstrap Cleanup (클러스터 재생성 시 필수)
+
+이전 클러스터의 SSM 파라미터가 남아있으면 리더 선출이 실패한다. **반드시** 삭제 후 진행.
+
+```bash
+aws ssm delete-parameters --names \
+  "/doktori/prod/k8s/init-lock" \
+  "/doktori/prod/k8s/join-command" \
+  "/doktori/prod/k8s/master-join-command" \
+  "/doktori/prod/k8s/certificate-key" \
+  --region ap-northeast-2
+```
+
 ## Phase 0 — Node Preparation (ALL nodes, user_data 또는 Ansible)
 
 클러스터 초기화 전, 모든 노드에서 실행.

@@ -83,7 +83,7 @@ do_install() {
   fi
 
   # 1. NetworkPolicy
-  log_step "1/3" "NetworkPolicy 적용..."
+  log_step "1/4" "NetworkPolicy 적용..."
   echo "  default-deny + NGF→api + NGF→chat + monitoring→apps"
 
   kubectl apply -f "${SCRIPT_DIR}/manifests/security/netpol-all.yaml"
@@ -92,8 +92,32 @@ do_install() {
   echo "    curl http://<NLB_DNS>/api/health"
   echo "    curl http://<NLB_DNS>/api/chat/health"
 
-  # 2. ArgoCD (Helm)
-  log_step "2/3" "ArgoCD 설치..."
+  # 2. External Secrets Operator (Helm)
+  log_step "2/4" "External Secrets Operator 설치..."
+
+  helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+  helm repo update external-secrets
+
+  if helm status external-secrets -n external-secrets &>/dev/null; then
+    echo "  → 이미 설치됨."
+  else
+    helm install external-secrets external-secrets/external-secrets \
+      --namespace external-secrets \
+      --create-namespace \
+      --version "2.2.0" \
+      --set installCRDs=true
+    echo "  → ESO 설치 완료. CRD 등록 대기..."
+    for i in $(seq 1 30); do
+      if kubectl get crd clustersecretstores.external-secrets.io &>/dev/null; then
+        echo "  → CRD 등록 완료"
+        break
+      fi
+      sleep 5
+    done
+  fi
+
+  # 3. ArgoCD (Helm)
+  log_step "3/4" "ArgoCD 설치..."
 
   helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
   helm repo update argo
@@ -118,7 +142,7 @@ do_install() {
     -n argocd --timeout=120s 2>/dev/null || true
 
   # 3. 초기 비밀번호 + 접근 안내
-  log_step "3/3" "ArgoCD 접근 정보..."
+  log_step "4/4" "ArgoCD 접근 정보..."
 
   ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
     -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "아직 생성 안 됨")
