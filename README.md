@@ -53,6 +53,55 @@ main push → ArgoCD sync → K8s cluster apply
 - ArgoCD: 애플리케이션 배포 (manifest 기반 자동 sync)
 - Helm/Kustomize로 환경별 설정 분리
 
+## 컴포넌트 버전 매트릭스
+
+> 최종 업데이트: 2026-03-22
+
+### 클러스터 코어
+
+| 컴포넌트 | 버전 | 정의 위치 | 비고 |
+|---------|------|----------|------|
+| Kubernetes (kubeadm) | 1.34 | `packer/variables.pkr.hcl`, `k8s/node-setup.sh` | EOL: 2026-10 |
+| containerd | 1.7.25 | `packer/variables.pkr.hcl` | 1.7.x LTS, EOL 2026-09 |
+| Calico CNI | 3.31.4 | `k8s/cluster-init.sh` | VXLAN 모드 |
+| CoreDNS | 1.12.4 | K8s 번들 | kubeadm 자동 설치 |
+| Gateway API CRD | 1.4.1 | `k8s/cluster-init.sh` | |
+| Ubuntu | 22.04 LTS | Packer AMI | 지원: 2027-04 |
+
+### Helm 릴리스 (부트스트랩 시 설치)
+
+| 컴포넌트 | Chart 버전 | App 버전 | 관리 주체 | 정의 위치 |
+|---------|-----------|---------|----------|----------|
+| ArgoCD | 8.0.0+ | 3.2.x | Helm standalone | `k8s/config.env` |
+| NGINX Gateway Fabric | 2.4.2 | 2.4.2 | Helm standalone | `k8s/cluster-init.sh` |
+
+### ArgoCD 관리 (Helm App)
+
+| 컴포넌트 | Chart 버전 | App 버전 | 정의 위치 |
+|---------|-----------|---------|----------|
+| metrics-server | 3.12.2 | 0.7.2 | `k8s/manifests/argocd/apps/metrics-server.yaml` |
+| kube-state-metrics | 5.28.1 | 2.13.0 | `k8s/manifests/argocd/apps/kube-state-metrics.yaml` |
+| External Secrets | 2.2.0 | 2.2.0 | `k8s/manifests/argocd/apps/external-secrets.yaml` |
+
+### ArgoCD 관리 (Raw Manifest)
+
+| 컴포넌트 | 버전 | 정의 위치 |
+|---------|------|----------|
+| Alloy (Grafana) | 1.14.1 | `k8s/config.env`, `k8s/manifests/monitoring/alloy-daemonset.yaml` |
+| 워크로드 (api, chat) | - | `k8s/manifests/workloads/` |
+| HPA | - | `k8s/manifests/hpa/` |
+| NetworkPolicy | - | `k8s/manifests/security/` |
+| ExternalSecret CR | - | `k8s/manifests/external-secrets/` |
+
+### 기타
+
+| 컴포넌트 | 버전 | 정의 위치 |
+|---------|------|----------|
+| Terraform | 1.14.x | 로컬 설치 |
+| Helm | 3.x | 노드 설치 스크립트 |
+| Chaos Mesh | 2.7.2 | `k8s/install-chaos-mesh.sh` |
+| ECR credential provider | cloud-provider-aws | `ansible/roles/k8s-post-bootstrap/tasks/ecr-credential-provider.yml` |
+
 ## 디렉토리 구조
 
 ```

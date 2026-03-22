@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/config.env"
 
-CHAOS_MESH_VERSION="2.7.1"
+CHAOS_MESH_VERSION="2.7.2"
 
 echo "============================================="
 echo " Chaos Mesh 설치"

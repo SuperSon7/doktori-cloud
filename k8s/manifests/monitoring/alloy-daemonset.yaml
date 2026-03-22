@@ -20,7 +20,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: alloy
-          image: grafana/alloy:v1.9.0
+          image: grafana/alloy:v1.14.1
           env:
             - name: TZ
               value: Asia/Seoul

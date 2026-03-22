@@ -1,0 +1,40 @@
+# UpstreamSettingsPolicy — NGF v2.x keepAlive 설정
+#
+# v2.x에서 keepAlive는 NginxProxy가 아닌 UpstreamSettingsPolicy로 설정.
+# 서비스별로 개별 설정 가능.
+#
+# keepAlive 효과:
+#   매 요청마다 새 TCP 연결 대신 기존 연결 재사용
+#   → 3-way handshake 오버헤드 제거, NodePort 커넥션 폭발 방지
+---
+apiVersion: gateway.nginx.org/v1alpha1
+kind: UpstreamSettingsPolicy
+metadata:
+  name: api-upstream-settings
+  namespace: prod
+spec:
+  targetRefs:
+    - group: core
+      kind: Service
+      name: api-svc
+  keepAlive:
+    connections: 64
+    requests: 1000
+    time: "1h"
+    timeout: "60s"
+---
+apiVersion: gateway.nginx.org/v1alpha1
+kind: UpstreamSettingsPolicy
+metadata:
+  name: chat-upstream-settings
+  namespace: prod
+spec:
+  targetRefs:
+    - group: core
+      kind: Service
+      name: chat-svc
+  keepAlive:
+    connections: 64
+    requests: 1000
+    time: "1h"
+    timeout: "60s"

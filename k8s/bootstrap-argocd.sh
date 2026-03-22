@@ -185,14 +185,8 @@ do_setup() {
 
     echo "  → Git 저장소 연결 완료"
 
-    # Application manifest에 repo URL 주입 후 배포
-    echo "  → ArgoCD Application 배포..."
-    for APP_FILE in "${SCRIPT_DIR}/manifests/argocd/application-"*.yaml; do
-      if [ -f "$APP_FILE" ]; then
-        sed "s|__GIT_REPO_URL__|${REPO_URL}|g" "$APP_FILE" | kubectl apply -f -
-        echo "    $(basename "$APP_FILE") 적용됨"
-      fi
-    done
+    # Application은 root-app.yaml → apps/ 폴더에서 App-of-Apps 패턴으로 관리
+    # (구 application-*.yaml 방식 제거됨)
 
     # REPO_URL을 파일 스코프로 export (app-of-apps에서 사용)
     export RESOLVED_REPO_URL="${REPO_URL}"

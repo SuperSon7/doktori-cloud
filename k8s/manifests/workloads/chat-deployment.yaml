@@ -23,8 +23,6 @@ spec:
         app: doktori
         component: chat
     spec:
-      imagePullSecrets:
-        - name: ecr-credentials
       priorityClassName: high-priority
       terminationGracePeriodSeconds: 60
       topologySpreadConstraints:

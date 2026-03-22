@@ -9,7 +9,8 @@ spec:
   policyTypes:
     - Ingress
 ---
-# 2. NGF → api
+# 2. NGF data plane → api
+# NGF v2.x: data plane Pod이 prod ns에 생성됨 (Gateway와 같은 namespace)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,6 +22,14 @@ spec:
       component: api
   ingress:
     - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nginx-gateway-fabric
+      ports:
+        - port: 8080
+          protocol: TCP
+    # control plane (nginx-gateway ns)에서도 접근 허용 (health check 등)
+    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: nginx-gateway
@@ -28,7 +37,7 @@ spec:
         - port: 8080
           protocol: TCP
 ---
-# 3. NGF → chat
+# 3. NGF data plane → chat
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -39,6 +48,13 @@ spec:
     matchLabels:
       component: chat
   ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nginx-gateway-fabric
+      ports:
+        - port: 8081
+          protocol: TCP
     - from:
         - namespaceSelector:
             matchLabels:
@@ -136,6 +152,38 @@ spec:
             cidr: 169.254.169.254/32
       ports:
         - port: 80
+          protocol: TCP
+---
+# 7-2. NGF data plane → upstream (api/chat) Egress 허용
+# v2.x: data plane Pod이 prod ns에 위치, upstream Pod에 트래픽 전달 필요
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ngf-dataplane-egress
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nginx-gateway-fabric
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: doktori
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
+    # control plane (nginx-gateway ns)과의 gRPC 통신
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nginx-gateway
+      ports:
+        - port: 443
           protocol: TCP
 ---
 # 8. DNS Egress 허용 — prod namespace 모든 Pod → kube-dns:53
@@ -376,11 +424,11 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
-    # NGF 메트릭 (nginx-gateway namespace)
+    # NGF data plane 메트릭 (v2.x: prod namespace에 위치)
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: nginx-gateway
+              kubernetes.io/metadata.name: prod
       ports:
         - port: 9113
           protocol: TCP
@@ -445,7 +493,60 @@ spec:
         - port: 9090
           protocol: TCP
 ---
-# 14. kube-state-metrics → kube-apiserver (list/watch)
+# 14-1. external-secrets namespace — default-deny + 필수 통신 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-eso-egress
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # IMDS (IAM Role 자격 증명)
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - port: 80
+          protocol: TCP
+    # AWS VPC Endpoints (SSM Parameter Store)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # kube-apiserver (Secret 생성/업데이트)
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 6443
+          protocol: TCP
+---
+# 15. kube-state-metrics → kube-apiserver (list/watch)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

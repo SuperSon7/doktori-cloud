@@ -14,9 +14,9 @@ source "${SCRIPT_DIR}/config.env"
 
 POD_CIDR="192.168.0.0/16"
 SERVICE_CIDR="172.16.0.0/16"
-CALICO_VERSION="v3.29.3"
+CALICO_VERSION="v3.31.4"
 GATEWAY_API_VERSION="v1.4.1"
-NGF_VERSION="1.6.2"
+NGF_VERSION="2.4.2"
 
 MASTER_IP=$(hostname -I | awk '{print $1}')
 
@@ -133,10 +133,15 @@ else
     --version "${NGF_VERSION}" \
     --namespace nginx-gateway \
     --create-namespace \
-    --set service.type=NodePort \
-    --set "service.ports[0].port=80,service.ports[0].targetPort=80,service.ports[0].nodePort=30080,service.ports[0].protocol=TCP,service.ports[0].name=http" \
-    --set "service.ports[1].port=443,service.ports[1].targetPort=443,service.ports[1].nodePort=30443,service.ports[1].protocol=TCP,service.ports[1].name=https"
-  echo "  → NGF 설치 완료 (NodePort 30080/30443)"
+    --set nginx.service.type=NodePort \
+    --set nginx.service.externalTrafficPolicy=Cluster \
+    --set "nginx.service.nodePorts[0].port=30080,nginx.service.nodePorts[0].listenerPort=80" \
+    --set "nginx.service.nodePorts[1].port=30443,nginx.service.nodePorts[1].listenerPort=443" \
+    --set nginx.config.rewriteClientIP.mode=XForwardedFor \
+    --set nginx.config.rewriteClientIP.setIPRecursively=false \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].type=CIDR" \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].value=10.0.0.0/8"
+  echo "  → NGF 설치 완료 (NodePort 30080/30443, externalTrafficPolicy=Cluster)"
 fi
 
 # -----------------------------------------------------------------------------

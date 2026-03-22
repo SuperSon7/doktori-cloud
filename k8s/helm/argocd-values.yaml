@@ -46,7 +46,9 @@ applicationSet:
 
 configs:
   params:
-    server.insecure: true
+    server.insecure: "true"
   cm:
     timeout.reconciliation: 180s
     kustomize.buildOptions: "--load-restrictor LoadRestrictionsNone"
+    # ArgoCD 3.x: annotation-based tracking (기본값)
+    # 신규 부트스트랩이므로 기본값 사용
