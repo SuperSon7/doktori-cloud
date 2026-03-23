@@ -58,7 +58,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /api/chat-rooms/
+            value: /api/chat-rooms
       # TODO: 부하 테스트 완료 후 rate limiting 활성화
       # filters:
       #   - type: ExtensionRef
