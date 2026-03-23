@@ -259,6 +259,13 @@ spec:
       ports:
         - port: 27017
           protocol: TCP
+    # AI 서버
+    - to:
+        - ipBlock:
+            cidr: 10.1.0.0/16
+      ports:
+        - port: 8000
+          protocol: TCP
     # AWS VPC Endpoints (SSM, ECR, CloudWatch Logs 등)
     - to:
         - ipBlock:
