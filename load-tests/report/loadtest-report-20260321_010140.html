@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doktori Load Test Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 2rem; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 { color: #58a6ff; margin-bottom: 0.5rem; font-size: 1.8rem; }
+  h2 { color: #58a6ff; margin: 2rem 0 1rem; font-size: 1.3rem; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+  h3 { color: #8b949e; margin: 1.5rem 0 0.5rem; font-size: 1.1rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.2rem; }
+  .card-title { color: #8b949e; font-size: 0.85rem; margin-bottom: 0.3rem; }
+  .card-value { font-size: 1.8rem; font-weight: 700; }
+  .card-value.pass { color: #3fb950; }
+  .card-value.fail { color: #f85149; }
+  .card-value.warn { color: #d29922; }
+  .card-value.info { color: #58a6ff; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th { background: #161b22; color: #8b949e; text-align: left; padding: 0.7rem; font-weight: 600; font-size: 0.85rem; }
+  td { padding: 0.7rem; border-top: 1px solid #21262d; font-size: 0.9rem; }
+  tr:hover td { background: #161b22; }
+  .pass-badge { background: #238636; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .fail-badge { background: #da3633; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+  .bottleneck { border-left: 3px solid #f85149; padding-left: 1rem; margin: 1rem 0; }
+  .action-item { border-left: 3px solid #3fb950; padding-left: 1rem; margin: 0.5rem 0; }
+  .tag { display: inline-block; background: #30363d; color: #8b949e; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-right: 4px; }
+  .bar { height: 8px; border-radius: 4px; background: #21262d; margin-top: 0.3rem; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .bar-fill.good { background: #3fb950; }
+  .bar-fill.warn { background: #d29922; }
+  .bar-fill.bad { background: #f85149; }
+  footer { margin-top: 3rem; color: #484f58; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Doktori Load Test Report</h1>
+<p class="subtitle">2026-03-21 01:01 | api.doktori.kr | K8s Cluster (API Pod x2, Chat Pod x2)</p>
+
+<h2>SLO Summary</h2>
+<div class="summary-grid">
+  <div class="card">
+    <div class="card-title">Load (300 VU) P95</div>
+    <div class="card-value pass">30ms</div>
+    <div class="bar"><div class="bar-fill good" style="width: 3%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Load 5xx Error Rate</div>
+    <div class="card-value pass">0%</div>
+    <div class="bar"><div class="bar-fill good" style="width: 0%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Stress (1500 VU) P95</div>
+    <div class="card-value fail">1.74s</div>
+    <div class="bar"><div class="bar-fill bad" style="width: 100%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Stress 5xx Error Rate</div>
+    <div class="card-value fail">30%</div>
+    <div class="bar"><div class="bar-fill bad" style="width: 60%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Total Requests (Stress)</div>
+    <div class="card-value info">825K</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Peak RPS</div>
+    <div class="card-value info">1,057/s</div>
+  </div>
+</div>
+
+<h2>Scenario Results</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Scenario</th>
+      <th>VU (total)</th>
+      <th>Requests</th>
+      <th>RPS</th>
+      <th>P95</th>
+      <th>5xx</th>
+      <th>4xx</th>
+      <th>SLO</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="tag">smoke</span> Smoke</td>
+      <td>15</td><td>468</td><td>7.3/s</td><td>19ms</td><td>0%</td><td>0%</td>
+      <td><span class="pass-badge">PASS</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">load</span> Load (일반 트래픽)</td>
+      <td>300</td><td>101,822</td><td>105/s</td><td>30ms</td><td>0%</td><td>3%</td>
+      <td><span class="pass-badge">PASS</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">guest-flow</span> Guest Flow</td>
+      <td>300</td><td>76,158</td><td>78/s</td><td>21ms</td><td>0%</td><td>0%</td>
+      <td><span class="pass-badge">PASS</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">stress</span> Stress (한계)</td>
+      <td>1,500</td><td>825,683</td><td>1,057/s</td><td>1.74s</td><td>30%</td><td>1.6%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">search</span> Meeting Search</td>
+      <td>1,500</td><td>212,424</td><td>236/s</td><td>4.69s</td><td>36%</td><td>0%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Bottleneck Analysis</h2>
+
+<div class="section">
+  <h3>1. Meeting Search API <span class="fail-badge">P95: 4.69s</span></h3>
+  <div class="bottleneck">
+    <p><strong>Root Cause:</strong> <code>MeetingRepositoryImpl.searchMeetings()</code> — JOIN Book subquery executed twice per request</p>
+    <p><strong>Impact:</strong> Stress test에서 전체 에러율을 36%까지 끌어올림. DB 커넥션 풀 고갈 유발.</p>
+    <p><strong>Evidence:</strong> search 단독 테스트 P95 4.69s vs load 전체 P95 30ms — 검색이 10x 이상 느림</p>
+  </div>
+  <div class="action-item">
+    <strong>Action:</strong> 서브쿼리 중복 제거 또는 검색 결과 캐싱 (Redis)
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. HPA Scale-out Limit <span class="fail-badge">Max 4 Pods</span></h3>
+  <div class="bottleneck">
+    <p><strong>Root Cause:</strong> API HPA maxReplicas=4. 1500 VU에서 Pod 4개로는 부족.</p>
+    <p><strong>Impact:</strong> CPU 60% 트리거 → 2→4 확장됐지만, 여전히 30% 에러</p>
+  </div>
+  <div class="action-item">
+    <strong>Action:</strong> maxReplicas 증가 (4→8) + 워커 노드 확인
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. WebSocket Chat <span class="fail-badge">UNTESTED</span></h3>
+  <div class="bottleneck">
+    <p><strong>Root Cause:</strong> chat-websocket.js에서 ws.connect()가 성공하지 못함 (ws_connect_duration=0s)</p>
+    <p><strong>Impact:</strong> Chat 서비스 부하가 실질적으로 검증되지 않음</p>
+  </div>
+  <div class="action-item">
+    <strong>Action:</strong> WebSocket 스크립트 디버깅 + ALB WebSocket 라우팅 검증
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. ECR Image Pull on Scale-out <span class="fail-badge">403 Forbidden</span></h3>
+  <div class="bottleneck">
+    <p><strong>Root Cause:</strong> etcd encryption 키 불일치 → Secret 읽기 실패 → imagePullSecrets 인증 불가</p>
+    <p><strong>Impact:</strong> HPA가 Pod를 늘려도 새 Pod가 뜨지 못함 (ImagePullBackOff)</p>
+  </div>
+  <div class="action-item">
+    <strong>Action:</strong> etcd encryption 키 동기화 + kubelet credential provider 전환
+  </div>
+</div>
+
+<h2>Infrastructure Observations</h2>
+<table>
+  <thead>
+    <tr><th>Component</th><th>Observation</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>HPA (API)</td><td>CPU 60% trigger → Pod 2→4 확장 동작</td><td><span class="pass-badge">OK</span></td></tr>
+    <tr><td>ALB</td><td>api.doktori.kr → ALB 직접 (CF 우회) 정상</td><td><span class="pass-badge">OK</span></td></tr>
+    <tr><td>NGF Routing</td><td>/api/* → api-svc, /ws/* → chat-svc 정상</td><td><span class="pass-badge">OK</span></td></tr>
+    <tr><td>ECR Pull</td><td>새 노드에서 403 Forbidden (encryption 이슈)</td><td><span class="fail-badge">FAIL</span></td></tr>
+    <tr><td>etcd Encryption</td><td>마스터별 다른 키 → Secret 읽기 실패</td><td><span class="fail-badge">FAIL</span></td></tr>
+    <tr><td>Prometheus</td><td>k6 remote write v2 + native histogram 정상</td><td><span class="pass-badge">OK</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Next Steps</h2>
+<table>
+  <thead>
+    <tr><th>Priority</th><th>Task</th><th>Expected Impact</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="fail-badge">P0</span></td><td>검색 서브쿼리 최적화 (백엔드)</td><td>stress P95 대폭 개선</td></tr>
+    <tr><td><span class="fail-badge">P0</span></td><td>chat-websocket.js 디버깅</td><td>채팅 부하 검증 가능</td></tr>
+    <tr><td><span class="fail-badge">P0</span></td><td>etcd encryption 키 동기화</td><td>Secret 접근 장애 방지</td></tr>
+    <tr><td><span class="tag">P1</span></td><td>HPA maxReplicas 증가 (4→8)</td><td>고부하 수용량 증가</td></tr>
+    <tr><td><span class="tag">P1</span></td><td>kubelet credential provider 전환</td><td>스케일아웃 시 pull 실패 방지</td></tr>
+    <tr><td><span class="tag">P2</span></td><td>멀티토큰 동작 확인</td><td>현실적 부하 시뮬레이션</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  Generated by Doktori Load Test Report Generator | 2026-03-21 01:01:40
+</footer>
+</div>
+</body>
+</html>

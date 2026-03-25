@@ -49,6 +49,8 @@ const WS_URL = __ENV.WS_URL || 'wss://api.doktori.kr/ws/chat';
 const CHAT_ROOM_IDS = (__ENV.CHAT_ROOM_IDS || '1,2,3').split(',').map(Number);
 const SESSION_DURATION_SEC = Number(__ENV.SESSION_DURATION || 1800); // 30분
 const MSG_INTERVAL_SEC = Number(__ENV.MSG_INTERVAL || 5);           // 5초마다 메시지
+const WS_VUS = Number(__ENV.WS_VUS || 100);
+const HTTP_VUS = Number(__ENV.HTTP_VUS || 50);
 
 // 토론 메시지 풀 (실제 독서 토론 느낌)
 const CHAT_MESSAGES = [
@@ -78,8 +80,8 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '1m', target: 100 },                        // 스파이크 접속
-        { duration: `${SESSION_DURATION_SEC}s`, target: 100 },  // 토론 유지
+        { duration: '1m', target: WS_VUS },                        // 스파이크 접속
+        { duration: `${SESSION_DURATION_SEC}s`, target: WS_VUS },  // 토론 유지
         { duration: '30s', target: 0 },                          // 종료
       ],
       gracefulRampDown: `${SESSION_DURATION_SEC}s`, // ramp-down 시 기존 VU가 세션 끝까지 유지
@@ -91,8 +93,8 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '1m', target: 50 },
-        { duration: `${SESSION_DURATION_SEC}s`, target: 50 },
+        { duration: '1m', target: HTTP_VUS },
+        { duration: `${SESSION_DURATION_SEC}s`, target: HTTP_VUS },
         { duration: '30s', target: 0 },
       ],
       exec: 'httpApi',

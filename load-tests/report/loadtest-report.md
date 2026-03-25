@@ -1,243 +1,156 @@
 # Doktori 부하테스트 종합 리포트
 
-> 테스트 기간: 2026-03-19 ~ 2026-03-21
-> 대상: api.doktori.kr (프로덕션 K8s 클러스터)
-> 인프라: EC2 러너 3대 (t4g.medium, 별도 AWS 계정 246477585940)
-> 모니터링: Grafana + Prometheus (러너 1, native histogram)
+> 테스트 기간: 2026-03-19 ~ 2026-03-23
+> 대상: api.doktori.kr (프로덕션 K8s v1.31, RDS Proxy, NGF keepAlive)
+> 인프라: EC2 러너 3대 (t4g.medium, 별도 AWS 계정)
+> 모니터링: Grafana + Prometheus (native histogram)
 
 ---
 
 ## Executive Summary
 
-1. **정상 트래픽(읽기 위주 300 VU)에서 SLO 충족** — P95 30ms, 5xx 0%
-2. **쓰기 비율을 45%로 올리면 같은 300 VU에서도 P95 48s로 1,600배 악화** — 읽기 위주 테스트가 성능을 과대평가하고 있었음
-3. **검색 API가 최대 병목** — 단독 P95 4.69s, 전체 에러율 36%
-4. **HPA 동작 확인 (2→4 Pod)** — 하지만 maxReplicas=4로는 1500 VU 감당 불가
-5. **WebSocket 채팅 부하 검증 성공** — 5분 세션 유지, 메시지 11,850개 송신, 6,000개 수신
-6. **인프라 이슈 발견** — etcd encryption 키 불일치, ECR pull 403, SSM 실행 한계
+1. **단계별 인프라 개선으로 stress 5xx 31% → 4.5% (85% 감소)**
+2. **정상 트래픽(읽기 위주 300 VU)에서 SLO 충족** — P95 30ms, 5xx 0%
+3. **쓰기 45% 부하에서 같은 300 VU로 P95 1,600배 악화** — 읽기 위주 테스트가 성능을 과대평가
+4. **HPA 스케일아웃 정상 확인** — WS 1500 VU에서 API 2→5, Chat 2→4 Pod
+5. **Chat HPA CPU 기준 유효** — WS 부하 시 CPU가 비례 증가 (100 VU→9%, 1500 VU→89%)
+6. **5xx 근본 원인: ALB TargetConnectionError (17만건)** — NGF keepAlive 활성화로 해결
+7. **RDS CPU 병목** — db.t4g.small vCPU 2개 포화 (97%), 풀테이블 스캔 쿼리 식별
+
+---
+
+## Stress 개선 여정 (핵심)
+
+| 단계 | 변경 | 5xx | P95 | RPS | 핵심 효과 |
+|------|------|-----|-----|-----|----------|
+| 0 | 기준 (Proxy 없음, HPA 미동작) | **31%** | 2.29s | 658/s | - |
+| 1 | +RDS Proxy | 32% | 2.16s | 941/s | RPS +43% |
+| 2 | +JDBC 최적화 | 19% | 6.13s | 483/s | 5xx -39% |
+| 3 | +HPA 정상화 (metrics-server) | 25% | 4.08s | 702/s | Pod 오토스케일링 |
+| **4** | **+NGF keepAlive** | **4.5%** | **5.79s** | **409/s** | **5xx -82%** |
+
+**31% → 4.5% = 총 85% 에러 감소**
 
 ---
 
 ## SLO 기준
 
-| SLO | 지표 | 목표 |
-|-----|------|------|
-| SLO-1 | API 가용성 (5xx 비율) | < 0.5% |
-| SLO-2 | 핵심 API Latency P95 | ≤ 1,000ms |
-| SLO-3 | Chat 서비스 가용성 | 99.0% |
-| SLO-4 | 모임 가입 성공률 | 99.0% |
+| SLO | 지표 | 목표 | Load (300VU) | Stress (1500VU) |
+|-----|------|------|-------------|----------------|
+| SLO-1 | 5xx 비율 | < 0.5% | **0% PASS** | 4.5% FAIL |
+| SLO-2 | P95 Latency | ≤ 1000ms | **30ms PASS** | 5.79s FAIL |
 
 ---
 
-## 시나리오별 결과 총괄
+## 시나리오별 결과
 
-| 시나리오 | VU (합산) | 총 요청 | RPS | P95 | 5xx | 4xx | SLO |
-|---------|----------|---------|-----|-----|-----|-----|-----|
-| Smoke | 15 | 468 | 7.3/s | 19ms | 0% | 0% | **PASS** |
-| Load v1 (읽기 위주) | 300 | 101,822 | 105/s | 30ms | 0% | 3% | **PASS** |
-| Guest Flow | 300 | 76,158 | 78/s | 21ms | 0% | 0% | **PASS** |
-| Load v2 (읽기55/쓰기45) | 300 | 28,794 | 29/s | 48s | 14% | 3% | **FAIL** |
-| Stress | 1,500 | 825,683 | 1,057/s | 1.74s | 30% | 1.6% | **FAIL** |
-| Meeting Search | 1,500 | 212,424 | 236/s | 4.69s | 36% | 0% | **FAIL** |
-| Mixed (REST+WS) v2 | 300 | 10,907 | 25/s | 20ms | 0% | 21% | **PASS** (HTTP), WS 정상 |
-| Lifecycle v3 (5min) | 150 | 10,887+WS | 25/s | 20ms | 0% | 21% | **PASS**, WS 5분 유지 |
+| 시나리오 | VU | 총 요청 | RPS | P95 | 5xx | SLO |
+|---------|-----|---------|-----|-----|-----|-----|
+| Smoke | 15 | 468 | 7.3/s | 19ms | 0% | **PASS** |
+| Load v1 (읽기 위주) | 300 | 101K | 105/s | 30ms | 0% | **PASS** |
+| Guest Flow | 300 | 76K | 78/s | 21ms | 0% | **PASS** |
+| Load v2 (쓰기 45%) | 300 | 29K | 29/s | 48s | 14% | FAIL |
+| Stress (최종) | 1,500 | 320K | 409/s | 5.79s | 4.5% | FAIL |
+| Meeting Search | 1,500 | 212K | 236/s | 4.69s | 36% | FAIL |
+| Lifecycle (WS+HTTP 5분) | 150 | 11K+WS | 25/s | 20ms | 0% | **PASS** |
+| WS Stress (1500 WS) | 1,710 | 38K+WS | - | - | - | WS 연결 85% 실패 |
 
 ---
 
-## 상세 분석
+## WebSocket 검증
 
-### 1. Load v1 vs v2: 쓰기 비율이 성능에 미치는 영향
+### Lifecycle 30분 (WS 100 + HTTP 50)
 
-| 지표 | Load v1 (읽기 90%) | Load v2 (읽기 55/쓰기 45%) | 배율 |
-|------|-------------------|--------------------------|------|
-| VU | 300 | 300 | 동일 |
-| 총 요청 | 101,822 | 28,794 | **3.5x 감소** |
-| RPS | 105/s | 29/s | **3.6x 감소** |
-| P95 | 30ms | **48s** | **1,600x 악화** |
-| 5xx | 0% | **14%** | - |
-| failed | 3% | **21%** | **7x 증가** |
+| 시점 | Chat CPU | Chat 메모리 | API CPU |
+|------|----------|------------|---------|
+| 1분 (스파이크) | 26% (74~84m) | 432~439Mi | 21% |
+| 15분 (안정) | 10% (30~32m) | 436~443Mi | 15% |
+| 22분 (안정) | 9% (27~28m) | 437~444Mi | 17% |
 
-**분석:**
-- 동일 300 VU인데 쓰기 비율만 올렸더니 처리량이 3.5배 줄고 P95가 1,600배 악화
-- 쓰기 작업(모임 생성, 참여, 채팅방 생성/입장)이 DB 트랜잭션, RabbitMQ 발행, 알림 생성을 동반 → 읽기보다 서버 리소스 소모가 훨씬 큼
-- **읽기 위주 테스트만으로는 실제 서비스 성능을 파악할 수 없음**
+- WS 100 연결 유지 + 5초 간격 메시지 → Chat CPU 9% (안정)
+- 메모리 변화 미미 (+12Mi)
+- **30분 세션 유지 성공**
 
-### 2. Stress (1500 VU) — 한계점 분석
-
-| 지표 | 러너 1 | 러너 2 | 러너 3 | 합산 |
-|------|--------|--------|--------|------|
-| VU | 500 | 500 | 500 | **1,500** |
-| 총 요청 | 275,647 | 275,590 | 274,446 | **825,683** |
-| RPS | 353/s | 353/s | 351/s | **1,057/s** |
-| P95 | 1.74s | 1.74s | 1.74s | **1.74s** |
-| 5xx | 29.9% | 30.6% | 30.4% | **~30%** |
-| max | 10.02s | 10.03s | 10.01s | **~10s (timeout)** |
-
-**분석:**
-- HPA가 Pod 2→4로 확장 → 하지만 부족
-- max 응답 10초 = K8s/ALB timeout 한계
-- 3대 러너의 결과가 거의 동일 → 서버 측 병목이 균등하게 발생
-- **한계점: 약 500 VU (단일 러너) / 합산 ~300~500 VU에서 급격히 악화 시작**
-
-### 3. Meeting Search — 검색 병목
-
-| 지표 | 값 | stress 대비 |
-|------|-----|-----------|
-| P95 | **4.69s** | 2.7x 나쁨 |
-| P90 | 3.72s | 2.6x |
-| 5xx | **36%** | 1.2x |
-| checks 실패 | 33.5% | - |
-
-**분석:**
-- stress(혼합 부하)보다 search 단독이 더 나쁨 → **검색이 전체 시스템의 최대 병목**
-- `MeetingRepositoryImpl.searchMeetings()`에서 JOIN Book 서브쿼리 2회 실행
-- 고부하 시 DB 커넥션 풀을 검색 쿼리가 독점 → 다른 API도 연쇄 지연
-
-### 4. WebSocket 채팅 검증 여정
-
-| 시도 | 결과 | 원인 |
-|------|------|------|
-| chat-websocket.js 단독 | 연결 0 | 동시 부하로 토큰 발급 503 |
-| mixed v1 (수동 SSH) | 연결 0 | SSH 키 파싱 오류 |
-| mixed v2 (토큰 retry) | **연결 902, 메시지 4,496** | 성공 |
-| lifecycle v1 (per-vu-iterations) | 세션 60초에서 끊김 | ws.connect timeout 기본 60초 |
-| lifecycle v2 (for+sleep) | 세션 60초에서 끊김 | k6 WS idle timeout |
-| **lifecycle v3 (setInterval)** | **세션 5분 유지, 메시지 11,850** | **성공** |
-
-**최종 lifecycle v3 결과:**
+### WS Stress (WS 1500 + HTTP 210, 5분)
 
 | 지표 | 값 |
 |------|-----|
-| WS 연결 성공 | 200회 |
-| WS 연결 P95 | 16ms |
-| WS 메시지 전송 | **11,850개** (17.9/s) |
-| WS 메시지 수신 | **6,000개** (9.1/s) |
-| WS 세션 시간 | **정확히 5분** |
-| WS 에러 | **0%** |
-| 동시 HTTP P95 | 20ms |
-| 동시 HTTP 5xx | 0% |
+| WS 연결 성공 | 1,119 / 7,337 시도 (15%) |
+| WS 메시지 송신 | 55,948 |
+| WS 메시지 수신 | 28,231 |
+| HPA | API 2→5, Chat 2→4 |
+| Chat CPU 피크 | **89%** → Pod 추가 후 72% |
+| Chat 메모리 피크 | 620Mi (limit 1536Mi의 40%) |
 
-**핵심:** `socket.setInterval` + `socket.setTimeout`으로 세션 유지 문제 해결. 30분 풀 테스트 준비 완료.
-
-### 5. Mixed (REST + WebSocket 동시)
-
-| 지표 | REST 단독 (load v1) | REST + WS 동시 (lifecycle v3) |
-|------|-------------------|------------------------------|
-| HTTP P95 | 30ms | **20ms** |
-| HTTP 5xx | 0% | **0%** |
-| WS 연결 | - | 200 세션 |
-| WS 메시지 | - | 11,850개 |
-
-**분석:**
-- WS 100 VU + HTTP 50 VU = 150 VU 총합에서 양쪽 모두 안정적
-- HTTP 4xx 21%는 모임 참여 409(이미 참여) 등 비즈니스 에러
-- 이전 mixed 실패(P95 timeout)는 토큰 503 때문이었고, 인프라 문제는 아니었음
+**Chat HPA CPU 기준 유효 확인:**
+- WS 100 → CPU 9% / WS 1500 → CPU 89% — **선형 비례**
+- 60% 트리거 도달 시 자동 스케일아웃 → CPU 72%로 하락
+- 메모리는 40%로 여유 — CPU가 먼저 병목
 
 ---
 
-## 시나리오 간 교차 비교
+## 5xx 근본 원인 분석
 
-### 같은 300 VU에서 시나리오별 성능 차이
+### ALB TargetConnectionError (keepAlive 적용 전)
 
-| 시나리오 | P95 | 5xx | RPS | 주요 차이점 |
-|---------|-----|-----|-----|-----------|
-| Load v1 (읽기 90%) | 30ms | 0% | 105/s | 읽기 전용 — 최상의 성능 |
-| Guest Flow (읽기 100%) | 21ms | 0% | 78/s | 비인증 읽기 — 가장 빠름 |
-| Load v2 (쓰기 45%) | **48s** | **14%** | 29/s | 쓰기 추가 → 1,600x 악화 |
-| Lifecycle v3 (WS+HTTP) | 20ms | 0% | 25/s | WS 150VU로 VU 적지만 안정적 |
+| 메트릭 | 수량 | 의미 |
+|--------|------|------|
+| **HTTPCode_ELB_5XX** | ~135,000 | ALB가 반환한 5xx |
+| HTTPCode_Target_5XX | ~220 | 앱이 반환한 5xx |
+| **TargetConnectionErrorCount** | ~170,000 | ALB → K8s 연결 실패 |
 
-**시사점:** 같은 인프라에서 트래픽 구성(읽기/쓰기 비율)에 따라 성능이 1,600배까지 차이남. 부하테스트에서 **실제 서비스의 읽기:쓰기 비율을 반영하는 것이 절대적으로 중요**.
+- **5xx의 99.8%가 ALB에서 발생** — 앱 문제가 아님
+- 원인: NGF upstream keepAlive 미설정 → 매 요청마다 새 TCP 연결 → NodePort 폭발
+- 해결: `UpstreamSettingsPolicy` keepAlive 64 연결 활성화
 
-### VU 증가에 따른 성능 변화 (읽기 위주)
+### RDS CPU 포화
 
-| VU | P95 | 5xx | RPS |
-|----|-----|-----|-----|
-| 15 (smoke) | 19ms | 0% | 7.3/s |
-| 300 (load v1) | 30ms | 0% | 105/s |
-| 1,500 (stress) | 1.74s | 30% | 1,057/s |
+| 지표 | 값 |
+|------|-----|
+| RDS 인스턴스 | db.t4g.small (vCPU 2) |
+| CPU 피크 | 97% |
+| CPU 크레딧 | 576 (소진 안 됨) |
+| max_connections | ~164 |
+| HikariCP 요구 | Pod 4×30 + Chat 4×20 = 200 |
 
-**시사점:** 300→1,500 VU (5배)에서 P95가 30ms→1.74s (58배), 에러가 0%→30%. **선형이 아닌 급격한 성능 저하** — 300~500 VU 구간에 임계점 존재.
+- **Proxy가 커넥션은 해결했지만 CPU 포화는 Proxy로 못 풀음**
+- t4g.medium 스케일업해도 vCPU 동일(2개) → 의미 없음
+- Slow query (1초)에 안 잡힘 → 개별 쿼리는 빠르지만 양이 많아서 CPU 포화
 
----
+### 풀 테이블 스캔 쿼리
 
-## 병목 분석 (우선순위)
-
-### P0: 검색 서브쿼리 최적화
-
-- **현상:** meeting-search P95 4.69s, stress에서 전체 에러율 30%의 주범
-- **원인:** `searchMeetings()` JOIN Book 서브쿼리 2회 실행
-- **영향:** DB 커넥션 풀 고갈 → 전체 API 연쇄 지연
-- **해결:** 서브쿼리 중복 제거, 검색 결과 캐싱 (Redis), 쿼리 최적화
-
-### P0: 쓰기 성능 최적화
-
-- **현상:** 쓰기 45%에서 300 VU도 감당 못함 (P95 48s)
-- **원인:** 모임 생성/참여가 DB 트랜잭션 + RabbitMQ + 알림 생성을 동반
-- **영향:** 실제 서비스 트래픽 패턴에서 현재 인프라로는 100 VU 수준이 한계
-- **해결:** 트랜잭션 범위 축소, 비동기 처리 확대, HikariCP 풀 사이즈 튜닝
-
-### P1: HPA maxReplicas 증가
-
-- **현상:** Pod 4개로는 1500 VU 감당 불가
-- **원인:** maxReplicas=4
-- **해결:** maxReplicas 8~12로 증가 + 워커 노드 확인
-
-### P1: ECR Credential Provider 전환
-
-- **현상:** HPA 스케일아웃 시 새 Pod가 ImagePullBackOff (403)
-- **원인:** etcd encryption 키 불일치 → imagePullSecrets 실패
-- **해결:** kubelet credential provider 전환 (CronJob 제거)
-
-### P2: Chat/API Pod 리소스 격리
-
-- **현상:** WS + REST 동시 부하 시 리소스 경합 가능성
-- **해결:** Pod anti-affinity 강화, Chat Pod 리소스 limit 조정
+| 메서드 | 원인 | 영향 |
+|--------|------|------|
+| `searchMeetings()` | `LIKE '%keyword%'` + `lower()` × 2회 서브쿼리 | books, meetings 풀스캔 |
+| `findMyTodayMeetings()` | `DATE(start_at)` 함수 | meeting_rounds 풀스캔 |
 
 ---
 
-## 인프라 관찰
+## 인프라 현황
 
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| HPA (API) | 동작 (2→4) | maxReplicas=4 한계 |
-| HPA (Chat) | 미확인 | WS 부하 시 별도 확인 필요 |
-| ALB 라우팅 | 정상 | api.doktori.kr → ALB 직접 |
-| NGF HTTPRoute | 정상 | /api/*, /ws/chat 분기 |
-| ECR Pull | **실패** | etcd encryption 키 불일치 |
-| etcd Encryption | **실패** | 마스터별 다른 키 → Secret 읽기 불가 |
+| K8s | v1.31.14, Worker 4× t4g.large | |
+| HPA (API) | 정상 | CPU 60%, max 8 Pod |
+| HPA (Chat) | 정상 | CPU 60%, max 8 Pod, CPU 기준 유효 |
+| RDS Proxy | 정상 | 커넥션 멀티플렉싱, JDBC pinning 최적화 |
+| NGF keepAlive | **정상** | UpstreamSettingsPolicy 64 연결 |
+| RDS | **WARN** | db.t4g.small CPU 97% — vCPU 한계 |
 | Prometheus | 정상 | k6 v1.6.1 + Prometheus 3.x + native histogram |
-| Grafana 대시보드 | 정상 | 커스텀 + 공식 k6 대시보드 |
-
----
-
-## 테스트 환경 요약
-
-| 항목 | 값 |
-|------|-----|
-| 러너 | t4g.medium × 3 (2 vCPU, 4GB RAM) |
-| k6 버전 | v1.6.1 |
-| Prometheus | 3.10.0 (native histogram + OOO window) |
-| 네트워크 | 인터넷 경유 (별도 AWS 계정 → api.doktori.kr ALB) |
-| K8s 클러스터 | v1.31.14, 워커 4대 (t4g.large) |
-| API Pod | 2~4 replica (HPA) |
-| Chat Pod | 2 replica |
 
 ---
 
 ## 다음 단계
 
-| 우선순위 | 작업 | 담당 | 기대 효과 |
-|---------|------|------|----------|
-| **P0** | 검색 서브쿼리 최적화 | 백엔드 | stress P95 대폭 개선 |
-| **P0** | 쓰기 API 트랜잭션 최적화 | 백엔드 | load v2 P95 개선 |
-| **P0** | etcd encryption 키 동기화 | 인프라 | Secret 접근 장애 방지 |
-| P1 | HPA maxReplicas 증가 (4→8) | 인프라 | 고부하 수용량 증가 |
-| P1 | kubelet credential provider 전환 | 인프라 | 스케일아웃 pull 실패 방지 |
-| P1 | 30분 lifecycle 풀 테스트 | QA | 장시간 WS 안정성 검증 |
-| P2 | Pod anti-affinity 강화 | 인프라 | Chat/API 리소스 격리 |
-| P2 | 알림 트리거 + 폴링 시나리오 | QA | end-to-end 지연 측정 |
-| P2 | 데이터 시딩 후 재테스트 | QA | 현실적 DB 부하 |
+| 우선순위 | 작업 | 기대 효과 |
+|---------|------|----------|
+| **P0** | 데이터 시딩 (11만건) + slow query 분석 | 실제 DB 부하에서 병목 쿼리 식별 |
+| **P0** | searchMeetings() 서브쿼리 최적화 | 검색 P95 대폭 개선 |
+| **P0** | findMyTodayMeetings() DATE() 제거 | 인덱스 활용 가능 |
+| P1 | HPA 커스텀 메트릭 검토 (응답시간 기반) | I/O 병목 시 보완 |
+| P1 | RDS 인스턴스 변경 (t4g → m6g) | CPU 전용 vCPU |
+| P2 | meeting-lifecycle 30분 풀 (3대 분산) | 대규모 WS 장시간 안정성 |
 
 ---
 
-*Generated: 2026-03-21 | Doktori Load Test Suite v2*
+*Generated: 2026-03-23 | Doktori Load Test Suite v3*

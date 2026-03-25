@@ -55,10 +55,36 @@ fi
 # -----------------------------------------------------------------------------
 # 2. kubeadm join
 # -----------------------------------------------------------------------------
-echo "[2/2] kubeadm join..."
+echo "[2/3] ECR credential provider 설치..."
+curl -fLo /tmp/ecr-credential-provider \
+  "https://artifacts.k8s.io/binaries/cloud-provider-aws/v1.31.0/linux/arm64/ecr-credential-provider-linux-arm64"
+install -m 755 /tmp/ecr-credential-provider /usr/local/bin/ecr-credential-provider
+rm -f /tmp/ecr-credential-provider
+
+mkdir -p /etc/kubernetes
+cat > /etc/kubernetes/ecr-credential-provider-config.yaml <<'ECREOF'
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+ECREOF
+echo "  → ECR credential provider 설치 완료"
+
+echo "[3/3] kubeadm join..."
 
 eval "$${JOIN_CMD}" \
   --cri-socket=unix:///run/containerd/containerd.sock
+
+# kubelet에 ECR credential provider 플래그 추가
+KUBELET_FLAGS=/var/lib/kubelet/kubeadm-flags.env
+if [ -f "$${KUBELET_FLAGS}" ] && ! grep -q "image-credential-provider" "$${KUBELET_FLAGS}"; then
+  sed -i 's|"$| --image-credential-provider-config=/etc/kubernetes/ecr-credential-provider-config.yaml --image-credential-provider-bin-dir=/usr/local/bin/"|' "$${KUBELET_FLAGS}"
+  systemctl restart kubelet
+fi
 
 echo ""
 echo "============================================="

@@ -98,14 +98,38 @@ fi
 if [ "$${IS_FIRST}" = true ]; then
   echo "[2/2] kubeadm init..."
 
+  # kubeadm config 생성 (kube-proxy iptables 모드 강제 — nftables는 AWS NLB NodePort와 호환 문제)
+  cat > /tmp/kubeadm-config.yaml <<KUBEADMEOF
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+controlPlaneEndpoint: "$${CONTROL_PLANE_ENDPOINT}:6443"
+networking:
+  podSubnet: "$${POD_CIDR}"
+  serviceSubnet: "$${SERVICE_CIDR}"
+apiServer:
+  certSANs:
+    - "$${CONTROL_PLANE_ENDPOINT}"
+    - "$${MASTER_IP}"
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "$${MASTER_IP}"
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+certificateKey: "$(kubeadm certs certificate-key)"
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "iptables"
+KUBEADMEOF
+
   kubeadm init \
-    --control-plane-endpoint="$${CONTROL_PLANE_ENDPOINT}:6443" \
+    --config /tmp/kubeadm-config.yaml \
     --upload-certs \
-    --apiserver-advertise-address="$${MASTER_IP}" \
-    --pod-network-cidr="$${POD_CIDR}" \
-    --service-cidr="$${SERVICE_CIDR}" \
-    --cri-socket=unix:///run/containerd/containerd.sock \
     2>&1 | tee /tmp/kubeadm-init.log
+
+  rm -f /tmp/kubeadm-config.yaml
 
   # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
   mkdir -p /home/ubuntu/.kube
@@ -114,6 +138,35 @@ if [ "$${IS_FIRST}" = true ]; then
 
   # root에서도 kubectl 사용 가능
   export KUBECONFIG=/etc/kubernetes/admin.conf
+
+  # kube-proxy iptables 모드는 kubeadm init --config에서 이미 설정됨
+  # (KubeProxyConfiguration mode: "iptables")
+
+  # ECR credential provider 설치 (kubelet 레벨 ECR 인증)
+  echo "  → ECR credential provider 설치..."
+  curl -fLo /tmp/ecr-credential-provider \
+    "https://artifacts.k8s.io/binaries/cloud-provider-aws/v1.31.0/linux/arm64/ecr-credential-provider-linux-arm64"
+  install -m 755 /tmp/ecr-credential-provider /usr/local/bin/ecr-credential-provider
+  rm -f /tmp/ecr-credential-provider
+
+  mkdir -p /etc/kubernetes
+  cat > /etc/kubernetes/ecr-credential-provider-config.yaml <<ECREOF
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+ECREOF
+
+  KUBELET_FLAGS=/var/lib/kubelet/kubeadm-flags.env
+  if [ -f "$${KUBELET_FLAGS}" ] && ! grep -q "image-credential-provider" "$${KUBELET_FLAGS}"; then
+    sed -i 's|"$| --image-credential-provider-config=/etc/kubernetes/ecr-credential-provider-config.yaml --image-credential-provider-bin-dir=/usr/local/bin/"|' "$${KUBELET_FLAGS}"
+    systemctl restart kubelet
+  fi
+  echo "  → ECR credential provider 설치 완료"
 
   # join 명령 저장 → SSM
   WORKER_JOIN=$(kubeadm token create --print-join-command)

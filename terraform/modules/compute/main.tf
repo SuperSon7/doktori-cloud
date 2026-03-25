@@ -229,8 +229,8 @@ resource "aws_security_group" "this" {
   }
 
   lifecycle {
-    create_before_destroy = true
-    ignore_changes        = [description]
+
+    create_before_destroy = true    ignore_changes        = [description, ingress]
   }
 }
 

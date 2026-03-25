@@ -43,6 +43,7 @@ data "aws_cloudfront_cache_policy" "caching_disabled" {
 
 resource "aws_cloudfront_cache_policy" "static_long" {
   name        = "${var.project_name}-${var.environment}-static-long"
+  comment     = "Long TTL cache policy for /_next/static/*"
   default_ttl = 60 * 60 * 24 * 30
   max_ttl     = 60 * 60 * 24 * 365
   min_ttl     = 60 * 60 * 24
@@ -96,7 +97,10 @@ resource "aws_cloudfront_origin_request_policy" "ssr_req" {
     header_behavior = "whitelist"
 
     headers {
-      items = ["Host", "Origin", "Referer", "Accept", "Accept-Language", "User-Agent"]
+      items = [
+        "Host", "Origin", "Referer", "Accept", "Accept-Language", "User-Agent",
+        "RSC", "Next-Router-State-Tree", "Next-Router-Prefetch", "Next-Router-Segment-Prefetch",
+      ]
     }
   }
 }

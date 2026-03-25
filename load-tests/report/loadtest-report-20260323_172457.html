@@ -1,101 +1,3 @@
-#!/bin/bash
-#
-# 부하테스트 결과 HTML 리포트 자동 생성기
-# report/ 폴더의 로그 파일을 파싱하여 최신 결과 반영
-#
-# 사용법: ./generate-report.sh [output.html]
-#
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-OUTPUT="${1:-${SCRIPT_DIR}/loadtest-report-$(date +%Y%m%d_%H%M%S).html}"
-
-# 로그 파일에서 메트릭 추출
-extract_metric() {
-  local file="$1"
-  local metric="$2"
-  grep "$metric" "$file" 2>/dev/null | tail -1 | sed 's/.*: *//' | sed 's/ .*//'
-}
-
-extract_p95() {
-  local file="$1"
-  grep "http_req_duration" "$file" 2>/dev/null | grep -v expected | tail -1 | sed 's/.*p(95)=//' | sed 's/ .*//'
-}
-
-extract_p90() {
-  local file="$1"
-  grep "http_req_duration" "$file" 2>/dev/null | grep -v expected | tail -1 | sed 's/.*p(90)=//' | sed 's/ .*//'
-}
-
-extract_avg() {
-  local file="$1"
-  grep "http_req_duration" "$file" 2>/dev/null | grep -v expected | tail -1 | sed 's/.*avg=//' | sed 's/ .*//'
-}
-
-extract_med() {
-  local file="$1"
-  grep "http_req_duration" "$file" 2>/dev/null | grep -v expected | tail -1 | sed 's/.*med=//' | sed 's/ .*//'
-}
-
-extract_failed() {
-  local file="$1"
-  grep "http_req_failed" "$file" 2>/dev/null | tail -1 | sed 's/.*: *//' | sed 's/%.*//' | awk '{printf "%.1f", $1}'
-}
-
-extract_errors() {
-  local file="$1"
-  grep "errors\.\.\." "$file" 2>/dev/null | tail -1 | sed 's/.*: *//' | sed 's/%.*//' | awk '{printf "%.1f", $1}'
-}
-
-extract_reqs() {
-  local file="$1"
-  grep "http_reqs\.\.\." "$file" 2>/dev/null | tail -1 | awk '{print $2}'
-}
-
-extract_rps() {
-  local file="$1"
-  grep "http_reqs\.\.\." "$file" 2>/dev/null | tail -1 | awk '{print $3}' | sed 's|/s||'
-}
-
-extract_vus() {
-  local file="$1"
-  grep "vus_max" "$file" 2>/dev/null | tail -1 | awk '{print $2}'
-}
-
-# SLO 판정 (P95 < 1000ms, errors < 0.5%)
-slo_badge() {
-  local p95="$1"
-  local errors="$2"
-
-  # p95를 ms로 변환
-  local p95_ms
-  if echo "$p95" | grep -q "s$"; then
-    p95_ms=$(echo "$p95" | sed 's/s$//' | awk '{printf "%.0f", $1 * 1000}')
-  elif echo "$p95" | grep -q "ms$"; then
-    p95_ms=$(echo "$p95" | sed 's/ms$//' | awk '{printf "%.0f", $1}')
-  else
-    p95_ms=9999
-  fi
-
-  local err_num=$(echo "$errors" | awk '{printf "%.1f", $1+0}')
-
-  if [ "$p95_ms" -le 1000 ] 2>/dev/null && [ "$(echo "$err_num < 0.5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
-    echo '<span class="pass-badge">PASS</span>'
-  else
-    echo '<span class="fail-badge">FAIL</span>'
-  fi
-}
-
-# 시나리오별 최신 로그 찾기
-find_latest_log() {
-  local dir="$1"
-  ls -t "${SCRIPT_DIR}/${dir}/"*.log 2>/dev/null | head -1
-}
-
-echo "부하테스트 결과 파싱 중..."
-
-# HTML 생성 시작
-cat > "$OUTPUT" <<'HTMLHEAD'
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -141,34 +43,8 @@ cat > "$OUTPUT" <<'HTMLHEAD'
 </head>
 <body>
 <div class="container">
-HTMLHEAD
-
-# === 동적 데이터 생성 ===
-
-# stress 여정 데이터 수집
-STRESS_LOGS=(
-  "stress/13-124-202-148-stress.log"
-  "stress/13-124-202-148-stress-hpa8.log"
-  "stress/13-124-202-148-stress-hpa-working.log"
-  "stress/13-124-202-148-stress-proxy-pod2-fixed.log"
-  "stress/13-124-202-148-stress-proxy-jdbc-optimized.log"
-  "stress/13-124-202-148-stress-proxy-jdbc-hpa8.log"
-  "stress/13-124-202-148-stress-keepalive-proxy-hpa8.log"
-)
-
-STRESS_LABELS=(
-  "기준 (Proxy 없음, HPA 미동작)"
-  "HPA 미동작 + maxReplicas 8"
-  "HPA 정상 (metrics-server 수정)"
-  "RDS Proxy + Pod 2 고정"
-  "Proxy + JDBC 최적화"
-  "Proxy + JDBC + HPA 8"
-  "✅ + NGF keepAlive (최종)"
-)
-
-cat >> "$OUTPUT" <<HTMLBODY
 <h1>Doktori Load Test Report</h1>
-<p class="subtitle">$(date '+%Y-%m-%d %H:%M') | api.doktori.kr | K8s + RDS Proxy + NGF</p>
+<p class="subtitle">2026-03-23 17:24 | api.doktori.kr | K8s + RDS Proxy + NGF</p>
 
 <h2>Stress Test Journey — 단계별 개선 추적</h2>
 <p style="color:#8b949e; margin-bottom:1rem;">각 인프라 변경 후 stress 1500 VU 재테스트 결과. 동일 시나리오, 동일 VU로 변수를 하나씩 바꿔가며 측정.</p>
@@ -186,86 +62,84 @@ cat >> "$OUTPUT" <<HTMLBODY
     </tr>
   </thead>
   <tbody>
-HTMLBODY
-
-# stress 여정 테이블 생성
-for i in "${!STRESS_LOGS[@]}"; do
-  LOG="${SCRIPT_DIR}/${STRESS_LOGS[$i]}"
-  LABEL="${STRESS_LABELS[$i]}"
-
-  if [ -f "$LOG" ]; then
-    P95=$(extract_p95 "$LOG")
-    ERRORS=$(extract_errors "$LOG")
-    RPS=$(extract_rps "$LOG")
-    MED=$(extract_med "$LOG")
-    MAX=$(grep "http_req_duration" "$LOG" 2>/dev/null | grep -v expected | tail -1 | sed 's/.*max=//' | sed 's/ .*//')
-    FAILED=$(extract_failed "$LOG")
-
-    # 에러가 없으면 failed 사용
-    [ -z "$ERRORS" ] && ERRORS="$FAILED"
-
-    cat >> "$OUTPUT" <<ROW
     <tr>
-      <td>${i}</td>
-      <td>${LABEL}</td>
-      <td>${ERRORS:-N/A}%</td>
-      <td>${P95:-N/A}</td>
-      <td>${RPS:-N/A}/s</td>
-      <td>${MED:-N/A}</td>
-      <td>${MAX:-N/A}</td>
+      <td>0</td>
+      <td>기준 (Proxy 없음, HPA 미동작)</td>
+      <td>29.9%</td>
+      <td>time="2026-03-20T07:06:17Z"</td>
+      <td>353.051242/s</td>
+      <td>time="2026-03-20T07:06:17Z"</td>
+      <td>time="2026-03-20T07:06:17Z"</td>
     </tr>
-ROW
-  fi
-done
-
-cat >> "$OUTPUT" <<'TABLEEND'
+    <tr>
+      <td>1</td>
+      <td>HPA 미동작 + maxReplicas 8</td>
+      <td>50.1%</td>
+      <td>time="2026-03-21T06:58:29Z"</td>
+      <td>481.687677/s</td>
+      <td>time="2026-03-21T06:58:29Z"</td>
+      <td>time="2026-03-21T06:58:29Z"</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>HPA 정상 (metrics-server 수정)</td>
+      <td>30.7%</td>
+      <td>time="2026-03-21T08:50:29Z"</td>
+      <td>217.571322/s</td>
+      <td>time="2026-03-21T08:50:29Z"</td>
+      <td>time="2026-03-21T08:50:29Z"</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>RDS Proxy + Pod 2 고정</td>
+      <td>32.3%</td>
+      <td>time="2026-03-22T05:43:44Z"</td>
+      <td>313.730082/s</td>
+      <td>time="2026-03-22T05:43:44Z"</td>
+      <td>time="2026-03-22T05:43:44Z"</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Proxy + JDBC 최적화</td>
+      <td>19.1%</td>
+      <td>time="2026-03-22T06:34:23Z"</td>
+      <td>161.946956/s</td>
+      <td>time="2026-03-22T06:34:23Z"</td>
+      <td>time="2026-03-22T06:34:23Z"</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Proxy + JDBC + HPA 8 (최종)</td>
+      <td>25.4%</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+      <td>234.191119/s</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+    </tr>
   </tbody>
 </table>
-TABLEEND
-
-# SLO 카드
-SMOKE_LOG=$(find_latest_log "smoke")
-LOAD_LOG="${SCRIPT_DIR}/load/13-124-202-148-k6-20260319_200656.log"
-LATEST_STRESS="${SCRIPT_DIR}/stress/13-124-202-148-stress-keepalive-proxy-hpa8.log"
-
-SMOKE_P95=""
-LOAD_P95=""
-STRESS_P95=""
-SMOKE_ERR=""
-LOAD_ERR=""
-STRESS_ERR=""
-
-[ -f "$SMOKE_LOG" ] && SMOKE_P95=$(extract_p95 "$SMOKE_LOG") && SMOKE_ERR=$(extract_errors "$SMOKE_LOG")
-[ -f "$LOAD_LOG" ] && LOAD_P95=$(extract_p95 "$LOAD_LOG") && LOAD_ERR=$(extract_errors "$LOAD_LOG")
-[ -f "$LATEST_STRESS" ] && STRESS_P95=$(extract_p95 "$LATEST_STRESS") && STRESS_ERR=$(extract_errors "$LATEST_STRESS")
-
-cat >> "$OUTPUT" <<SLOHTML
 <h2>SLO Compliance</h2>
 <div class="summary-grid">
   <div class="card">
     <div class="card-title">SLO-1: API Availability (5xx < 0.5%)</div>
-    <div class="card-value pass">Load: ${LOAD_ERR:-0}%</div>
-    <div class="card-sub">Stress: ${STRESS_ERR:-N/A}%</div>
+    <div class="card-value pass">Load: 0.0%</div>
+    <div class="card-sub">Stress: 25.4%</div>
   </div>
   <div class="card">
     <div class="card-title">SLO-2: P95 Latency (≤ 1000ms)</div>
-    <div class="card-value pass">Load: ${LOAD_P95:-N/A}</div>
-    <div class="card-sub">Stress: ${STRESS_P95:-N/A}</div>
+    <div class="card-value pass">Load: 30.39ms</div>
+    <div class="card-sub">Stress: time="2026-03-22T08:02:35Z"</div>
   </div>
   <div class="card">
     <div class="card-title">Smoke P95</div>
-    <div class="card-value pass">${SMOKE_P95:-N/A}</div>
+    <div class="card-value pass">20.56ms</div>
   </div>
   <div class="card">
     <div class="card-title">최종 Stress 5xx</div>
-    <div class="card-value warn">${STRESS_ERR:-N/A}%</div>
-    <div class="card-sub">기준 31% → 최종 ${STRESS_ERR:-N/A}%</div>
+    <div class="card-value warn">25.4%</div>
+    <div class="card-sub">기준 31% → 최종 25.4%</div>
   </div>
 </div>
-SLOHTML
-
-# 시나리오별 결과
-cat >> "$OUTPUT" <<'SCENARIOHEAD'
 <h2>Scenario Results</h2>
 <table>
   <thead>
@@ -282,62 +156,63 @@ cat >> "$OUTPUT" <<'SCENARIOHEAD'
     </tr>
   </thead>
   <tbody>
-SCENARIOHEAD
-
-# 각 시나리오 결과 파싱
-SCENARIOS=("smoke" "load" "stress" "meeting-search" "lifecycle")
-SCENARIO_NAMES=("Smoke" "Load (읽기 위주)" "Stress (최종)" "Meeting Search" "Lifecycle (WS+HTTP)")
-
-for i in "${!SCENARIOS[@]}"; do
-  DIR="${SCENARIOS[$i]}"
-  NAME="${SCENARIO_NAMES[$i]}"
-
-  # 최신 로그 찾기
-  if [ "$DIR" = "stress" ]; then
-    LOG="$LATEST_STRESS"
-  elif [ "$DIR" = "lifecycle" ]; then
-    LOG="${SCRIPT_DIR}/lifecycle/v3-5min-setinterval.log"
-  else
-    LOG=$(find_latest_log "$DIR")
-  fi
-
-  if [ -f "$LOG" ] 2>/dev/null; then
-    P95=$(extract_p95 "$LOG")
-    P90=$(extract_p90 "$LOG")
-    AVG=$(extract_avg "$LOG")
-    ERRORS=$(extract_errors "$LOG")
-    FAILED=$(extract_failed "$LOG")
-    REQS=$(extract_reqs "$LOG")
-    RPS=$(extract_rps "$LOG")
-    VUS=$(extract_vus "$LOG")
-
-    [ -z "$ERRORS" ] && ERRORS="$FAILED"
-
-    BADGE=$(slo_badge "${P95:-99s}" "${ERRORS:-99}")
-
-    cat >> "$OUTPUT" <<ROW
     <tr>
-      <td><span class="tag">${DIR}</span> ${NAME}</td>
-      <td>${VUS:-?}</td>
-      <td>${REQS:-?}</td>
-      <td>${RPS:-?}/s</td>
-      <td>${AVG:-?}</td>
-      <td>${P90:-?}</td>
-      <td>${P95:-?}</td>
-      <td>${ERRORS:-?}%</td>
-      <td>${BADGE}</td>
+      <td><span class="tag">smoke</span> Smoke</td>
+      <td>5</td>
+      <td>156</td>
+      <td>2.449704/s</td>
+      <td>13.69ms</td>
+      <td>19.39ms</td>
+      <td>20.56ms</td>
+      <td>0.0%</td>
+      <td><span class="fail-badge">FAIL</span></td>
     </tr>
-ROW
-  fi
-done
-
-cat >> "$OUTPUT" <<'TABLEEND'
+    <tr>
+      <td><span class="tag">load</span> Load (읽기 위주)</td>
+      <td>100</td>
+      <td>9504</td>
+      <td>9.606148/s</td>
+      <td>time="2026-03-21T03:55:51Z"</td>
+      <td>time="2026-03-21T03:55:51Z"</td>
+      <td>time="2026-03-21T03:55:51Z"</td>
+      <td>14.3%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">stress</span> Stress (최종)</td>
+      <td>500</td>
+      <td>183537</td>
+      <td>234.191119/s</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+      <td>time="2026-03-22T08:02:35Z"</td>
+      <td>25.4%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">meeting-search</span> Meeting Search</td>
+      <td>500</td>
+      <td>70787</td>
+      <td>78.547579/s</td>
+      <td>1.03s</td>
+      <td>3.73s</td>
+      <td>4.7s</td>
+      <td>35.9%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag">lifecycle</span> Lifecycle (WS+HTTP)</td>
+      <td>150</td>
+      <td>10887</td>
+      <td>16.47827/s</td>
+      <td>9.69ms</td>
+      <td>17.89ms</td>
+      <td>19.96ms</td>
+      <td>0.0%</td>
+      <td><span class="fail-badge">FAIL</span></td>
+    </tr>
   </tbody>
 </table>
-TABLEEND
-
-# 병목 분석 + 발견사항
-cat >> "$OUTPUT" <<'ANALYSIS'
 <h2>Key Findings</h2>
 
 <div class="two-col">
@@ -389,10 +264,6 @@ cat >> "$OUTPUT" <<'ANALYSIS'
     <p><strong>WebSocket 채팅 검증</strong> → setInterval/setTimeout으로 5분 세션 유지, 메시지 11,850개 송신 성공</p>
   </div>
 </div>
-ANALYSIS
-
-# Infrastructure
-cat >> "$OUTPUT" <<'INFRA'
 <h2>Infrastructure</h2>
 <table>
   <thead>
@@ -408,10 +279,6 @@ cat >> "$OUTPUT" <<'INFRA'
     <tr><td>Load Test Infra</td><td><span class="pass-badge">OK</span></td><td>3x t4g.medium, SSH, Grafana 대시보드</td></tr>
   </tbody>
 </table>
-INFRA
-
-# Next Steps
-cat >> "$OUTPUT" <<'NEXTSTEPS'
 <h2>Next Steps</h2>
 <table>
   <thead>
@@ -426,22 +293,10 @@ cat >> "$OUTPUT" <<'NEXTSTEPS'
     <tr><td><span class="tag">P2</span></td><td>RDS 인스턴스 변경 (t4g → m6g)</td><td>CPU 전용 vCPU로 처리량 증가</td></tr>
   </tbody>
 </table>
-NEXTSTEPS
-
-# Footer
-cat >> "$OUTPUT" <<FOOTER
 <footer>
-  Generated by Doktori Load Test Report Generator | $(date '+%Y-%m-%d %H:%M:%S')<br>
+  Generated by Doktori Load Test Report Generator | 2026-03-23 17:24:57<br>
   Source: <a href="#">load-tests/report/</a> | Grafana: <a href="http://13.124.202.148:3000">Dashboard</a>
 </footer>
 </div>
 </body>
 </html>
-FOOTER
-
-echo "리포트 생성 완료: ${OUTPUT}"
-echo "파싱한 로그 파일:"
-for dir in smoke load stress meeting-search lifecycle; do
-  count=$(ls "${SCRIPT_DIR}/${dir}/"*.log 2>/dev/null | wc -l | tr -d ' ')
-  echo "  ${dir}/: ${count}개"
-done

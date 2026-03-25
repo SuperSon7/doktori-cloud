@@ -181,6 +181,7 @@ metadata:
 | 12 | Spot Instance 전략 | 전부 On-Demand | 비용 최적화 어필 | 중 |
 | 13 | K8s Audit Logging → SIEM | etcd 암호화만 | API server 감사 로그 수집 | 중 |
 | 14 | OPA/Kyverno 정책 엔진 | ❌ 없음 | PSS보다 세밀한 정책 (Tier 1 #3과 택1) | 높 |
+| 15 | DynamoDB Lock 테이블 제거 | DDB 사용 중 | TF 1.10+ 네이티브 S3 락으로 전환 | 낮 |
 
 ---
 
@@ -192,7 +193,7 @@ metadata:
 | 2 | 분산 트레이싱 | 🔲 Todo | - | |
 | 3 | Pod Security Standards | 🔲 Todo | - | |
 | 4 | CI 보안 스캔 | 🔲 Todo | - | |
-| 5 | Egress NetworkPolicy | 🔲 Todo | - | |
+| 5 | Egress NetworkPolicy | ✅ Done | 2026-03-20 | ingress+egress default-deny, 서비스별 허용 룰 구현 |
 | 6 | Progressive Delivery | 🔲 Todo | - | |
 | 7 | IR 체계 문서화 | 🔲 Todo | - | |
 | 8 | DR 계획 문서화 | 🔲 Todo | - | |
@@ -202,3 +203,4 @@ metadata:
 | 12 | Spot Instance | 🔲 Todo | - | |
 | 13 | K8s Audit Logging | 🔲 Todo | - | |
 | 14 | OPA/Kyverno | 🔲 Todo | - | |
+| 15 | DynamoDB Lock 제거 | 🔲 Todo | - | backend.hcl에서 dynamodb_table 제거 + use_lockfile=true |

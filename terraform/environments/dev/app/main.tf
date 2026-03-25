@@ -176,7 +176,7 @@ module "compute" {
 
 resource "aws_ec2_instance_state" "batch_default_stopped" {
   instance_id = module.compute.instance_ids[local.batch_instance_key]
-  state       = "stopped"
+  state       = "running"
   force       = false
   depends_on  = [module.compute]
 }
