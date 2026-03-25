@@ -356,7 +356,7 @@ groups:
               expr: |
                 histogram_quantile(0.99,
                   sum by (le, app, env) (
-                    rate(http_server_requests_seconds_bucket{env=~"prod|prod-k8s"}[5m])
+                    rate(http_server_requests_seconds_bucket{env=~"prod|prod-k8s", outcome="SUCCESS"}[5m])
                   )
                 )
               instant: true
