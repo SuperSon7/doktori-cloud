@@ -54,12 +54,13 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+          # CPU limit 제거: throttling 방지, 노드 여유 CPU 활용
+          # API Pod와 동일하게 memory limit만 설정
           resources:
             requests:
               cpu: "300m"
               memory: "512Mi"
             limits:
-              cpu: "1"
               memory: "1536Mi"
           env:
             - name: TZ
