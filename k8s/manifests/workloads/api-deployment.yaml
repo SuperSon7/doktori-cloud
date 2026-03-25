@@ -82,6 +82,7 @@ spec:
               path: /api/health
               port: 8080
             periodSeconds: 5
+            successThreshold: 2
             failureThreshold: 3
           livenessProbe:
             httpGet:
