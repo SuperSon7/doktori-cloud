@@ -1,0 +1,38 @@
+# Prometheus Adapter — Chat HPA 커스텀 메트릭 제공
+#
+# 역할: 외부 Prometheus의 chat_ws_sessions_active 메트릭을
+#       k8s custom.metrics.k8s.io API로 노출하여 HPA가 조회 가능하게 함
+#
+# 의존성: 외부 Prometheus (monitoring.mgmt.doktori.internal:9090)
+#         Prometheus가 다운되면 커스텀 메트릭 불가 → Chat HPA는 Memory fallback
+#
+# 설치: helm install prometheus-adapter prometheus-community/prometheus-adapter \
+#         --namespace monitoring -f prometheus-adapter-values.yaml
+
+prometheus:
+  url: http://monitoring.mgmt.doktori.internal
+  port: 9090
+
+# 메트릭 캐시 갱신 주기 (기본 10분 → 1분으로 단축)
+metricsRelistInterval: 1m
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+rules:
+  custom:
+    # Chat WebSocket 세션 수 → HPA에서 type: Pods로 조회
+    - seriesQuery: 'chat_ws_sessions_active'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+          pod:
+            resource: pod
+      name:
+        as: "chat_ws_sessions_active"
+      metricsQuery: '<<.Series>>{<<.LabelMatchers>>}'
