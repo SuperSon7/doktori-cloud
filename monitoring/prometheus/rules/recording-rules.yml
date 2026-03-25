@@ -1,0 +1,53 @@
+# =============================================================
+# Recording Rules — histogram bucket drop 후 p99 보존
+#
+# 왜 recording rule인가:
+#   histogram_quantile()은 _bucket 시계열이 필요하지만,
+#   bucket은 카디널리티가 10~20배로 뻥튀기됨.
+#   Alloy에서 bucket을 drop하되, drop 전에 Prometheus에서
+#   주기적으로 p99를 미리 계산해서 저장하면
+#   bucket 없이도 percentile 대시보드를 유지할 수 있음.
+#
+# 주의: Alloy에서 bucket을 drop하면 이 recording rule도
+#       새 데이터를 생성하지 못함. 따라서 이 rule은
+#       "bucket을 유지하면서 p99만 추출"하는 용도가 아니라,
+#       "apiserver_request_duration_seconds_bucket은 유지하되
+#        나머지 5개 bucket만 drop"하는 현재 전략에서,
+#       apiserver_request_duration의 p99를 저장하는 용도.
+# =============================================================
+
+groups:
+  - name: k8s-component-latency
+    interval: 60s
+    rules:
+      # API Server 요청 지연 p99 (verb × resource별)
+      # 원본: apiserver_request_duration_seconds_bucket (13,032 시계열)
+      # 결과: ~50 시계열 (verb × resource 조합)
+      - record: apiserver:request_duration_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (verb, resource, le) (
+              rate(apiserver_request_duration_seconds_bucket{env="prod"}[5m])
+            )
+          )
+
+      # etcd 요청 지연 p99 (operation별)
+      # 원본: etcd_request_duration_seconds_bucket (10,152 시계열) — Alloy에서 drop됨
+      # 이 rule은 drop 전 기존 데이터가 있을 때만 계산됨
+      # 향후 etcd bucket을 다시 수집할 때를 대비한 placeholder
+      # - record: etcd:request_duration_seconds:p99
+      #   expr: |
+      #     histogram_quantile(0.99,
+      #       sum by (operation, le) (
+      #         rate(etcd_request_duration_seconds_bucket{env="prod"}[5m])
+      #       )
+      #     )
+
+      # API Server 요청 지연 p50 (전체 평균 감지용)
+      - record: apiserver:request_duration_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum by (verb, resource, le) (
+              rate(apiserver_request_duration_seconds_bucket{env="prod"}[5m])
+            )
+          )

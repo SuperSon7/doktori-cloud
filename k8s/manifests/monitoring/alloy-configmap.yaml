@@ -127,12 +127,23 @@ data:
 
     prometheus.scrape "cadvisor" {
       targets    = discovery.relabel.cadvisor.output
-      forward_to = [prometheus.remote_write.monitoring.receiver]
+      forward_to = [prometheus.relabel.cadvisor_drop.receiver]
       scrape_interval = "30s"
       scheme     = "https"
       bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
       tls_config {
         insecure_skip_verify = true
+      }
+    }
+
+    prometheus.relabel "cadvisor_drop" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      // container_tasks_state drop
+      // 이유: 2,100 시계열, cgroup task 상태 — 대시보드/알림 미사용
+      rule {
+        source_labels = ["__name__"]
+        regex         = "container_tasks_state"
+        action        = "drop"
       }
     }
 
@@ -162,12 +173,24 @@ data:
 
     prometheus.scrape "kubelet" {
       targets    = discovery.relabel.kubelet.output
-      forward_to = [prometheus.remote_write.monitoring.receiver]
+      forward_to = [prometheus.relabel.kubelet_drop.receiver]
       scrape_interval = "30s"
       scheme     = "https"
       bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
       tls_config {
         insecure_skip_verify = true
+      }
+    }
+
+    prometheus.relabel "kubelet_drop" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      // kubelet_runtime_operations_duration_seconds_bucket drop
+      // 이유: 1,965 시계열 차지, 대시보드 미사용.
+      //       kubelet 대시보드에서는 _count/_sum으로 평균 계산 가능
+      rule {
+        source_labels = ["__name__"]
+        regex         = "kubelet_runtime_operations_duration_seconds_bucket"
+        action        = "drop"
       }
     }
 
@@ -211,10 +234,22 @@ data:
 
     prometheus.scrape "etcd" {
       targets    = discovery.relabel.etcd.output
-      forward_to = [prometheus.remote_write.monitoring.receiver]
+      forward_to = [prometheus.relabel.etcd_drop.receiver]
       scrape_interval = "60s"
       // etcd metrics endpoint는 HTTP (TLS 불필요)
       scheme     = "http"
+    }
+
+    prometheus.relabel "etcd_drop" {
+      forward_to = [prometheus.remote_write.monitoring.receiver]
+      // etcd_request_duration_seconds_bucket drop
+      // 이유: 10,152 시계열 차지, 대시보드 미사용.
+      //       etcd 대시보드에서는 _count/_sum 기반 메트릭 사용
+      rule {
+        source_labels = ["__name__"]
+        regex         = "etcd_request_duration_seconds_bucket"
+        action        = "drop"
+      }
     }
 
     // =============================================================
@@ -312,6 +347,15 @@ data:
       rule {
         replacement  = "prod"
         target_label = "env"
+      }
+      // ── 카디널리티 최적화: 불필요 histogram bucket drop ──
+      // apiserver_request_duration만 남기고 나머지 고카디널리티 bucket 제거
+      // 이유: body_size, response_sizes, watch_list, watch_cache, sli는
+      //       대시보드/알림 어디서도 미사용 (TSDB 분석 결과 합계 ~20,000 시계열)
+      rule {
+        source_labels = ["__name__"]
+        regex         = "apiserver_(request_body_size_bytes|response_sizes|watch_list_duration_seconds|watch_cache_read_wait_seconds|request_sli_duration_seconds)_bucket"
+        action        = "drop"
       }
     }
 

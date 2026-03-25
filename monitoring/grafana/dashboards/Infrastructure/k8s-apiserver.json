@@ -1242,6 +1242,78 @@
       ],
       "title": "API Server - Memory Usage by instance",
       "type": "timeseries"
+    },
+    {
+      "id": 70,
+      "type": "row",
+      "title": "Request Latency Percentiles (Recording Rules)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      }
+    },
+    {
+      "id": 71,
+      "type": "timeseries",
+      "title": "API Server Request Duration p99 (by verb)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "apiserver:request_duration_seconds:p99{verb=~\"GET|LIST|POST|PUT|DELETE\"}",
+          "legendFormat": "{{verb}} {{resource}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": 72,
+      "type": "timeseries",
+      "title": "API Server Request Duration p50 (by verb)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "apiserver:request_duration_seconds:p50{verb=~\"GET|LIST|POST|PUT|DELETE\"}",
+          "legendFormat": "{{verb}} {{resource}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      }
     }
   ],
   "refresh": "30s",
