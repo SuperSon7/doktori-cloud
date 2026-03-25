@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: api
   minReplicas: 2
-  maxReplicas: 8
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
@@ -25,7 +25,7 @@ spec:
           value: 1
           periodSeconds: 60
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 30
       policies:
         - type: Pods
           value: 2
