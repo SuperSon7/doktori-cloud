@@ -142,9 +142,9 @@ groups:
             model:
               expr: |
                 1 - (
-                  node_filesystem_avail_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay"}
+                  node_filesystem_avail_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay", mountpoint!~"/etc/.*|/var/log|/var/lib/alloy.*|/run/.*|/boot/efi"}
                   /
-                  node_filesystem_size_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay"}
+                  node_filesystem_size_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay", mountpoint!~"/etc/.*|/var/log|/var/lib/alloy.*|/run/.*|/boot/efi"}
                 )
               instant: true
               refId: A
@@ -263,9 +263,9 @@ groups:
             model:
               expr: |
                 1 - (
-                  node_filesystem_avail_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay"}
+                  node_filesystem_avail_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay", mountpoint!~"/etc/.*|/var/log|/var/lib/alloy.*|/run/.*|/boot/efi"}
                   /
-                  node_filesystem_size_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay"}
+                  node_filesystem_size_bytes{env=~"prod|prod-k8s", fstype!~"tmpfs|overlay", mountpoint!~"/etc/.*|/var/log|/var/lib/alloy.*|/run/.*|/boot/efi"}
                 )
               instant: true
               refId: A
