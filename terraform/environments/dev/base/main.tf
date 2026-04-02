@@ -115,19 +115,18 @@ resource "random_password" "qdrant_api_key" {
 # =============================================================================
 # VPC Peering — dev ↔ mgmt (monitoring)
 # =============================================================================
-data "terraform_remote_state" "monitoring" {
+data "terraform_remote_state" "monitoring_base" {
   backend = "s3"
   config = {
-    bucket = var.state_bucket
-    key    = "monitoring/terraform.tfstate"
-    region = var.aws_region
+    bucket = "doktori-terraform-state"
+    key    = "monitoring/base/terraform.tfstate"
+    region = "ap-northeast-2"
   }
 }
 
 locals {
-  mgmt_vpc_id   = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_id
-  mgmt_vpc_cidr = data.terraform_remote_state.monitoring.outputs.mgmt_vpc_cidr
-  mgmt_zone_id  = data.terraform_remote_state.monitoring.outputs.mgmt_zone_id
+  mgmt_vpc_id   = data.terraform_remote_state.monitoring_base.outputs.vpc_id
+  mgmt_vpc_cidr = data.terraform_remote_state.monitoring_base.outputs.vpc_cidr
 }
 
 resource "aws_vpc_peering_connection" "dev_to_mgmt" {
@@ -154,29 +153,6 @@ resource "aws_route" "dev_private_to_mgmt" {
   destination_cidr_block    = local.mgmt_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.dev_to_mgmt.id
 }
-
-# --- mgmt → dev route (default VPC main route table) ---
-data "aws_route_table" "mgmt_main" {
-  vpc_id = local.mgmt_vpc_id
-
-  filter {
-    name   = "association.main"
-    values = ["true"]
-  }
-}
-
-resource "aws_route" "mgmt_to_dev" {
-  route_table_id            = data.aws_route_table.mgmt_main.id
-  destination_cidr_block    = "10.0.0.0/16"
-  vpc_peering_connection_id = aws_vpc_peering_connection.dev_to_mgmt.id
-}
-
-# --- mgmt PHZ → dev VPC association (monitoring.mgmt.doktori.internal resolve) ---
-resource "aws_route53_zone_association" "mgmt_phz_dev" {
-  zone_id = local.mgmt_zone_id
-  vpc_id  = module.networking.vpc_id
-}
-
 # -----------------------------------------------------------------------------
 # SSM Parameter Store
 # -----------------------------------------------------------------------------
