@@ -3,40 +3,37 @@
 # =============================================================================
 
 locals {
+  # dev/prod 단일 레포 — 이미지 태그로 환경 구분
+  # dev 빌드: dev-${GIT_SHA}
+  # prod 빌드: prod-${GIT_SHA}
+  # lifecycle rule: 각 prefix 10개 유지, untagged 1일 후 삭제
   repositories = {
-    # --- dev/staging 공용 ---
-    backend_api  = { name = "doktori/backend-api",  scope = "dev" }
-    backend_chat = { name = "doktori/backend-chat", scope = "dev" }
-    ai           = { name = "doktori/ai",           scope = "dev" }
-    frontend     = { name = "doktori/frontend",     scope = "dev" }
-    nginx        = { name = "doktori/nginx",        scope = "dev" }
-
-    # --- prod 전용 ---
-    prod_backend_api  = { name = "doktori/prod-backend-api",  scope = "prod" }
-    prod_backend_chat = { name = "doktori/prod-backend-chat", scope = "prod" }
-    prod_ai           = { name = "doktori/prod-ai",           scope = "prod" }
-    prod_frontend     = { name = "doktori/prod-frontend",     scope = "prod" }
+    backend_api  = "doktori/backend-api"
+    backend_chat = "doktori/backend-chat"
+    ai           = "doktori/ai"
+    frontend     = "doktori/frontend"
+    nginx        = "doktori/nginx"
   }
 }
 
 resource "aws_ecr_repository" "this" {
   for_each = local.repositories
 
-  name                 = each.value.name
+  name                 = each.value
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
-  tags = merge(
-    {
-      Name    = each.value.name
-      Service = replace(each.key, "prod_", "")
-      Scope   = each.value.scope
-    },
-    each.value.scope == "prod" ? { Environment = "prod" } : {},
-  )
+  tags = {
+    Name    = each.value
+    Service = each.key
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_ecr_lifecycle_policy" "cleanup" {
@@ -48,15 +45,36 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 10 images"
+        description  = "prod-* 태그 10개 유지"
         selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 10
+          tagStatus      = "tagged"
+          tagPatternList = ["prod-*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = 10
         }
-        action = {
-          type = "expire"
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "dev-* 태그 10개 유지"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["dev-*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = 10
         }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 3
+        description  = "untagged 1일 후 삭제"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
       }
     ]
   })
