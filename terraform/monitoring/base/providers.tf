@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.10.0"
 
   required_providers {
     aws = {
@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    key = "monitoring/terraform.tfstate"
+    key = "monitoring/base/terraform.tfstate"
   }
 }
 
@@ -18,8 +18,9 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project   = var.project_name
-      ManagedBy = "Terraform"
+      Project     = var.project_name
+      Environment = "shared"
+      ManagedBy   = "Terraform"
     }
   }
 }
