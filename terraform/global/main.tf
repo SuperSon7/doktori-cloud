@@ -33,20 +33,16 @@ resource "aws_iam_service_linked_role" "autoscaling" {
 # GitHub Actions Deploy Role (OIDC)
 # -----------------------------------------------------------------------------
 locals {
-  # Deploy role: 모든 서비스 레포 + Cloud 레포 (main, develop, staging, feature/*)
-  github_oidc_subjects = concat(
-    flatten([
+  # Deploy role: 서비스 레포 전용 (be/fe/ai) — ECR push, SSM 배포 용도
+  # Cloud 레포는 terraform_oidc_subjects(아래)에서 별도 관리
+  github_oidc_subjects = flatten([
       for repo in var.github_repos : [
         "repo:${var.github_org}/${repo}:ref:refs/heads/main",
         "repo:${var.github_org}/${repo}:ref:refs/heads/develop",
         "repo:${var.github_org}/${repo}:ref:refs/heads/staging",
       ]
-    ]),
-    [
-      "repo:${var.github_org}/${var.cloud_repo}:ref:refs/heads/feature/*",
-      "repo:${var.github_org}/5-team-service-fe:ref:refs/heads/feature/s3-CDN",
-    ],
-  )
+    ])
+
 
   # Terraform role: Cloud 레포 전용 (main, feature/*, PR)
   terraform_oidc_subjects = [
@@ -136,44 +132,9 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
   })
 }
 
-resource "aws_iam_role_policy" "github_actions_cdn" {
-  count = var.static_bucket_name != null && var.cloudfront_distribution_id != null ? 1 : 0
-
-  name = "${var.project_name}-gha-fe-cdn-prod"
-  role = aws_iam_role.github_actions_deploy.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "S3BucketMeta"
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket",
-          "s3:GetBucketLocation",
-        ]
-        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}"]
-      },
-      {
-        Sid    = "S3ObjectWriteDelete"
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:DeleteObject",
-        ]
-        Resource = ["arn:${data.aws_partition.current.partition}:s3:::${var.static_bucket_name}/*"]
-      },
-      {
-        Sid    = "CloudFrontInvalidation"
-        Effect = "Allow"
-        Action = [
-          "cloudfront:CreateInvalidation",
-        ]
-        Resource = ["arn:${data.aws_partition.current.partition}:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${var.cloudfront_distribution_id}"]
-      },
-    ]
-  })
-}
+# CDN 배포 권한(S3 write, CloudFront invalidation)은 prod/cdn 레이어에서 attachment
+# 해당 리소스(S3 bucket, CloudFront distribution)가 생성된 후 ARN 참조 가능
+# → terraform/environments/prod/cdn/main.tf 참조
 
 # -----------------------------------------------------------------------------
 # GitHub Actions Terraform Role (OIDC) — Cloud repo only
@@ -279,16 +240,8 @@ resource "aws_iam_role_policy" "terraform_infra" {
         ]
         Resource = "*"
       },
-      {
-        Sid    = "KMSDecryptParameterStore"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:Encrypt"]
-        Resource = [
-          "arn:aws:kms:ap-northeast-2:250857930609:key/2ddbf5d2-3960-4d7c-97cd-45e7cd7fa2e6",
-          "arn:aws:kms:ap-northeast-2:250857930609:key/e30d6af4-88ef-420a-b1ef-9d43d1ef8010",
-          "arn:aws:kms:ap-northeast-2:250857930609:key/709fb125-d24d-4365-a33d-ebbeb9a4ec39",
-        ]
-      },
+      # KMS Decrypt: KMS 키 생성 레이어(base/data)에서 data "aws_kms_key"로 참조 후 별도 policy attachment
+      # → 키가 존재하기 전에 ARN 하드코딩 금지 (PRINCIPLES.md §11)
       {
         Sid      = "ELB"
         Effect   = "Allow"
@@ -337,16 +290,6 @@ resource "aws_iam_role_policy" "terraform_infra" {
         Action   = ["cloudwatch:*", "logs:*"]
         Resource = "*"
       },
-      {
-        Sid    = "TerraformStateLock"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:DeleteItem",
-        ]
-        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/*terraform*"
-      },
     ]
   })
 }
@@ -355,9 +298,19 @@ resource "aws_iam_role_policy" "terraform_infra" {
 # SSM IAM Groups & Policies
 # -----------------------------------------------------------------------------
 
-# Cloud team - full access to all instances in all environments
+# Cloud team - AdministratorAccess + Billing + SSM (Admin 그룹 통합)
 resource "aws_iam_group" "cloud_team" {
   name = "${var.project_name}-cloud-team"
+}
+
+resource "aws_iam_group_policy_attachment" "cloud_team_admin" {
+  group      = aws_iam_group.cloud_team.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+resource "aws_iam_group_policy_attachment" "cloud_team_billing" {
+  group      = aws_iam_group.cloud_team.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSBillingConductorFullAccess"
 }
 
 resource "aws_iam_group_policy" "cloud_team_ssm" {
@@ -612,58 +565,11 @@ resource "aws_iam_user_group_membership" "team_member" {
   ]
 }
 
-# -----------------------------------------------------------------------------
-# Admin Group + Admin Users
-# -----------------------------------------------------------------------------
-resource "aws_iam_group" "admin" {
-  name = "Admin"
-}
+# Admin 그룹 제거 — cloud_team으로 통합 (AdministratorAccess + Billing 동일)
 
-resource "aws_iam_group_policy_attachment" "admin_access" {
-  group      = aws_iam_group.admin.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-}
-
-resource "aws_iam_group_policy_attachment" "admin_billing" {
-  group      = aws_iam_group.admin.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSBillingConductorFullAccess"
-}
-
-resource "aws_iam_user" "admin" {
-  for_each = var.admin_users
-
-  name          = each.key
-  force_destroy = true
-
-  tags = {
-    Name = each.key
-  }
-}
-
-resource "aws_iam_user_group_membership" "admin" {
-  for_each = var.admin_users
-
-  user   = aws_iam_user.admin[each.key].name
-  groups = [aws_iam_group.admin.name]
-}
-
-# -----------------------------------------------------------------------------
-# Service Accounts
-# -----------------------------------------------------------------------------
-resource "aws_iam_user" "grafana_billing_reader" {
-  name          = "grafana-billing-reader"
-  force_destroy = true
-
-  tags = {
-    Name    = "grafana-billing-reader"
-    Service = "monitoring"
-  }
-}
-
-resource "aws_iam_user_policy_attachment" "grafana_cloudwatch" {
-  user       = aws_iam_user.grafana_billing_reader.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
-}
+# Service Accounts (grafana-billing-reader)
+# Grafana EC2 instance profile으로 대체 — terraform/monitoring/app/main.tf 참조
+# IAM user + 장기 자격증명 방식 제거 (보안 개선)
 
 # -----------------------------------------------------------------------------
 # Budget Alert

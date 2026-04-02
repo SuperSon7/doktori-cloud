@@ -17,13 +17,12 @@ variable "github_org" {
 }
 
 variable "github_repos" {
-  description = "GitHub repository names for deploy OIDC"
+  description = "Service repo names for deploy OIDC (ECR push, SSM). Cloud repo는 cloud_repo 변수로 별도 관리"
   type        = list(string)
   default = [
     "5-team-service-be",
     "5-team-service-fe",
     "5-team-service-ai",
-    "5-team-service-cloud",
   ]
 }
 
@@ -34,9 +33,9 @@ variable "cloud_repo" {
 }
 
 variable "budget_limit_amount" {
-  description = "Monthly budget limit in KRW"
+  description = "Monthly budget limit in USD"
   type        = string
-  default     = "1000000"
+  default     = "800"
 }
 
 variable "budget_alert_emails" {
@@ -51,28 +50,10 @@ variable "team_members" {
     groups = list(string)
   }))
   default = {
-    ella  = { groups = ["be"] }
-    bruni = { groups = ["be"] }
+    ella            = { groups = ["be"] }
+    bruni           = { groups = ["be"] }
+    doktori-cloud-h = { groups = ["cloud"] }
+    doktori-cloud-v = { groups = ["cloud"] }
   }
 }
 
-variable "admin_users" {
-  description = "Admin users (assigned to Admin group with AdministratorAccess)"
-  type        = map(object({}))
-  default = {
-    doktori-admin   = {}
-    doktori-cloud-h = {}
-  }
-}
-
-variable "static_bucket_name" {
-  description = "Static bucket name for CDN deployment permissions"
-  type        = string
-  default     = "doktori-prod-frontend-static"
-}
-
-variable "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID for invalidation permissions"
-  type        = string
-  default     = "EN4J9BGDSE4G0"
-}
