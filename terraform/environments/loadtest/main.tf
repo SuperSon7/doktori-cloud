@@ -169,7 +169,6 @@ resource "aws_instance" "runner" {
 
   tags = {
     Name    = "${var.project_name}-k6-runner-${count.index + 1}"
-    Purpose = "distributed-k6-loadtest"
     Access  = "ssm-only"
   }
 

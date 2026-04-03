@@ -2,17 +2,74 @@
 # Staging App Layer — compute (downsized instances for cost savings)
 # =============================================================================
 
-data "terraform_remote_state" "base" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "${var.environment}/base/terraform.tfstate"
-    region = var.aws_region
+# -----------------------------------------------------------------------------
+# AWS Data Sources — replace terraform_remote_state with direct lookups
+# -----------------------------------------------------------------------------
+data "aws_vpc" "main" {
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
 }
 
+data "aws_subnet" "public" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-public" }
+}
+
+data "aws_subnet" "private_app" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-app" }
+}
+
+data "aws_subnet" "private_db" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-db" }
+}
+
+data "aws_subnet" "private_rds" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-rds" }
+}
+
+data "aws_subnet" "private_k8s_a" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-k8s-a" }
+}
+
+data "aws_subnet" "private_k8s_b" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-k8s-b" }
+}
+
+data "aws_route53_zone" "internal" {
+  name         = "${var.environment}.${var.project_name}.internal"
+  private_zone = true
+  vpc_id       = data.aws_vpc.main.id
+}
+
+data "aws_route_table" "private_primary" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-primary-rt" }
+}
+
 locals {
-  net = data.terraform_remote_state.base.outputs.networking
+  net = {
+    vpc_id   = data.aws_vpc.main.id
+    vpc_cidr = data.aws_vpc.main.cidr_block
+    subnet_ids = {
+      public        = data.aws_subnet.public.id
+      private_app   = data.aws_subnet.private_app.id
+      private_db    = data.aws_subnet.private_db.id
+      private_rds   = data.aws_subnet.private_rds.id
+      private_k8s_a = data.aws_subnet.private_k8s_a.id
+      private_k8s_b = data.aws_subnet.private_k8s_b.id
+    }
+    internal_zone_id        = data.aws_route53_zone.internal.zone_id
+    internal_zone_name      = data.aws_route53_zone.internal.name
+    private_route_table_ids = {
+      primary = data.aws_route_table.private_primary.id
+    }
+  }
 }
 
 data "aws_ami" "ubuntu_arm64" {
@@ -87,7 +144,7 @@ module "compute" {
       subnet_key    = "public"
       volume_size   = var.default_volume_size
       associate_eip = true
-      tags          = { Part = "cloud" }
+      tags          = { Owner = "cloud" }
       sg_ingress = [
         { description = "HTTP from anywhere", from_port = 80, to_port = 80, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "HTTPS from anywhere", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
@@ -98,7 +155,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "fe" }
+      tags          = { Owner = "fe" }
       sg_ingress    = []
     }
     api = {
@@ -106,7 +163,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "be" }
+      tags          = { Owner = "be" }
       sg_ingress    = []
     }
     chat = {
@@ -114,7 +171,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "be" }
+      tags          = { Owner = "be" }
       sg_ingress    = []
     }
     ai = {
@@ -122,7 +179,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "ai" }
+      tags          = { Owner = "ai" }
       sg_ingress    = []
     }
     rds_monitoring = {
@@ -130,7 +187,7 @@ module "compute" {
       architecture  = "x86"
       subnet_key    = "public"
       volume_size   = var.default_volume_size
-      tags          = { Part = "monitoring" }
+      tags          = { Owner = "monitoring" }
       sg_ingress = [
         { description = "MySQL exporter from VPC", from_port = 9104, to_port = 9104, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -140,7 +197,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "data" }
+      tags          = { Owner = "data" }
       sg_ingress = [
         { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -150,7 +207,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "private_app"
       volume_size   = var.default_volume_size
-      tags          = { Part = "data" }
+      tags          = { Owner = "data" }
       sg_ingress = [
         { description = "RabbitMQ AMQP from VPC", from_port = 5672, to_port = 5672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "RabbitMQ mgmt from VPC", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
@@ -211,7 +268,6 @@ resource "aws_subnet" "h_k8s" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-${replace(each.key, "_", "-")}"
-    Tier = "private-k8s"
   }
 }
 
@@ -239,7 +295,7 @@ resource "aws_security_group" "h_k8s_master" {
 
   tags = {
     Name = "h-k8s-master-sg"
-    Role = "k8s-cp"
+    Service = "k8s-cp"
   }
 }
 
@@ -260,7 +316,7 @@ resource "aws_security_group" "h_k8s_worker" {
 
   tags = {
     Name = "h-k8s-worker-sg"
-    Role = "k8s-worker"
+    Service = "k8s-worker"
   }
 }
 
@@ -431,9 +487,8 @@ resource "aws_instance" "h_k8s" {
   }
 
   tags = {
-    Name = each.key
-    env  = var.environment
-    role = each.value.role
+    Name    = each.key
+    Service = each.value.role
   }
 
   depends_on = [aws_route_table_association.h_k8s]

@@ -2,13 +2,18 @@
 # Staging Loadtest Layer — k6 runner EC2 instances
 # =============================================================================
 
-data "terraform_remote_state" "base" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "${var.environment}/base/terraform.tfstate"
-    region = var.aws_region
+# -----------------------------------------------------------------------------
+# AWS Data Sources — replace terraform_remote_state with direct lookups
+# -----------------------------------------------------------------------------
+data "aws_vpc" "main" {
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
+}
+
+data "aws_subnet" "public" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-public" }
 }
 
 data "aws_ami" "ubuntu_arm64" {
@@ -27,7 +32,12 @@ data "aws_ami" "ubuntu_arm64" {
 }
 
 locals {
-  net = data.terraform_remote_state.base.outputs.networking
+  net = {
+    vpc_id = data.aws_vpc.main.id
+    subnet_ids = {
+      public = data.aws_subnet.public.id
+    }
+  }
 
   runner_names = [
     "k6-runner-1",
@@ -125,9 +135,7 @@ resource "aws_instance" "runner" {
 
   tags = {
     Name    = each.key
-    Project = var.project_tag
-    Purpose = "distributed-k6-loadtest"
-    Access  = "ssm-only"
+    Project = var.project_name
   }
 
   lifecycle {

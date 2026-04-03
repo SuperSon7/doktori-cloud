@@ -2,28 +2,84 @@
 # Prod App Layer — compute (EC2, SG, IAM, EIP)
 # =============================================================================
 
-data "terraform_remote_state" "base" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "${var.environment}/base/terraform.tfstate"
-    region = var.aws_region
+# -----------------------------------------------------------------------------
+# AWS Data Sources — replace terraform_remote_state with direct lookups
+# -----------------------------------------------------------------------------
+data "aws_vpc" "main" {
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
 }
 
-data "terraform_remote_state" "dns" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "dns-zone/terraform.tfstate"
-    region = var.aws_region
-  }
+data "aws_subnet" "public" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-public" }
+}
+
+data "aws_subnet" "public_c" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-public-c" }
+}
+
+data "aws_subnet" "public_b" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-public-b" }
+}
+
+data "aws_subnet" "private_app" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-app" }
+}
+
+data "aws_subnet" "private_app_c" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-app-c" }
+}
+
+data "aws_subnet" "private_app_b" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-app-b" }
+}
+
+data "aws_subnet" "private_db" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-db" }
+}
+
+data "aws_subnet" "private_rds" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-rds" }
+}
+
+data "aws_route53_zone" "internal" {
+  name         = "${var.environment}.doktori.internal"
+  private_zone = true
+  vpc_id       = data.aws_vpc.main.id
+}
+
+data "aws_route53_zone" "public" {
+  name = "doktori.kr"
 }
 
 data "aws_caller_identity" "current" {}
 
 locals {
-  net = data.terraform_remote_state.base.outputs.networking
+  net = {
+    vpc_id   = data.aws_vpc.main.id
+    vpc_cidr = data.aws_vpc.main.cidr_block
+    subnet_ids = {
+      public        = data.aws_subnet.public.id
+      public_c      = data.aws_subnet.public_c.id
+      public_b      = data.aws_subnet.public_b.id
+      private_app   = data.aws_subnet.private_app.id
+      private_app_c = data.aws_subnet.private_app_c.id
+      private_app_b = data.aws_subnet.private_app_b.id
+      private_db    = data.aws_subnet.private_db.id
+      private_rds   = data.aws_subnet.private_rds.id
+    }
+    internal_zone_id   = data.aws_route53_zone.internal.zone_id
+    internal_zone_name = data.aws_route53_zone.internal.name
+  }
 }
 
 locals {
@@ -112,7 +168,7 @@ module "compute" {
       architecture  = "arm64"
       subnet_key    = "public"
       associate_eip = true
-      tags          = { Part = "cloud" }
+      tags          = { Owner = "cloud" }
       sg_ingress = [
         { description = "HTTP from anywhere", from_port = 80, to_port = 80, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
         { description = "HTTPS from anywhere", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
@@ -122,35 +178,35 @@ module "compute" {
       instance_type = "t4g.small"
       architecture  = "arm64"
       subnet_key    = "private_app"
-      tags          = { Part = "fe" }
+      tags          = { Owner = "fe" }
       sg_ingress    = []
     }
     api = {
       instance_type = "t4g.small"
       architecture  = "arm64"
       subnet_key    = "private_app"
-      tags          = { Part = "be" }
+      tags          = { Owner = "be" }
       sg_ingress    = []
     }
     chat = {
       instance_type = "t4g.medium"
       architecture  = "arm64"
       subnet_key    = "private_app"
-      tags          = { Part = "be" }
+      tags          = { Owner = "be" }
       sg_ingress    = []
     }
     ai = {
       instance_type = "t4g.medium"
       architecture  = "arm64"
       subnet_key    = "private_app"
-      tags          = { Part = "ai" }
+      tags          = { Owner = "ai" }
       sg_ingress    = []
     }
     rds_monitoring = {
       instance_type = "t3.micro"
       architecture  = "x86"
       subnet_key    = "public"
-      tags          = { Part = "monitoring" }
+      tags          = { Owner = "monitoring" }
       sg_ingress = [
         { description = "MySQL exporter from VPC", from_port = 9104, to_port = 9104, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -159,7 +215,7 @@ module "compute" {
       instance_type = "t4g.micro"
       architecture  = "arm64"
       subnet_key    = "private_db"
-      tags          = { Part = "data" }
+      tags          = { Owner = "data" }
       sg_ingress = [
         { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -168,7 +224,7 @@ module "compute" {
       instance_type = "t4g.micro"
       architecture  = "arm64"
       subnet_key    = "private_db"
-      tags          = { Part = "data" }
+      tags          = { Owner = "data" }
       sg_ingress = [
         { description = "RabbitMQ AMQP from VPC", from_port = 5672, to_port = 5672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "RabbitMQ mgmt from VPC", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
@@ -178,7 +234,7 @@ module "compute" {
       instance_type = "t4g.micro"
       architecture  = "arm64"
       subnet_key    = "private_db"
-      tags          = { Part = "data" }
+      tags          = { Owner = "data" }
       sg_ingress = [
         { description = "MongoDB from VPC", from_port = 27017, to_port = 27017, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -190,7 +246,7 @@ module "compute" {
       associate_eip              = true
       existing_eip_allocation_id = ""
       user_data                  = local.chat_observer_user_data
-      tags                       = { Part = "loadtest-observer" }
+      tags                       = { Owner = "loadtest-observer" }
       sg_ingress = length(var.chat_observer_allowed_cidrs) > 0 ? [
         { description = "HTTPS from allowed observer CIDRs", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = var.chat_observer_allowed_cidrs },
       ] : []
@@ -240,8 +296,7 @@ resource "aws_s3_bucket" "frontend_codedeploy_revisions" {
 
   tags = {
     Name    = local.frontend_codedeploy_revision_bucket_name
-    Part    = "fe"
-    Purpose = "codedeploy-revisions"
+    Owner   = "fe"
   }
 }
 
@@ -567,7 +622,7 @@ resource "aws_route53_record" "api_cert_validation" {
     }
   }
 
-  zone_id = data.terraform_remote_state.dns.outputs.zone_id
+  zone_id = data.aws_route53_zone.public.zone_id
   name    = each.value.name
   type    = each.value.type
   ttl     = 60
@@ -641,5 +696,21 @@ resource "aws_lb_listener_rule" "ai_https" {
     path_pattern {
       values = ["/ai/*"]
     }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Public DNS — api.doktori.kr → ALB
+# zone entity: dns-zone 레이어 / record: 리소스(ALB)가 있는 이 레이어에서 관리
+# -----------------------------------------------------------------------------
+resource "aws_route53_record" "api_public" {
+  zone_id = data.aws_route53_zone.public.zone_id
+  name    = "api.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = module.frontend.alb_dns_name
+    zone_id                = module.frontend.alb_zone_id
+    evaluate_target_health = true
   }
 }

@@ -3,11 +3,6 @@ variable "project_name" {
   default = "doktori"
 }
 
-variable "project_tag" {
-  type    = string
-  default = "doktori-loadtest"
-}
-
 variable "environment" {
   type    = string
   default = "staging"
@@ -16,11 +11,6 @@ variable "environment" {
 variable "aws_region" {
   type    = string
   default = "ap-northeast-2"
-}
-
-variable "state_bucket" {
-  type    = string
-  default = "doktori-v2-terraform-state"
 }
 
 variable "instance_type" {

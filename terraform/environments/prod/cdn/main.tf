@@ -1,21 +1,15 @@
 # -----------------------------------------------------------------------------
-# Remote State — App 레이어에서 Public ALB DNS 참조
-# CF SSR origin을 nginx EIP 대신 ALB DNS로 변경하기 위함
+# AWS Data Source — ALB DNS 직접 조회 (terraform_remote_state 제거)
 # -----------------------------------------------------------------------------
-data "terraform_remote_state" "app" {
-  backend = "s3"
-  config = {
-    bucket = "doktori-v2-terraform-state"
-    key    = "${var.environment}/app/terraform.tfstate"
-    region = var.aws_region
-  }
+data "aws_lb" "frontend" {
+  name = "${var.project_name}-${var.environment}-fe-alb"
 }
 
 locals {
   # nginx EC2 제거 후에는 ALB DNS를 직접 SSR origin으로 사용
   # 전환 전: var.ssr_origin_domain (origin.doktori.kr → nginx EIP)
   # 전환 후: ALB DNS (자동 참조)
-  ssr_origin = var.ssr_origin_domain != "" ? var.ssr_origin_domain : data.terraform_remote_state.app.outputs.frontend_alb_dns
+  ssr_origin = var.ssr_origin_domain != "" ? var.ssr_origin_domain : data.aws_lb.frontend.dns_name
 }
 
 resource "aws_s3_bucket" "static" {
@@ -206,6 +200,43 @@ resource "aws_cloudfront_distribution" "cdn" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# GitHub Actions Deploy Role — CDN 배포 권한 (리소스 생성 후 attachment)
+# role 자체는 global 레이어에서 생성, 리소스 종속 policy는 여기서 관리
+# -----------------------------------------------------------------------------
+data "aws_iam_role" "gha_deploy" {
+  name = "${var.project_name}-gha-deploy"
+}
+
+resource "aws_iam_role_policy" "gha_cdn" {
+  name = "${var.project_name}-gha-fe-cdn-prod"
+  role = data.aws_iam_role.gha_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3BucketMeta"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = [aws_s3_bucket.static.arn]
+      },
+      {
+        Sid      = "S3ObjectWriteDelete"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = ["${aws_s3_bucket.static.arn}/*"]
+      },
+      {
+        Sid      = "CloudFrontInvalidation"
+        Effect   = "Allow"
+        Action   = ["cloudfront:CreateInvalidation"]
+        Resource = [aws_cloudfront_distribution.cdn.arn]
+      },
+    ]
+  })
+}
+
 data "aws_iam_policy_document" "static_bucket_policy" {
   statement {
     sid       = "AllowCloudFrontRead"
@@ -228,4 +259,70 @@ data "aws_iam_policy_document" "static_bucket_policy" {
 resource "aws_s3_bucket_policy" "static" {
   bucket = aws_s3_bucket.static.id
   policy = data.aws_iam_policy_document.static_bucket_policy.json
+}
+
+# -----------------------------------------------------------------------------
+# ACM Certificate — CloudFront용 (us-east-1 필수)
+# zone entity: dns-zone 레이어 / cert + validation record: 리소스(CloudFront)가 있는 이 레이어에서 관리
+# -----------------------------------------------------------------------------
+data "aws_route53_zone" "public" {
+  name = var.domain_name
+}
+
+resource "aws_acm_certificate" "cdn" {
+  provider          = aws.us_east_1
+  domain_name       = var.domain_name
+  subject_alternative_names = ["www.${var.domain_name}"]
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cdn_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.cdn.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id = data.aws_route53_zone.public.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+}
+
+resource "aws_acm_certificate_validation" "cdn" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.cdn.arn
+  validation_record_fqdns = [for r in aws_route53_record.cdn_cert_validation : r.fqdn]
+}
+
+# Public DNS — doktori.kr / www.doktori.kr → CloudFront
+resource "aws_route53_record" "root" {
+  zone_id = data.aws_route53_zone.public.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.cdn.domain_name
+    zone_id                = aws_cloudfront_distribution.cdn.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = data.aws_route53_zone.public.zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.cdn.domain_name
+    zone_id                = aws_cloudfront_distribution.cdn.hosted_zone_id
+    evaluate_target_health = false
+  }
 }

@@ -2,17 +2,42 @@
 # Prod Data Layer — database (RDS)
 # =============================================================================
 
-data "terraform_remote_state" "base" {
-  backend = "s3"
-  config = {
-    bucket = var.state_bucket
-    key    = "${var.environment}/base/terraform.tfstate"
-    region = var.aws_region
+# -----------------------------------------------------------------------------
+# AWS Data Sources — replace terraform_remote_state with direct lookups
+# -----------------------------------------------------------------------------
+data "aws_vpc" "main" {
+  tags = {
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
 }
 
+data "aws_subnet" "private_db" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-db" }
+}
+
+data "aws_subnet" "private_rds" {
+  vpc_id = data.aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-${var.environment}-private-rds" }
+}
+
+data "aws_route53_zone" "internal" {
+  name         = "${var.environment}.doktori.internal"
+  private_zone = true
+  vpc_id       = data.aws_vpc.main.id
+}
+
 locals {
-  net = data.terraform_remote_state.base.outputs.networking
+  net = {
+    vpc_id   = data.aws_vpc.main.id
+    vpc_cidr = data.aws_vpc.main.cidr_block
+    subnet_ids = {
+      private_db  = data.aws_subnet.private_db.id
+      private_rds = data.aws_subnet.private_rds.id
+    }
+    internal_zone_id   = data.aws_route53_zone.internal.zone_id
+    internal_zone_name = data.aws_route53_zone.internal.name
+  }
 }
 
 # -----------------------------------------------------------------------------

@@ -13,11 +13,6 @@ variable "aws_region" {
   default = "ap-northeast-2"
 }
 
-variable "state_bucket" {
-  type    = string
-  default = "doktori-v2-terraform-state"
-}
-
 variable "key_name" {
   type    = string
   default = "doktori-prod"

@@ -49,3 +49,9 @@ variable "acm_cert_arn" {
   type        = string
   default     = null
 }
+
+variable "domain_name" {
+  description = "Root domain name"
+  type        = string
+  default     = "doktori.kr"
+}
