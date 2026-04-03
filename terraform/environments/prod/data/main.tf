@@ -2,41 +2,25 @@
 # Prod Data Layer — database (RDS)
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# AWS Data Sources — replace terraform_remote_state with direct lookups
-# -----------------------------------------------------------------------------
-data "aws_vpc" "main" {
-  tags = {
-    Name = "${var.project_name}-${var.environment}-vpc"
+data "terraform_remote_state" "base" {
+  backend = "s3"
+  config = {
+    bucket = "doktori-terraform-state"
+    key    = "prod/base/terraform.tfstate"
+    region = "ap-northeast-2"
   }
-}
-
-data "aws_subnet" "private_db" {
-  vpc_id = data.aws_vpc.main.id
-  tags   = { Name = "${var.project_name}-${var.environment}-private-db" }
-}
-
-data "aws_subnet" "private_rds" {
-  vpc_id = data.aws_vpc.main.id
-  tags   = { Name = "${var.project_name}-${var.environment}-private-rds" }
-}
-
-data "aws_route53_zone" "internal" {
-  name         = "${var.environment}.doktori.internal"
-  private_zone = true
-  vpc_id       = data.aws_vpc.main.id
 }
 
 locals {
   net = {
-    vpc_id   = data.aws_vpc.main.id
-    vpc_cidr = data.aws_vpc.main.cidr_block
+    vpc_id   = data.terraform_remote_state.base.outputs.networking.vpc_id
+    vpc_cidr = data.terraform_remote_state.base.outputs.networking.vpc_cidr
     subnet_ids = {
-      private_db  = data.aws_subnet.private_db.id
-      private_rds = data.aws_subnet.private_rds.id
+      private_db  = data.terraform_remote_state.base.outputs.networking.subnet_ids["private_db"]
+      private_rds = data.terraform_remote_state.base.outputs.networking.subnet_ids["private_rds"]
     }
-    internal_zone_id   = data.aws_route53_zone.internal.zone_id
-    internal_zone_name = data.aws_route53_zone.internal.name
+    internal_zone_id   = data.terraform_remote_state.base.outputs.networking.internal_zone_id
+    internal_zone_name = data.terraform_remote_state.base.outputs.networking.internal_zone_name
   }
 }
 
@@ -91,4 +75,29 @@ module "database" {
 
   # RDS Proxy
   enable_rds_proxy = true
+}
+
+# -----------------------------------------------------------------------------
+# SSM — DB 접속 정보 (RDS apply 후 Terraform이 직접 write)
+# -----------------------------------------------------------------------------
+
+# apply 시점에만 패스워드 읽기 — state에 저장되지 않음
+ephemeral "aws_ssm_parameter" "db_password" {
+  name = "/${var.project_name}/${var.environment}/DB_PASSWORD"
+}
+
+# Spring JDBC URL (패스워드 없음 — Spring은 DB_PASSWORD를 별도로 읽음)
+resource "aws_ssm_parameter" "db_url" {
+  name  = "/${var.project_name}/${var.environment}/DB_URL"
+  type  = "String"
+  value = "jdbc:mysql://${module.database.proxy_host}/${var.db_name}?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+  tags  = { Name = "${var.project_name}-${var.environment}-DB_URL" }
+}
+
+# Python SQLAlchemy URL (패스워드 포함 — value_wo로 state 저장 방지)
+resource "aws_ssm_parameter" "ai_db_url" {
+  name     = "/${var.project_name}/${var.environment}/AI_DB_URL"
+  type     = "SecureString"
+  value_wo = "mysql+pymysql://${module.database.db_username}:${ephemeral.aws_ssm_parameter.db_password.value}@${module.database.proxy_host}/${var.db_name}?charset=utf8mb4"
+  tags     = { Name = "${var.project_name}-${var.environment}-AI_DB_URL" }
 }

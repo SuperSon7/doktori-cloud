@@ -16,9 +16,9 @@ variable "common_parameters" {
 
   default = {
     # --- AI / ML ---
+    # AI_DB_URL → dev/staging은 extra_parameters에서 CHANGE_ME 쉘, prod는 data 레이어에서 Terraform write
     "AI_API_KEY"     = { type = "SecureString" }
     "AI_BASE_URL"    = { type = "String" }
-    "AI_DB_URL"      = { type = "SecureString" }
     "GEMINI_API_KEY" = { type = "SecureString" }
     "GEMINI_MODEL"   = { type = "String" }
 
@@ -40,22 +40,17 @@ variable "common_parameters" {
     "KAKAO_REST_API_KEY"      = { type = "SecureString" }
 
     # --- AWS ---
-    "AWS_REGION"         = { type = "String" }
-    "AWS_S3_BUCKET_NAME" = { type = "String" }
-    "AWS_S3_DB_BACKUP"   = { type = "String" }
-    "AWS_S3_ENABLED"     = { type = "String" }
-    "AWS_S3_ENDPOINT"    = { type = "String" }
-    "ECR_REGISTRY"       = { type = "String" }
+    # AWS_REGION, AWS_S3_*, ECR_REGISTRY → 각 레이어 main.tf에서 Terraform이 직접 write (CHANGE_ME 불필요)
 
     # --- Redis ---
+    # SPRING_REDIS_PORT → static "6379", base 레이어에서 Terraform write
     "SPRING_REDIS_HOST"     = { type = "String" }
-    "SPRING_REDIS_PORT"     = { type = "String" }
     "SPRING_REDIS_PASSWORD" = { type = "SecureString" }
 
     # --- RabbitMQ ---
+    # SPRING_RABBITMQ_PORT → static "5672", base 레이어에서 Terraform write
     "SPRING_RABBITMQ_HOST"     = { type = "String" }
     "SPRING_RABBITMQ_PASSWORD" = { type = "SecureString" }
-    "SPRING_RABBITMQ_PORT"     = { type = "String" }
     "SPRING_RABBITMQ_USERNAME" = { type = "SecureString" }
 
     # --- Recommendation Scheduler ---
