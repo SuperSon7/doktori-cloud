@@ -26,6 +26,7 @@ variable "common_parameters" {
     "RUNPOD_API_KEY"               = { type = "SecureString" }
     "RUNPOD_ENDPOINT_ID"           = { type = "SecureString" }
     "RUNPOD_POLL_INTERVAL_SECONDS" = { type = "String" }
+    "RUNPOD_POLL_TIMEOUT_SECONDS"  = { type = "String" }
 
     # --- Database ---
     # DB_PASSWORD는 database 모듈이 관리 (random_password → SSM)

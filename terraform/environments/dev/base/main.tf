@@ -74,15 +74,6 @@ module "networking" {
 # -----------------------------------------------------------------------------
 data "aws_caller_identity" "current" {}
 
-# -----------------------------------------------------------------------------
-# SSM Parameter Store
-# -----------------------------------------------------------------------------
-resource "random_password" "qdrant_api_key" {
-  length           = 32
-  special          = false
-  override_special = ""
-}
-
 # =============================================================================
 # VPC Peering — dev ↔ mgmt (monitoring)
 # =============================================================================
@@ -118,9 +109,10 @@ resource "aws_route" "dev_private_to_mgmt" {
   destination_cidr_block    = local.mgmt_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.dev_to_mgmt.id
 }
-# -----------------------------------------------------------------------------
+
+# =============================================================================
 # SSM Parameter Store
-# -----------------------------------------------------------------------------
+# =============================================================================
 module "ssm_parameters" {
   source = "../../../modules/ssm-parameters"
 
@@ -133,9 +125,8 @@ module "ssm_parameters" {
     "DB_URL"    = { type = "String" }
     "AI_DB_URL" = { type = "SecureString" }
 
-    "RUNPOD_POLL_TIMEOUT_SECONDS" = { type = "String" }
-    "QUIZ_CACHE_TTL_SECONDS"      = { type = "String" }
-    "MONGO_URI"                   = { type = "SecureString" }
+    "QUIZ_CACHE_TTL_SECONDS" = { type = "String" }
+    "MONGO_URI"              = { type = "SecureString" }
   }
 }
 
@@ -174,15 +165,14 @@ resource "aws_ssm_parameter" "qdrant_url" {
   name  = "/${var.project_name}/${var.environment}/QDRANT_URL"
   type  = "String"
   value = "http://ai-qdrant.${module.networking.internal_zone_name}:6333"
+  tags  = { Name = "${var.project_name}-${var.environment}-QDRANT_URL" }
+}
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-QDRANT_URL"
-  }
-
-  lifecycle {
-    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
-    ignore_changes = [value, description]
-  }
+# Qdrant API Key — 초기값 random 생성, 이후 CLI로 재주입 가능
+resource "random_password" "qdrant_api_key" {
+  length           = 32
+  special          = false
+  override_special = ""
 }
 
 resource "aws_ssm_parameter" "qdrant_api_key" {
@@ -195,7 +185,7 @@ resource "aws_ssm_parameter" "qdrant_api_key" {
   }
 
   lifecycle {
-    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
+    # 초기값 random으로 생성 후 운영 중 CLI로 재주입 가능 — Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }
