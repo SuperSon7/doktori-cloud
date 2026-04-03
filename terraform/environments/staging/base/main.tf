@@ -53,13 +53,8 @@ module "ssm_parameters" {
 
   # staging 전용 파라미터
   extra_parameters = {
-    "DB_URL"                            = { type = "SecureString" }
-    "RUNPOD_POLL_TIMEOUT_SECONDS"       = { type = "SecureString" }
-    "QUIZ_CACHE_TTL_SECONDS"            = { type = "String" }
-    "REDIS_URL"                         = { type = "SecureString" }
-    "SPRING_DATA_REDIS_HOST"            = { type = "String" }
-    "SPRING_DATA_REDIS_PORT"            = { type = "String" }
-    "NEXT_PUBLIC_API_BASE_URL_STAGING"  = { type = "String" }
-    "NEXT_PUBLIC_CHAT_BASE_URL_STAGING" = { type = "String" }
+    "DB_URL"                      = { type = "SecureString" }
+    "RUNPOD_POLL_TIMEOUT_SECONDS" = { type = "SecureString" }
+    "QUIZ_CACHE_TTL_SECONDS"      = { type = "String" }
   }
 }
