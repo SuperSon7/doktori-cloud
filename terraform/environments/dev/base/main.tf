@@ -36,7 +36,7 @@ module "networking" {
   nat_ami_id        = data.aws_ami.nat_ubuntu.id
   nat_instance_type = "t4g.micro"
   nat_volume_size   = 10
-  nat_key_name      = var.nat_key_name
+  # nat_key_name 미설정 — SSM Session Manager로 접근 (NAT는 public 서브넷, IGW 통해 SSM 접근 가능)
   nat_user_data     = <<-USERDATA
     #!/bin/bash
     set -e
