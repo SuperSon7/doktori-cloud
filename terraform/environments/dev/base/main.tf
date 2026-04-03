@@ -113,13 +113,7 @@ resource "aws_vpc_peering_connection" "dev_to_mgmt" {
 }
 
 # --- dev → mgmt routes ---
-# public route table
-resource "aws_route" "dev_public_to_mgmt" {
-  route_table_id            = module.networking.public_route_table_id
-  destination_cidr_block    = local.mgmt_vpc_cidr
-  vpc_peering_connection_id = aws_vpc_peering_connection.dev_to_mgmt.id
-}
-
+# public route table은 제외 — public 서브넷(NAT)이 mgmt에 먼저 연결할 이유 없음
 # private route tables (all AZs)
 resource "aws_route" "dev_private_to_mgmt" {
   for_each = module.networking.private_route_table_ids
