@@ -12,9 +12,3 @@ variable "aws_region" {
   type    = string
   default = "ap-northeast-2"
 }
-
-variable "nat_key_name" {
-  type    = string
-  default = "doktori-dev"
-}
-

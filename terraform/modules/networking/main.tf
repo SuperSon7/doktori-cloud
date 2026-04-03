@@ -39,7 +39,6 @@ resource "aws_subnet" "this" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-${replace(each.key, "_", "-")}"
-    Tier = each.value.tier
   }
 }
 
@@ -192,6 +191,7 @@ resource "aws_instance" "nat" {
   )
 
   lifecycle {
+    # most_recent AMI는 apply마다 달라지므로 재생성 방지. user_data는 초기 설정 후 변경 불필요
     ignore_changes = [ami, user_data]
   }
 

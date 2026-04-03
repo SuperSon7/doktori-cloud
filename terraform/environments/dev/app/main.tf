@@ -2,13 +2,45 @@
 # Dev App Layer — compute (dev-app(data포함) + dev-ai 인스턴스)
 # =============================================================================
 
+# -----------------------------------------------------------------------------
+# Remote State — 상위 레이어 참조
+# -----------------------------------------------------------------------------
 data "terraform_remote_state" "base" {
   backend = "s3"
   config = {
-    bucket = var.state_bucket
-    key    = "${var.environment}/base/terraform.tfstate"
-    region = var.aws_region
+    bucket = "doktori-terraform-state"
+    key    = "dev/base/terraform.tfstate"
+    region = "ap-northeast-2"
   }
+}
+
+data "terraform_remote_state" "data" {
+  backend = "s3"
+  config = {
+    bucket = "doktori-terraform-state"
+    key    = "dev/data/terraform.tfstate"
+    region = "ap-northeast-2"
+  }
+}
+
+data "terraform_remote_state" "monitoring_base" {
+  backend = "s3"
+  config = {
+    bucket = "doktori-terraform-state"
+    key    = "monitoring/base/terraform.tfstate"
+    region = "ap-northeast-2"
+  }
+}
+
+locals {
+  net = {
+    vpc_id             = data.terraform_remote_state.base.outputs.networking.vpc_id
+    vpc_cidr           = data.terraform_remote_state.base.outputs.networking.vpc_cidr
+    subnet_ids         = data.terraform_remote_state.base.outputs.networking.subnet_ids
+    internal_zone_id   = data.terraform_remote_state.base.outputs.networking.internal_zone_id
+    internal_zone_name = data.terraform_remote_state.base.outputs.networking.internal_zone_name
+  }
+  mgmt_vpc_cidr = data.terraform_remote_state.monitoring_base.outputs.vpc_cidr
 }
 
 data "aws_caller_identity" "current" {}
@@ -20,13 +52,12 @@ data "archive_file" "batch_start_lambda" {
 }
 
 locals {
-  net                = data.terraform_remote_state.base.outputs.networking
-  batch_instance_key = "ai_batch"
+  batch_instance_key  = "ai_batch"
   qdrant_instance_key = "ai_qdrant"
-  batch_log_file     = "/var/log/doktori/weekly-batch.log"
+  batch_log_file      = "/var/log/doktori/weekly-batch.log"
   batch_tag_selector = {
     Environment = "dev"
-    Role        = "batch-weekly"
+    Service     = "batch-weekly"
     Schedule    = "weekly"
   }
   batch_image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.batch_image_repository}:${var.batch_image_tag}"
@@ -71,17 +102,17 @@ resource "aws_route53_record" "service" {
 module "compute" {
   source = "../../../modules/compute"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  aws_region            = var.aws_region
-  vpc_id                = local.net.vpc_id
-  vpc_cidr              = local.net.vpc_cidr
+  project_name           = var.project_name
+  environment            = var.environment
+  aws_region             = var.aws_region
+  vpc_id                 = local.net.vpc_id
+  vpc_cidr               = local.net.vpc_cidr
   enable_batch_self_stop = true
-  subnet_ids   = local.net.subnet_ids
-  key_name     = var.key_name
+  subnet_ids             = local.net.subnet_ids
+  key_name               = var.key_name
 
   s3_bucket_arns = [
-    "arn:aws:s3:::${var.project_name}-v2-${var.environment}",
+    data.terraform_remote_state.data.outputs.storage.bucket_arns["app"],
   ]
 
   ssm_parameter_paths = [
@@ -96,7 +127,7 @@ module "compute" {
       volume_size   = 60
       associate_eip = false
       tags = {
-        Part     = "cloud"
+        Owner    = "cloud"
         Service  = "app"
         AutoStop = "true"
       }
@@ -107,12 +138,9 @@ module "compute" {
         { description = "Backend from VPC", from_port = 8080, to_port = 8080, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "AI service from VPC", from_port = 8000, to_port = 8000, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "MySQL from VPC", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
-        { description = "SSH", from_port = 22, to_port = 22, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
-        { description = "MySQL from prod VPC", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = ["10.1.0.0/16"] },
-        { description = "RDS replication source", from_port = 3306, to_port = 3306, protocol = "tcp", cidr_blocks = ["15.164.45.30/32"] },
-        { description = "MongoDB from VPC", from_port = 27017, to_port = 27017, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
+        { description = "MongoDB from VPC", from_port = 27017, to_port = 27017, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "Wiremock", from_port = 9090, to_port = 9090, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
-        { description = "RabbitMQ Management", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
+        { description = "RabbitMQ Management", from_port = 15672, to_port = 15672, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr, local.mgmt_vpc_cidr] },
         { description = "Redis from VPC", from_port = 6379, to_port = 6379, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
     }
@@ -122,7 +150,7 @@ module "compute" {
       subnet_key    = "private_app"
       volume_size   = 30
       tags = {
-        Part     = "ai"
+        Owner    = "ai"
         AutoStop = "true"
         Service  = "ai"
       }
@@ -135,15 +163,14 @@ module "compute" {
       volume_size   = var.qdrant_volume_size
       user_data     = local.qdrant_user_data
       tags = {
-        Part     = "ai"
+        Owner    = "ai"
         AutoStop = "false"
         Service  = "ai-qdrant"
-        Role     = "vector-store"
       }
       sg_ingress = [
-        { description = "HTTPS from internal subnet", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["10.100.0.0/24"] },
-        { description = "Qdrant HTTP from VPC", from_port = 6333, to_port = 6333, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
-        { description = "Qdrant gRPC from VPC", from_port = 6334, to_port = 6334, protocol = "tcp", cidr_blocks = ["10.0.0.0/16"] },
+        { description = "HTTPS from internal subnet", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = [var.qdrant_external_cidr] },
+        { description = "Qdrant HTTP from VPC", from_port = 6333, to_port = 6333, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
+        { description = "Qdrant gRPC from VPC", from_port = 6334, to_port = 6334, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
     }
     (local.batch_instance_key) = {
@@ -153,15 +180,10 @@ module "compute" {
       volume_size   = var.batch_volume_size
       user_data     = local.batch_user_data
       tags = {
-        Part             = "ai"
+        Owner            = "ai"
         AutoStop         = "true"
         Service          = "ai-batch"
-        Role             = local.batch_tag_selector.Role
         Schedule         = local.batch_tag_selector.Schedule
-        BatchType        = "weekly"
-        BatchCommand     = join(" ", var.batch_container_command)
-        BatchLogFile     = local.batch_log_file
-        StartScheduleKST = "MON 03:00"
       }
       sg_ingress = []
     }
@@ -242,7 +264,7 @@ resource "aws_lambda_function" "batch_start" {
   environment {
     variables = {
       TAG_Environment = local.batch_tag_selector.Environment
-      TAG_Role        = local.batch_tag_selector.Role
+      TAG_Service     = local.batch_tag_selector.Service
       TAG_Schedule    = local.batch_tag_selector.Schedule
     }
   }

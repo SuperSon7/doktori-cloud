@@ -59,6 +59,7 @@ module "networking" {
     Name     = "doktori-dev-nat-vpn"
     Service  = "nat-vpn"
     AutoStop = "false"
+    Owner    = "cloud"
   }
 
   internal_domain = "dev.doktori.internal"
@@ -70,37 +71,6 @@ module "networking" {
   nat_extra_ingress = [
     { description = "WireGuard VPN", from_port = 51820, to_port = 51820, protocol = "udp", cidr_blocks = ["0.0.0.0/0"] },
   ]
-}
-
-# -----------------------------------------------------------------------------
-# Storage — S3 buckets
-# -----------------------------------------------------------------------------
-module "storage" {
-  source = "../../../modules/storage"
-
-  project_name       = var.project_name
-  environment        = var.environment
-  aws_region         = var.aws_region
-  create_kms_and_iam = false # 기존 수동 생성 KMS/IAM 유지 — Phase 1에서 import 예정
-
-  s3_buckets = {
-    app = {
-      bucket_name        = "doktori-v2-dev"
-      public_read        = true
-      public_read_prefix = "/images/*"
-      versioning         = false
-      enable_cors        = true
-      encryption         = true
-      bucket_key_enabled = true
-      folders = [
-        "backup/",
-        "images/chats/",
-        "images/meetings/",
-        "images/profiles/",
-        "images/reviews/",
-      ]
-    }
-  }
 }
 
 # -----------------------------------------------------------------------------
@@ -186,6 +156,7 @@ resource "aws_ssm_parameter" "qdrant_url" {
   }
 
   lifecycle {
+    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }
@@ -200,6 +171,7 @@ resource "aws_ssm_parameter" "qdrant_api_key" {
   }
 
   lifecycle {
+    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }
@@ -214,6 +186,7 @@ resource "aws_ssm_parameter" "qdrant_location" {
   }
 
   lifecycle {
+    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }
@@ -228,6 +201,7 @@ resource "aws_ssm_parameter" "qdrant_collection_discussion" {
   }
 
   lifecycle {
+    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }
@@ -242,6 +216,7 @@ resource "aws_ssm_parameter" "qdrant_collection_reco" {
   }
 
   lifecycle {
+    # CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }

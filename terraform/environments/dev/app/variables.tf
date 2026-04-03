@@ -12,12 +12,6 @@ variable "aws_region" {
   type    = string
   default = "ap-northeast-2"
 }
-
-variable "state_bucket" {
-  type    = string
-  default = "doktori-v2-terraform-state"
-}
-
 variable "key_name" {
   type    = string
   default = "doktori-dev"
@@ -75,4 +69,10 @@ variable "qdrant_image" {
   description = "Container image used for the dev Qdrant instance"
   type        = string
   default     = "qdrant/qdrant:v1.13.6"
+}
+
+variable "qdrant_external_cidr" {
+  description = "External network CIDR for Qdrant HTTPS access"
+  type        = string
+  default     = "10.100.0.0/24"
 }

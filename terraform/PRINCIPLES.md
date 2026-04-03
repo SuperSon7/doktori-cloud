@@ -25,11 +25,11 @@ Layer 0: Bootstrap          -- S3 state bucket -- 1회성
 Layer 1: Global             -- OIDC, IAM, Budget -- 계정 수준 정책
 Layer 1: Shared/ECR         -- ECR repositories
 Layer 1: Shared/DNS         -- dns_zone (Public Hosted Zone + 정적 레코드)
-Layer 1: Shared/Monitoring  -- monitoring/base (SG, EIP, PHZ, Peering routes)
+Layer 1: Shared/Monitoring  -- monitoring/base (mgmt VPC, NAT+WireGuard, PHZ, Peering routes)
                             -- monitoring/data (S3 Loki)
-                            -- monitoring/app  (EC2, IAM)
+                            -- monitoring/app  (EC2, IAM, SG)
 Layer 2: Foundation         -- {env}/base (VPC, NAT, Peering) -- 환경별 네트워크
-Layer 3: Data               -- {env}/data (RDS) -- stateful
+Layer 3: Data               -- {env}/data (S3, RDS) -- stateful 스토리지. dev는 S3만 (RDS는 Docker Compose)
 Layer 4: App                -- {env}/app (EC2, Lambda) -- stateless
 ```
 
@@ -90,6 +90,7 @@ IAM은 성격에 따라 배치가 달라진다:
 | 종류 | 배치 레이어 | 이유 |
 |------|-------------|------|
 | OIDC provider, Role/User/Group 엔티티, Admin, Budget | Global | 계정 수준, 리소스 독립적 |
+| EC2 instance role/profile | 해당 EC2 레이어 | EC2와 생명주기 동일, ARN이 EC2 생성 후 확정 |
 | 리소스에 종속된 policy attachment | 해당 리소스 레이어 | 참조 대상이 존재한 후 ARN 확정 |
 
 **원칙:** Role 엔티티는 Global에서 생성한다. 특정 리소스 ARN(CloudFront distribution, KMS key, S3 bucket 등)을 참조하는 policy는 해당 리소스가 생성되는 레이어에서 `data "aws_iam_role"`로 role을 조회하여 `aws_iam_role_policy`로 attachment한다.
@@ -112,6 +113,16 @@ resource "aws_iam_role_policy" "gha_cdn" {
 ## 4. 네이밍 컨벤션
 
 **AWS 리소스:** `{project}-{environment}-{resource}` (예: `doktori-dev-vpc`)
+
+Shared/Monitoring 리소스는 environment 자리에 역할명을 사용한다.
+
+| 레이어 | environment 자리 | 예시 |
+|--------|-----------------|------|
+| dev/prod/staging | 환경명 | `doktori-dev-vpc` |
+| monitoring 서비스 | `monitoring` | `doktori-monitoring-sg`, `doktori-monitoring-role` |
+| mgmt 네트워크 | `mgmt` | `doktori-mgmt-vpc`, `doktori-mgmt-nat-sg` |
+
+`mgmt`와 `monitoring`을 구분하는 이유: mgmt VPC는 WireGuard VPN 진입점과 모니터링 서버를 함께 호스팅하는 관리망이다. VPN은 모니터링과 무관하므로 네트워크 레이어는 `mgmt`, 그 위에 올라가는 모니터링 애플리케이션 리소스는 `monitoring`으로 구분한다.
 
 **State key:** `{environment}/{layer}/terraform.tfstate` (예: `dev/base/terraform.tfstate`)
 

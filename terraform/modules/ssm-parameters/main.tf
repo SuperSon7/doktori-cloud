@@ -13,6 +13,7 @@ resource "aws_ssm_parameter" "this" {
   }
 
   lifecycle {
+    # 초기값 "CHANGE_ME"는 껍데기 — CLI로 실제 값을 주입하므로 Terraform이 덮어쓰지 않도록 ignore
     ignore_changes = [value, description]
   }
 }

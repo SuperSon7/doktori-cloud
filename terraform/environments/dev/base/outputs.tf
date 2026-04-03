@@ -13,11 +13,3 @@ output "networking" {
     private_route_table_ids = module.networking.private_route_table_ids
   }
 }
-
-output "storage" {
-  description = "Storage outputs for downstream layers"
-  value = {
-    bucket_names = module.storage.bucket_names
-    bucket_arns  = module.storage.bucket_arns
-  }
-}

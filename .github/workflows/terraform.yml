@@ -499,7 +499,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        layer: [dev/app, staging/app, staging/data, prod/app, prod/data]
+        layer: [dev/app, dev/data, staging/app, staging/data, prod/app, prod/data]
     steps:
       - uses: actions/checkout@v4
         with:
