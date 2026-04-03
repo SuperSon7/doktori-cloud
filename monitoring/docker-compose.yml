@@ -59,7 +59,7 @@ services:
       - monitoring
 
   blackbox-exporter:
-    image: prom/blackbox-exporter:latest
+    image: prom/blackbox-exporter:v0.28.0
     container_name: blackbox-exporter
     restart: unless-stopped
     ports:
@@ -68,7 +68,7 @@ services:
       - monitoring
 
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.56.2
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     privileged: true
     volumes:
