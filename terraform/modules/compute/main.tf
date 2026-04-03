@@ -181,7 +181,7 @@ resource "aws_iam_role_policy" "ec2_self_stop" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "ec2:ResourceTag/Role" = "batch-weekly"
+            "ec2:ResourceTag/Service" = "batch-weekly"
           }
         }
       },

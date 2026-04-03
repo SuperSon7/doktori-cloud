@@ -372,7 +372,7 @@ resource "aws_launch_template" "master" {
     resource_type = "instance"
     tags = {
       Name = "${var.project_name}-${var.environment}-k8s-master"
-      Role = "k8s-cp"
+      Service = "k8s-cp"
     }
   }
 
@@ -414,7 +414,7 @@ resource "aws_launch_template" "worker" {
     resource_type = "instance"
     tags = {
       Name = "${var.project_name}-${var.environment}-k8s-worker"
-      Role = "k8s-worker"
+      Service = "k8s-worker"
     }
   }
 
@@ -449,7 +449,7 @@ resource "aws_autoscaling_group" "master" {
   }
 
   tag {
-    key                 = "Role"
+    key                 = "Service"
     value               = "k8s-cp"
     propagate_at_launch = true
   }
@@ -484,7 +484,7 @@ resource "aws_autoscaling_group" "worker" {
   }
 
   tag {
-    key                 = "Role"
+    key                 = "Service"
     value               = "k8s-worker"
     propagate_at_launch = true
   }

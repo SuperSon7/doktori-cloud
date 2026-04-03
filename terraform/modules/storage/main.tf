@@ -6,9 +6,12 @@ resource "aws_s3_bucket" "this" {
   bucket   = each.value.bucket_name
 
   tags = {
-    Name       = each.value.bucket_name
-    Service    = "storage"
-    CostCenter = "app"
+    Name    = each.value.bucket_name
+    Service = "storage"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -150,7 +153,6 @@ resource "aws_kms_key" "parameter_store" {
 
   tags = {
     Name       = "${var.project_name}-${var.environment}-parameter-store-key"
-    CostCenter = "infra"
   }
 }
 

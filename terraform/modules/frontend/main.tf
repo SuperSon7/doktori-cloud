@@ -169,7 +169,7 @@ resource "aws_launch_template" "this" {
     resource_type = "instance"
     tags = {
       Name = "${var.project_name}-${var.environment}-frontend"
-      Part = "fe"
+      Owner = "fe"
     }
   }
 
