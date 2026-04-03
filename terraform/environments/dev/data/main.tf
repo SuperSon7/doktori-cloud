@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  s3_bucket_name = "doktori-v2-dev"
+  s3_bucket_name = "doktori-dev"
 }
 
 module "storage" {
@@ -24,7 +24,6 @@ module "storage" {
       encryption         = true
       bucket_key_enabled = true
       folders = [
-        "backup/",
         "images/chats/",
         "images/meetings/",
         "images/profiles/",
@@ -42,13 +41,6 @@ resource "aws_ssm_parameter" "aws_s3_bucket_name" {
   type  = "String"
   value = module.storage.bucket_names["app"]
   tags  = { Name = "${var.project_name}-${var.environment}-AWS_S3_BUCKET_NAME" }
-}
-
-resource "aws_ssm_parameter" "aws_s3_db_backup" {
-  name  = "/${var.project_name}/${var.environment}/AWS_S3_DB_BACKUP"
-  type  = "String"
-  value = module.storage.bucket_names["app"] # backup/ 폴더 공유
-  tags  = { Name = "${var.project_name}-${var.environment}-AWS_S3_DB_BACKUP" }
 }
 
 resource "aws_ssm_parameter" "aws_s3_enabled" {

@@ -39,7 +39,6 @@ systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
 systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
 
 TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
@@ -60,7 +59,10 @@ APP_LOG="${log_file}"
 ENV_FILE="/opt/doktori/weekly-batch.env"
 IMAGE_URI="${image_uri}"
 AWS_REGION="${aws_region}"
-INSTANCE_ID="$${INSTANCE_ID}"
+
+# 런타임에 메타데이터 API에서 직접 조회 (user_data 단계의 변수는 여기 전달 안 됨)
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 
 {
   echo "=== Weekly batch start $(date -Is) ==="

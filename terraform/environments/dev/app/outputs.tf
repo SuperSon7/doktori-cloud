@@ -18,7 +18,7 @@ output "weekly_batch" {
     lambda_function    = aws_lambda_function.batch_start.function_name
     tag_selector       = local.batch_tag_selector
     default_state      = aws_ec2_instance_state.batch_default_stopped.state
-    ssm_parameter_path = var.batch_ssm_parameter_path
+    ssm_parameter_path = var.ssm_parameter_path
     container_command  = var.batch_container_command
   }
 }
@@ -31,7 +31,7 @@ output "qdrant" {
     security_group_id  = module.compute.security_group_ids[local.qdrant_instance_key]
     internal_host      = local.qdrant_internal_host
     endpoint           = "http://${local.qdrant_internal_host}:6333"
-    ssm_parameter_path = var.batch_ssm_parameter_path
+    ssm_parameter_path = var.ssm_parameter_path
     image              = var.qdrant_image
   }
 }

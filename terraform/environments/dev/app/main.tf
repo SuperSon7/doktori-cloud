@@ -65,16 +65,15 @@ locals {
     aws_region         = var.aws_region
     ecr_registry       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     image_uri          = local.batch_image_uri
-    ssm_parameter_path = var.batch_ssm_parameter_path
+    ssm_parameter_path = var.ssm_parameter_path
     batch_command      = join(" ", [for part in var.batch_container_command : format("%q", part)])
     log_file           = local.batch_log_file
   })
   qdrant_internal_host = "ai-qdrant.${local.net.internal_zone_name}"
   qdrant_user_data = templatefile("${path.module}/templates/dev_qdrant_user_data.sh.tftpl", {
     aws_region         = var.aws_region
-    ssm_parameter_path = var.batch_ssm_parameter_path
+    ssm_parameter_path = var.ssm_parameter_path
     qdrant_image       = var.qdrant_image
-    qdrant_host        = local.qdrant_internal_host
   })
 }
 
@@ -168,7 +167,8 @@ module "compute" {
         Service  = "ai-qdrant"
       }
       sg_ingress = [
-        { description = "HTTPS from internal subnet", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = [var.qdrant_external_cidr] },
+        # monitoring VPC(VPN 포함) → Qdrant 접근용 — 포트 443 이유 불명확, mgmt CIDR로 범위 고정
+        { description = "HTTPS from mgmt VPC", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = [local.mgmt_vpc_cidr] },
         { description = "Qdrant HTTP from VPC", from_port = 6333, to_port = 6333, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
         { description = "Qdrant gRPC from VPC", from_port = 6334, to_port = 6334, protocol = "tcp", cidr_blocks = [local.net.vpc_cidr] },
       ]
@@ -199,7 +199,7 @@ module "compute" {
 resource "aws_ec2_instance_state" "batch_default_stopped" {
   instance_id = module.compute.instance_ids[local.batch_instance_key]
   state       = "stopped"
-  force       = false
+  force       = false # running 중 apply 시 강제 종료 안 함 — 배치 실행 중 데이터 유실 방지
   depends_on  = [module.compute]
 }
 

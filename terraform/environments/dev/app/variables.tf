@@ -41,8 +41,8 @@ variable "batch_image_tag" {
   default     = "develop"
 }
 
-variable "batch_ssm_parameter_path" {
-  description = "SSM parameter path injected into the weekly batch container"
+variable "ssm_parameter_path" {
+  description = "SSM parameter path — batch 및 qdrant 컨테이너에 공통 주입"
   type        = string
   default     = "/doktori/dev"
 }
@@ -71,8 +71,3 @@ variable "qdrant_image" {
   default     = "qdrant/qdrant:v1.13.6"
 }
 
-variable "qdrant_external_cidr" {
-  description = "External network CIDR for Qdrant HTTPS access"
-  type        = string
-  default     = "10.100.0.0/24"
-}

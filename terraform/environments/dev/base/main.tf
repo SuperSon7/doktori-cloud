@@ -2,14 +2,14 @@
 # Dev Base Layer — networking + storage
 # =============================================================================
 
-# Ubuntu 24.04 ARM64 for NAT instance (dev uses Ubuntu, not Amazon Linux)
+# Ubuntu 22.04 ARM64 for NAT instance — compute 모듈 및 monitoring NAT과 동일 버전
 data "aws_ami" "nat_ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
   }
 
   filter {
