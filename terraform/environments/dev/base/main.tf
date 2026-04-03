@@ -56,8 +56,8 @@ module "networking" {
   USERDATA
 
   nat_extra_tags = {
-    Name     = "doktori-dev-nat-vpn"
-    Service  = "nat-vpn"
+    Name     = "doktori-dev-nat"
+    Service  = "nat"
     AutoStop = "false"
     Owner    = "cloud"
   }
@@ -66,11 +66,7 @@ module "networking" {
 
   # dev는 Interface Endpoint 미사용 (비용 절감 — NAT 경유로 AWS API 접근)
   vpc_interface_endpoints = []
-
-  # WireGuard VPN — dev NAT 인스턴스에서 VPN 서버 운용
-  nat_extra_ingress = [
-    { description = "WireGuard VPN", from_port = 51820, to_port = 51820, protocol = "udp", cidr_blocks = ["0.0.0.0/0"] },
-  ]
+  # VPN은 monitoring VPC에 있고 VPC peering으로 dev에 접근 — NAT에 중복 운용 불필요
 }
 
 # -----------------------------------------------------------------------------
