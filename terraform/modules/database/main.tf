@@ -46,8 +46,14 @@ resource "aws_ssm_parameter" "db_password" {
   }
 
   lifecycle {
+    # 초기값(random_password)으로 첫 apply 후 수동 교체 가능하도록 ignore
     ignore_changes = [value]
   }
+}
+
+# apply 시점에만 SSM에서 비밀번호를 읽어옴 — state에 저장되지 않음
+ephemeral "aws_ssm_parameter" "db_password" {
+  name = aws_ssm_parameter.db_password.name
 }
 
 # -----------------------------------------------------------------------------
@@ -112,7 +118,7 @@ resource "aws_db_instance" "main" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = random_password.db.result
+  password_wo = ephemeral.aws_ssm_parameter.db_password.value
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -163,14 +169,11 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
   count = var.enable_rds_proxy ? 1 : 0
 
   secret_id = aws_secretsmanager_secret.db_credentials[0].id
-  secret_string = jsonencode({
+  # secret_string_wo: apply 시점에만 값을 씀 — state에 저장되지 않음
+  secret_string_wo = jsonencode({
     username = aws_db_instance.main.username
-    password = random_password.db.result
+    password = ephemeral.aws_ssm_parameter.db_password.value
   })
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
 }
 
 # -----------------------------------------------------------------------------
