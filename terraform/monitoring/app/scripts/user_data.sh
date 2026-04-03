@@ -2,7 +2,7 @@
 set -e
 
 # -----------------------------------------------------------------------------
-# User Data Script for Monitoring Server (Ubuntu 24.04)
+# User Data Script for Monitoring Server (Ubuntu 22.04)
 # Project: ${project_name}
 # Architecture: ${architecture}
 #
@@ -58,7 +58,7 @@ unzip -q awscliv2.zip
 rm -rf aws awscliv2.zip
 
 # -----------------------------------------------------------------------------
-# SSM Agent (Ubuntu 24.04 snap 기반)
+# SSM Agent (Ubuntu 22.04 snap 기반)
 # -----------------------------------------------------------------------------
 echo "=== Ensuring SSM Agent is running ==="
 snap install amazon-ssm-agent --classic 2>/dev/null || true

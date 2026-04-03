@@ -1,14 +1,13 @@
 # =============================================================================
 # Monitoring App — Compute 레이어
-# EC2, IAM, SG, EIP, PHZ record
-# SG/EIP를 base가 아닌 app에 두는 이유:
-#   - SG: 서비스 포트 변경이 잦아 app 레이어에서 함께 관리
-#   - EIP: 생성과 association을 분리하면 불필요한 레이어 의존성 발생
+# EC2, IAM, SG, PHZ record
+# SG를 base가 아닌 app에 두는 이유:
+#   - 서비스 포트 변경이 잦아 compute와 함께 관리하는 것이 자연스러움
+# EIP 없음: EC2가 private 서브넷에 있으므로 불필요. 아웃바운드는 NAT, 인바운드는 VPN 경유.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Remote State — monitoring/base 레이어 참조
-# VPC ID, subnet ID 등 인프라 식별자는 remote_state로 직접 참조 (AWS API 조회보다 빠르고 명확)
+# Remote State — 상위 레이어 참조 (인프라 식별자는 remote_state로 직접 참조)
 # -----------------------------------------------------------------------------
 data "terraform_remote_state" "base" {
   backend = "s3"
@@ -19,12 +18,18 @@ data "terraform_remote_state" "base" {
   }
 }
 
-locals {
-  base = data.terraform_remote_state.base.outputs
+data "terraform_remote_state" "data" {
+  backend = "s3"
+  config = {
+    bucket = "doktori-terraform-state"
+    key    = "monitoring/data/terraform.tfstate"
+    region = "ap-northeast-2"
+  }
 }
 
-data "aws_s3_bucket" "loki" {
-  bucket = "${var.project_name}-monitoring-loki"
+locals {
+  base = data.terraform_remote_state.base.outputs
+  data = data.terraform_remote_state.data.outputs
 }
 
 data "aws_route53_zone" "mgmt" {
@@ -42,8 +47,8 @@ data "aws_ami" "ubuntu" {
   filter {
     name = "name"
     values = [var.architecture == "arm64"
-      ? "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
-    : "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+      ? "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"
+    : "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 
   filter {
@@ -97,7 +102,7 @@ resource "aws_security_group" "monitoring" {
   }
 
   egress {
-    description = "Allow all outbound (Prometheus HTTPS scrape, apt 등)"
+    description = "Allow all outbound (Prometheus HTTPS scrape, apt, etc.)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -114,22 +119,6 @@ resource "aws_security_group" "monitoring" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# EIP — Prometheus scrape whitelist 및 Grafana 접근용 고정 IP
-# -----------------------------------------------------------------------------
-resource "aws_eip" "monitoring" {
-  domain = "vpc"
-
-  tags = {
-    Name    = "${var.project_name}-monitoring-eip"
-    Service = "monitoring"
-  }
-
-  lifecycle {
-    # EIP는 외부 화이트리스트 등록된 IP → 실수로 삭제되면 재등록 공수 큼
-    prevent_destroy = true
-  }
-}
 
 # -----------------------------------------------------------------------------
 # IAM Role (SSM + Loki S3 + CloudWatch)
@@ -174,8 +163,8 @@ resource "aws_iam_role_policy" "loki_s3" {
         "s3:ListBucket"
       ]
       Resource = [
-        data.aws_s3_bucket.loki.arn,
-        "${data.aws_s3_bucket.loki.arn}/*"
+        local.data.loki_bucket_arn,
+        "${local.data.loki_bucket_arn}/*"
       ]
     }]
   })
@@ -241,10 +230,6 @@ resource "aws_instance" "monitoring" {
   }
 }
 
-resource "aws_eip_association" "monitoring" {
-  allocation_id = aws_eip.monitoring.id
-  instance_id   = aws_instance.monitoring.id
-}
 
 # -----------------------------------------------------------------------------
 # PHZ Record — monitoring.mgmt.doktori.internal

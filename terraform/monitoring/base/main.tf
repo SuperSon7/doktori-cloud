@@ -55,7 +55,7 @@ data "aws_ami" "nat_ubuntu" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
   }
 
   filter {
@@ -66,7 +66,7 @@ data "aws_ami" "nat_ubuntu" {
 
 resource "aws_security_group" "nat" {
   name        = "${var.project_name}-mgmt-nat-sg"
-  description = "mgmt NAT instance — WireGuard VPN + private subnet NAT forwarding"
+  description = "mgmt NAT instance - WireGuard VPN + private subnet NAT forwarding"
   vpc_id      = aws_vpc.mgmt.id
 
   ingress {

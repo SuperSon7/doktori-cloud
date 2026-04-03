@@ -24,11 +24,12 @@ variable "architecture" {
 variable "instance_type" {
   description = "EC2 instance type (t4g for ARM, t3 for x86)"
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.medium"
 
   # 변경 가이드:
   # ARM:   t4g.small (2GB, $12/월) | t4g.medium (4GB, $24/월)
   # Intel: t3.small  (2GB, $15/월) | t3.medium  (4GB, $30/월)
+  # Prometheus ~1.5GB + Loki ~400MB + Grafana ~200MB → K8s 연결 시 4GB 권장
 }
 
 variable "key_name" {
@@ -40,22 +41,24 @@ variable "key_name" {
 variable "root_volume_size" {
   description = "Root EBS volume size in GB"
   type        = number
-  default     = 30
+  default     = 60
 
-  # 산정 근거:
-  # Prometheus 30d  : ~1.3 GB
-  # Loki 30d        : ~1-2 GB
-  # Grafana         : ~0.3 GB
-  # Docker images   : ~2 GB
-  # OS              : ~4 GB
-  # 합계 ~9.6 GB × 2 (안전 마진) = ~20 GB → 여유분 포함 30 GB
+  # 산정 근거 (K8s 환경 기준):
+  # Prometheus 14d (K8s 메트릭 포함) : ~8-15 GB
+  # Loki index cache (chunks는 S3)   : ~2-3 GB
+  # Docker images                    : ~3 GB
+  # OS + 기타                        : ~4 GB
+  # 합계 ~22 GB → 여유분 포함 60 GB
+  # Loki S3 완전 전환 후 재평가 가능
 }
 
 variable "allowed_admin_cidrs" {
-  description = "Grafana(3000) 접근 허용 관리자 IP 목록"
+  description = "Grafana(3000) 접근 허용 CIDR (WireGuard VPN 클라이언트 서브넷)"
   type        = list(string)
-  # tfvars에서 오버라이드. 미설정 시 외부에서 Grafana 접근 불가.
-  default     = []
+  # EC2가 private 서브넷이므로 인터넷 직접 노출 없음
+  # VPN 연결 후 mgmt private CIDR(172.16.1.0/24) 경유로 접근
+  # 미설정 시 mgmt VPC 내부(172.16.0.0/16)에서만 접근 가능
+  default     = ["172.16.0.0/16"]
 }
 
 variable "peered_vpc_cidrs" {
