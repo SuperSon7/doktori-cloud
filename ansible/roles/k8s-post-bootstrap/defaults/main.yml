@@ -22,7 +22,7 @@ argocd_chart_version: "8.0.14"
 external_secrets_chart_version: "2.2.0"
 
 # --- 컨테이너 이미지 ---
-alloy_version: "v1.14.1"
+alloy_version: "v1.15.0"
 
 # --- HPA ---
 hpa_cpu_target: 60

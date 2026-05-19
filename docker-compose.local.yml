@@ -234,7 +234,7 @@ services:
   # Observability Agent (replaces node_exporter + mysqld_exporter + promtail)
   # ---------------------------------------------------------------------------
   alloy:
-    image: grafana/alloy:v1.9.0
+    image: grafana/alloy:v1.15.0
     command:
       - run
       - /etc/alloy/config.alloy
