@@ -10,7 +10,7 @@ output "s3_bucket_arn" {
 
 output "backend_config" {
   description = "Backend configuration to use in other terraform projects"
-  value = <<-EOT
+  value       = <<-EOT
     backend "s3" {
       bucket       = "${aws_s3_bucket.terraform_state.id}"
       key          = "<project>/terraform.tfstate"

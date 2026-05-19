@@ -32,6 +32,24 @@ variable "cloud_repo" {
   default     = "5-team-service-cloud"
 }
 
+variable "terraform_repos" {
+  description = "GitHub owner/repo pairs allowed to assume the Terraform role"
+  type = list(object({
+    owner = string
+    repo  = string
+  }))
+  default = [
+    {
+      owner = "100-hours-a-week"
+      repo  = "5-team-service-cloud"
+    },
+    {
+      owner = "SuperSon7"
+      repo  = "doktori-cloud"
+    },
+  ]
+}
+
 variable "budget_limit_amount" {
   description = "Monthly budget limit in USD"
   type        = string
@@ -56,4 +74,3 @@ variable "team_members" {
     doktori-cloud-v = { groups = ["cloud"] }
   }
 }
-
