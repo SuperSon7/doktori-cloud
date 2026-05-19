@@ -279,8 +279,10 @@ spec:
             cidr: 0.0.0.0/0
             except:
               - 10.0.0.0/8
+              - 100.64.0.0/10
               - 172.16.0.0/12
               - 192.168.0.0/16
+              - 198.18.0.0/15
       ports:
         - port: 443
           protocol: TCP
@@ -347,8 +349,10 @@ spec:
             cidr: 0.0.0.0/0
             except:
               - 10.0.0.0/8
+              - 100.64.0.0/10
               - 172.16.0.0/12
               - 192.168.0.0/16
+              - 198.18.0.0/15
       ports:
         - port: 443
           protocol: TCP
@@ -477,8 +481,10 @@ spec:
             cidr: 0.0.0.0/0
             except:
               - 10.0.0.0/8
+              - 100.64.0.0/10
               - 172.16.0.0/12
               - 192.168.0.0/16
+              - 198.18.0.0/15
       ports:
         - port: 443
           protocol: TCP
@@ -496,7 +502,7 @@ spec:
     # mgmt VPC (monitoring.mgmt.doktori.internal) — Prometheus/Loki remote_write
     - to:
         - ipBlock:
-            cidr: 172.31.0.0/16
+            cidr: 172.16.0.0/16
       ports:
         - port: 3100
           protocol: TCP
@@ -601,7 +607,7 @@ spec:
     # 외부 Prometheus (mgmt VPC — monitoring.mgmt.doktori.internal)
     - to:
         - ipBlock:
-            cidr: 172.31.0.0/16
+            cidr: 172.16.0.0/16
       ports:
         - port: 9090
           protocol: TCP

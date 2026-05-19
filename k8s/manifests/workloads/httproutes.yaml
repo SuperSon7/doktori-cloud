@@ -66,12 +66,14 @@ spec:
       #       group: gateway.nginx.org
       #       kind: SnippetsFilter
       #       name: rate-limit-api
+      # waiting-room SSE lives under /api/chat-rooms/{id}/waiting-room/subscribe.
+      # Spring emitter timeout is 30m and sends heartbeat every 30s, so NGF must
+      # not close this prefix at the short REST timeout.
       timeouts:
-        backendRequest: "75s"
+        backendRequest: "31m"
       backendRefs:
         - name: chat-svc
           port: 8081
----
 # api REST API (catch-all /api/)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -96,8 +98,10 @@ spec:
       #       group: gateway.nginx.org
       #       kind: SnippetsFilter
       #       name: rate-limit-api-zones
+      # Spring AI client read timeout is fixed at 60s.
+      # Long AI calls should use api.doktori.kr directly, not the CloudFront domain.
       timeouts:
-        backendRequest: "30s"
+        backendRequest: "65s"
       backendRefs:
         - name: api-svc
           port: 8080

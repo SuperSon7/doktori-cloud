@@ -1,0 +1,44 @@
+# =============================================================================
+# FI-18: Gateway -> Chat cross-node 네트워크 열화
+#
+# 목적:
+#   packet loss 를 최종 원인으로 결론내기 위한 실험이 아니라,
+#   cross-node 경로가 불안정할 때 WebSocket heartbeat 지연과 disconnect 가
+#   어떤 방식으로 증폭되는지 관찰하기 위한 보조 실험이다.
+#
+# 주의:
+#   - staging 또는 재생성 가능한 실습 클러스터에서만 사용
+#   - same-node / cross-node 비교 결과를 먼저 확보한 뒤 적용
+#   - 문서에는 "증상 증폭 실험" 으로만 기록
+# =============================================================================
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: fi-18-chat-cross-node-delay-loss
+  namespace: chaos-testing
+  labels:
+    experiment: fi-18
+    target: gateway-chat
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - prod
+    labelSelectors:
+      app.kubernetes.io/name: doktori-gateway-nginx
+  delay:
+    latency: "80ms"
+    jitter: "20ms"
+    correlation: "25"
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - prod
+      labelSelectors:
+        app: doktori
+        component: chat
+  duration: "5m"
+

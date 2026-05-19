@@ -25,24 +25,65 @@
 
 - name: Create Firebase Secret from SSM
   shell: |
-    if kubectl get secret firebase-credentials -n {{ k8s_namespace }} &>/dev/null; then
-      echo "already exists"
+    set -e
+    SSM_KEY="/{{ project_name }}/{{ k8s_namespace }}/FIREBASE_SERVICE_ACCOUNT"
+
+    if kubectl get crd externalsecrets.external-secrets.io &>/dev/null && \
+       kubectl get clustersecretstore aws-parameter-store &>/dev/null; then
+      cat <<EOF | kubectl apply -f -
+    apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: firebase-credentials
+      namespace: {{ k8s_namespace }}
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        name: aws-parameter-store
+        kind: ClusterSecretStore
+      target:
+        name: firebase-credentials
+        creationPolicy: Owner
+      data:
+        - secretKey: firebase-service-account.json
+          remoteRef:
+            key: ${SSM_KEY}
+    EOF
+
+      for i in $(seq 1 30); do
+        if kubectl get secret firebase-credentials -n {{ k8s_namespace }} &>/dev/null; then
+          echo "external_secret_ready"
+          exit 0
+        fi
+        sleep 2
+      done
+    fi
+
+    for i in $(seq 1 20); do
+      FIREBASE_JSON=$(aws ssm get-parameter \
+        --name "${SSM_KEY}" \
+        --with-decryption --query "Parameter.Value" --output text \
+        --region {{ aws_region }} 2>/dev/null) && break
+      sleep 3
+    done
+
+    if [ -z "${FIREBASE_JSON:-}" ]; then
+      echo "ssm_not_found"
       exit 0
     fi
-    FIREBASE_JSON=$(aws ssm get-parameter \
-      --name "/{{ project_name }}/{{ k8s_namespace }}/FIREBASE_SERVICE_ACCOUNT" \
-      --with-decryption --query "Parameter.Value" --output text \
-      --region {{ aws_region }} 2>/dev/null) || { echo "ssm_not_found"; exit 0; }
-    echo "${FIREBASE_JSON}" > /tmp/firebase-sa.json
+
+    TMP_FILE=$(mktemp)
+    trap 'rm -f "${TMP_FILE}"' EXIT
+    printf '%s' "${FIREBASE_JSON}" > "${TMP_FILE}"
     kubectl create secret generic firebase-credentials \
       --namespace={{ k8s_namespace }} \
-      --from-file=firebase-service-account.json=/tmp/firebase-sa.json
-    rm -f /tmp/firebase-sa.json
-    echo "created"
+      --from-file=firebase-service-account.json="${TMP_FILE}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+    echo "secret_reconciled"
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   register: firebase_result
-  changed_when: "'created' in firebase_result.stdout"
+  changed_when: "'external_secret_ready' in firebase_result.stdout or 'secret_reconciled' in firebase_result.stdout"
   no_log: true
 
 - name: Fail if Firebase Secret not available
@@ -55,6 +96,12 @@
     - firebase_result.stdout is defined
     - "'ssm_not_found' in firebase_result.stdout"
     - not (skip_firebase | default(false) | bool)
+
+- name: Verify Firebase Secret is present
+  command: kubectl get secret firebase-credentials -n {{ k8s_namespace }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
 
 - name: Apply workload manifests
   command: kubectl apply -f {{ k8s_scripts_dir }}/manifests/workloads/

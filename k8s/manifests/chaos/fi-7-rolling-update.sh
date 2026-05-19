@@ -26,8 +26,8 @@ fi
 
 NEW_TAG="$1"
 NAMESPACE="prod"
-ECR_REGISTRY="250857930609.dkr.ecr.ap-northeast-2.amazonaws.com"
-API_IMAGE="${ECR_REGISTRY}/doktori/api:${NEW_TAG}"
+ECR_REGISTRY="246477585940.dkr.ecr.ap-northeast-2.amazonaws.com"
+API_IMAGE="${ECR_REGISTRY}/doktori/backend-api:${NEW_TAG}"
 
 echo "============================================="
 echo " FI-7: Rolling Update 무중단 배포 검증"

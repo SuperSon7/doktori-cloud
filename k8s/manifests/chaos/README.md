@@ -65,6 +65,7 @@ kubectl port-forward -n chaos-testing svc/chaos-dashboard 2333:2333
 | FI-15B | `fi-15-coredns-full-kill.yaml` | CoreDNS | Phase B: 전체 kill (DNS 전면 장애) | SLO-1,3 |
 | FI-16 | `fi-16-metrics-server-kill.yaml` | metrics-server | HPA 판단 불가 상태 확인 | HPA |
 | FI-17 | `fi-17-calico-kill.yaml` | Calico | CNI 장애 → 기존 Pod 통신 유지 확인 | 네트워크 |
+| FI-18 | `fi-18-chat-cross-node-network-degradation.yaml` | Gateway→Chat | cross-node 지연 증폭으로 WebSocket 영향 관찰 | 네트워크 |
 
 ## 실행 방법
 

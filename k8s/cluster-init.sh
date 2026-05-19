@@ -12,8 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/config.env"
 
-POD_CIDR="192.168.0.0/16"
-SERVICE_CIDR="172.16.0.0/16"
+POD_CIDR="100.64.0.0/16"
+SERVICE_CIDR="198.18.16.0/20"
 CALICO_VERSION="v3.31.4"
 GATEWAY_API_VERSION="v1.4.1"
 NGF_VERSION="2.4.2"
@@ -87,6 +87,7 @@ else
 
   # custom-resources.yaml 다운로드 + AWS용 수정
   curl -sO "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
+  sed -i "s|cidr: 192.168.0.0/16|cidr: ${POD_CIDR}|" custom-resources.yaml
   sed -i 's/encapsulation: .*/encapsulation: VXLAN/' custom-resources.yaml
   sed -i '/calicoNetwork:/a\    bgp: Disabled' custom-resources.yaml
 

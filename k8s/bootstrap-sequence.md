@@ -69,9 +69,9 @@ kubeadm join 완료 후 `/var/lib/kubelet/kubeadm-flags.env`에 플래그 추가
 
 Terraform user_data + SSM 조율로 자동화되어 있음.
 
-1. Master: `kubeadm init` (CNI: Cilium)
+1. Master: `kubeadm init` (CNI: Calico)
 2. Workers: SSM에서 join token 수신 후 `kubeadm join`
-3. Cilium 설치 확인: `kubectl get pods -n kube-system -l k8s-app=cilium`
+3. Calico 설치 확인: `kubectl get pods -n calico-system -l k8s-app=calico-node`
 
 ---
 
@@ -258,7 +258,7 @@ sudo systemctl restart kubelet
 kubectl get nodes
 
 # 2. ECR credential provider 동작 확인
-kubectl run test-ecr --image=<ECR_REGISTRY>/api:latest --rm -it -- echo OK
+kubectl run test-ecr --image=<ECR_REGISTRY>/doktori/backend-api:<prod-tag> --rm -it -- echo OK
 
 # 3. ESO → Secret 생성 확인
 kubectl get externalsecret -n prod

@@ -7,7 +7,8 @@
 k8s_namespace: prod
 project_name: doktori
 aws_region: ap-northeast-2
-ecr_registry: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com
+ecr_registry: 246477585940.dkr.ecr.ap-northeast-2.amazonaws.com
+ecr_credential_provider_version: "v1.31.0"
 
 # --- 모니터링 ---
 monitoring_server: monitoring.mgmt.doktori.internal

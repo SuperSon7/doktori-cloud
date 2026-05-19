@@ -30,6 +30,80 @@ echo " Namespace: ${NAMESPACE}"
 echo " ECR: ${ECR_REGISTRY}"
 echo "============================================="
 
+ensure_firebase_secret() {
+  local ssm_key="/${PROJECT_NAME}/${NAMESPACE}/FIREBASE_SERVICE_ACCOUNT"
+  local tmp_file
+  local firebase_json=""
+  local attempt
+
+  echo "  Firebase Secret reconcile..."
+
+  if kubectl get crd externalsecrets.external-secrets.io &>/dev/null && \
+     kubectl get clustersecretstore aws-parameter-store &>/dev/null; then
+    cat <<EOF | kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: firebase-credentials
+  namespace: ${NAMESPACE}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-parameter-store
+    kind: ClusterSecretStore
+  target:
+    name: firebase-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: firebase-service-account.json
+      remoteRef:
+        key: ${ssm_key}
+EOF
+
+    for attempt in $(seq 1 30); do
+      if kubectl get secret firebase-credentials -n "${NAMESPACE}" &>/dev/null; then
+        echo "  → Firebase Secret 준비 완료 (ExternalSecret)"
+        return 0
+      fi
+      sleep 2
+    done
+    echo "  → ExternalSecret 경로 대기 시간 초과, SSM 직접 생성으로 전환"
+  fi
+
+  for attempt in $(seq 1 20); do
+    if firebase_json=$(aws ssm get-parameter \
+      --name "${ssm_key}" \
+      --with-decryption \
+      --query "Parameter.Value" \
+      --output text \
+      --region "${AWS_REGION}" 2>/dev/null); then
+      break
+    fi
+    echo "  → SSM 재시도 ${attempt}/20"
+    sleep 3
+  done
+
+  if [[ -z "${firebase_json}" ]]; then
+    echo ""
+    echo "  ✗ Firebase Secret 생성 실패: ${ssm_key}"
+    echo "    워크로드 적용을 중단합니다."
+    exit 1
+  fi
+
+  tmp_file="$(mktemp)"
+  trap 'rm -f "${tmp_file}"' RETURN
+  printf '%s' "${firebase_json}" > "${tmp_file}"
+  kubectl create secret generic firebase-credentials \
+    --namespace="${NAMESPACE}" \
+    --from-file=firebase-service-account.json="${tmp_file}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  rm -f "${tmp_file}"
+  trap - RETURN
+
+  kubectl get secret firebase-credentials -n "${NAMESPACE}" >/dev/null
+  echo "  → Firebase Secret 준비 완료 (SSM)"
+}
+
 # -----------------------------------------------------------------------------
 # 0. 사용자 입력 (보안 값)
 # -----------------------------------------------------------------------------
@@ -162,39 +236,7 @@ echo "  → CronJob 생성 (10시간 간격)"
 # -----------------------------------------------------------------------------
 echo "[4/7] api 서비스 배포 (Flyway 선행)..."
 
-# Firebase Secret — SSM에서 자동 가져오기, 실패 시 수동 안내
-if ! kubectl get secret firebase-credentials -n "${NAMESPACE}" &>/dev/null; then
-  echo "  Firebase Secret 없음 — SSM에서 가져오는 중..."
-  SSM_FIREBASE_KEY="/${PROJECT_NAME}/${NAMESPACE}/FIREBASE_SERVICE_ACCOUNT"
-
-  if FIREBASE_JSON=$(aws ssm get-parameter \
-    --name "${SSM_FIREBASE_KEY}" \
-    --with-decryption \
-    --query "Parameter.Value" \
-    --output text \
-    --region "${AWS_REGION}" 2>/dev/null); then
-
-    echo "${FIREBASE_JSON}" > /tmp/firebase-service-account.json
-    kubectl create secret generic firebase-credentials \
-      --namespace="${NAMESPACE}" \
-      --from-file=firebase-service-account.json=/tmp/firebase-service-account.json
-    rm -f /tmp/firebase-service-account.json
-    echo "  → Firebase Secret 생성 완료 (SSM)"
-  else
-    echo ""
-    echo "  ⚠ SSM에서 Firebase 인증 정보를 찾을 수 없습니다 (${SSM_FIREBASE_KEY})"
-    echo "    수동 생성:"
-    echo "      kubectl create secret generic firebase-credentials \\"
-    echo "        --namespace=${NAMESPACE} \\"
-    echo "        --from-file=firebase-service-account.json=<파일경로>"
-    echo ""
-    read -rp "  Firebase Secret 없이 계속할까요? FCM 푸시가 안 됩니다. (y/N): " SKIP_FIREBASE
-    if [[ "${SKIP_FIREBASE}" != "y" && "${SKIP_FIREBASE}" != "Y" ]]; then
-      echo "  → Firebase Secret 생성 후 다시 실행하세요."
-      exit 1
-    fi
-  fi
-fi
+ensure_firebase_secret
 
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
@@ -240,7 +282,7 @@ spec:
               component: api
       containers:
         - name: api
-          image: ${ECR_REGISTRY}/doktori/prod-backend-api:${API_IMAGE_TAG}
+          image: ${ECR_REGISTRY}/doktori/backend-api:${API_IMAGE_TAG}
           ports:
             - containerPort: 8080
           resources:
@@ -287,7 +329,7 @@ spec:
         - name: firebase-cred
           secret:
             secretName: firebase-credentials
-            optional: true
+            optional: false
 ---
 apiVersion: v1
 kind: Service
@@ -367,7 +409,7 @@ spec:
               component: chat
       containers:
         - name: chat
-          image: ${ECR_REGISTRY}/doktori/prod-backend-chat:${CHAT_IMAGE_TAG}
+          image: ${ECR_REGISTRY}/doktori/backend-chat:${CHAT_IMAGE_TAG}
           ports:
             - containerPort: 8081
           resources:
@@ -513,9 +555,12 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /api/chat-rooms/
+            value: /api/chat-rooms
+      # waiting-room SSE lives under /api/chat-rooms/{id}/waiting-room/subscribe.
+      # Spring emitter timeout is 30m and sends heartbeat every 30s, so NGF must
+      # not close this prefix at the short REST timeout.
       timeouts:
-        backendRequest: "75s"
+        backendRequest: "31m"
       backendRefs:
         - name: chat-svc
           port: 8081
@@ -534,8 +579,10 @@ spec:
         - path:
             type: PathPrefix
             value: /api/
+      # Spring AI client read timeout is fixed at 60s.
+      # Long AI calls should use api.doktori.kr directly, not the CloudFront domain.
       timeouts:
-        backendRequest: "30s"
+        backendRequest: "65s"
       backendRefs:
         - name: api-svc
           port: 8080

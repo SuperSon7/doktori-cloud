@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # AWS 태그 기반 K8s inventory 자동 생성
-# ASG 인스턴스의 Name 태그 + Role 태그로 master/worker 분류
+# ASG 인스턴스의 Service 태그로 master/worker 분류
 #
 # Usage: ./generate-inventory.sh
 # Output: inventory/k8s-hosts.yml
@@ -18,7 +18,7 @@ echo "K8s inventory 생성 중..."
 # Master 인스턴스
 MASTERS=$(aws ec2 describe-instances \
   --filters \
-    "Name=tag:Role,Values=k8s-cp" \
+    "Name=tag:Service,Values=k8s-cp" \
     "Name=instance-state-name,Values=running" \
   --query 'Reservations[].Instances[].[InstanceId,PrivateIpAddress]' \
   --output text)
@@ -26,7 +26,7 @@ MASTERS=$(aws ec2 describe-instances \
 # Worker 인스턴스
 WORKERS=$(aws ec2 describe-instances \
   --filters \
-    "Name=tag:Role,Values=k8s-worker" \
+    "Name=tag:Service,Values=k8s-worker" \
     "Name=instance-state-name,Values=running" \
   --query 'Reservations[].Instances[].[InstanceId,PrivateIpAddress]' \
   --output text)

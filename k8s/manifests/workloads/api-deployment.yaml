@@ -42,7 +42,7 @@ spec:
               component: api
       containers:
         - name: api
-          image: 250857930609.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/prod-backend-api:ae8ecb9
+          image: 246477585940.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/backend-api:prod-portfolio-20260424-181234-devtokens3
           ports:
             - containerPort: 8080
               name: http
@@ -60,6 +60,8 @@ spec:
               value: Asia/Seoul
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: APP_DEV_TEST_USER_COUNT
+              value: "10000"
             - name: FIREBASE_CREDENTIALS_PATH
               value: "file:/app/secrets/firebase-service-account.json"
           volumeMounts:
@@ -96,6 +98,6 @@ spec:
         - name: firebase-cred
           secret:
             secretName: firebase-credentials
-            optional: true
+            optional: false
         - name: tmp
           emptyDir: {}

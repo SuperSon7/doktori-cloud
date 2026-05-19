@@ -62,6 +62,8 @@ ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags argocd
 ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags hardening
 ```
 
+`k8s/manifests/workloads/`는 직접 `kubectl apply -f` 하지 말고, `deploy-workloads.sh` 또는 `ansible --tags workloads` 경로를 사용해야 합니다. 이 경로가 `ecr-credentials`와 `firebase-credentials`를 먼저 reconcile합니다.
+
 **역할 분담:**
 
 | 단계 | 도구 | 이유 |
