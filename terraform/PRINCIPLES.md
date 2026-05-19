@@ -108,6 +108,18 @@ resource "aws_iam_role_policy" "gha_cdn" {
 
 이 패턴은 HashiCorp Module Composition(Dependency Inversion), terraform-aws-modules, Gruntwork account-baseline 모두 동일하게 권장한다.
 
+**예외 — 서비스 주체(Service Principal) Role:** `codedeploy.amazonaws.com`, `lambda.amazonaws.com` 등 AWS 서비스가 assume하는 Role은 해당 리소스와 생명주기가 완전히 같으므로 리소스 레이어에서 함께 생성한다. Global에 두면 리소스 삭제 시 Role만 고아로 남고, 리소스 ARN 참조가 순환 의존을 만들기 때문이다.
+
+```hcl
+# prod/app/main.tf — CodeDeploy 서비스 Role은 app 레이어에서 직접 생성
+resource "aws_iam_role" "frontend_codedeploy_service" {
+  name = "${local.frontend_codedeploy_application_name}-service-role"
+  assume_role_policy = jsonencode({
+    Statement = [{ Principal = { Service = "codedeploy.amazonaws.com" }, Action = "sts:AssumeRole" }]
+  })
+}
+```
+
 ---
 
 ## 4. 네이밍 컨벤션
@@ -197,6 +209,48 @@ resource "aws_db_instance" "main" {
 }
 ```
 
+**SSM Parameter Store 패턴:**
+
+시크릿 성격에 따라 세 가지 패턴을 구분한다.
+
+| 패턴 | 대상 | 코드 |
+|------|------|------|
+| **ephemeral + value_wo** | Terraform이 초기값 생성, 이후 변경 없음 (비밀번호 등 랜덤 가능) | 아래 예시 참고 |
+| **CHANGE_ME 쉘** | 값을 CLI로 주입하는 파라미터 (외부 API key 등) | `ssm-parameters` 모듈 사용 |
+| **Terraform 직접 write** | 코드에서 값이 확정되는 정적 파라미터 (포트 번호 등) | `ignore_changes` 없이 작성 |
+
+```hcl
+# 패턴 1 — ephemeral + value_wo: 초기 랜덤값 생성, state에 저장 안 됨
+# random >= 3.7.0, AWS provider >= 5.78.0 필요
+ephemeral "random_password" "api_key" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "api_key" {
+  name             = "/${var.project_name}/${var.environment}/API_KEY"
+  type             = "SecureString"
+  value_wo         = ephemeral.random_password.api_key.result
+  value_wo_version = 1  # 키 로테이션 시 올린다
+
+  lifecycle {
+    # apply마다 새 랜덤 값이 생성되므로 생성 후 고정
+    ignore_changes = [value_wo, value_wo_version]
+  }
+}
+
+# 패턴 2 — CHANGE_ME 쉘: 값은 CLI로 주입, Terraform은 껍데기만 관리
+# (ssm-parameters 모듈이 이 패턴을 공통화함)
+
+# 패턴 3 — 정적 값: Terraform이 직접 write, ignore_changes 불필요
+resource "aws_ssm_parameter" "rabbitmq_port" {
+  name  = "/${var.project_name}/${var.environment}/SPRING_RABBITMQ_PORT"
+  type  = "String"
+  value = "5672"
+  tags  = { Name = "${var.project_name}-${var.environment}-SPRING_RABBITMQ_PORT" }
+}
+```
+
 `Name` 태그 주석(`data source 조회`)은 remote_state 전환 후에도 콘솔 식별 용도로 유지한다.
 
 ---
@@ -217,6 +271,36 @@ lifecycle {
   ignore_changes = [desired_capacity]
 }
 ```
+
+### Security Group Description 원칙
+
+Security Group은 **리소스 자체 description**과 **rule description**을 구분한다.
+
+- `aws_security_group.description`: SG 리소스 자체 설명. AWS/Terraform에서 교체가 발생할 수 있으므로 운영 중인 고정 name SG에서는 함부로 변경하지 않는다.
+- `ingress.description`, `egress.description`, `aws_vpc_security_group_*_rule.description`: 허용 규칙 설명. 실제 접근 경로를 명확히 하기 위해 적극적으로 관리한다.
+
+Rule description 형식:
+
+```text
+from <source> to <target/service>
+```
+
+예:
+
+```hcl
+ingress {
+  description = "from public ALB SG to k8s worker NGF NodePort"
+  from_port   = 30080
+  to_port     = 30080
+  protocol    = "tcp"
+}
+```
+
+금지/주의:
+
+- SG 자체 description을 단순 문구 개선 목적으로 바꾸지 않는다.
+- 고정 `name` + `create_before_destroy = true`인 SG의 자체 description을 바꾸면 Terraform이 같은 이름의 새 SG를 먼저 만들려다 `InvalidGroup.Duplicate`로 실패할 수 있다.
+- description 정리 작업의 기본 범위는 rule description이다. SG 자체 description 변경이 꼭 필요하면 plan에서 `forces replacement` 여부를 확인하고, 별도 PR/작업으로 다룬다.
 
 ---
 
@@ -261,3 +345,28 @@ resource "aws_vpc" "main" { ... }
 - 태그 기반 리소스 탐색을 기본으로 한다.
 - 시크릿 관리: SSM Parameter Store를 사용하되, 접근 패턴을 추상화하여 교체 가능한 구조 유지.
 - AWS managed service(VPC, S3, RDS, ECR, IAM)는 허용. 비즈니스 로직을 AWS API에 직접 결합하지 않는다.
+
+---
+
+## 12. CI/CD 원칙
+
+CI/CD의 배포 단위는 모듈이 아니라 독립 state를 가진 root module이다. `modules/`는 재사용 단위일 뿐 직접 apply 대상이 아니다.
+
+**PR:** 검증과 plan만 수행한다. `terraform fmt -check`, `terraform validate`, 보안 스캔, 비용 diff, changed root module plan을 PR comment로 남긴다. PR에서 apply하지 않는다.
+
+**Apply:** main merge 이후 실행하되 레이어 의존성 순서를 지킨다.
+
+```
+global → ecr/dns_zone → monitoring/base → monitoring/data → monitoring/app
+→ {env}/base → monitoring re-apply → {env}/data → {env}/app → prod/cdn
+```
+
+같은 단계의 서로 다른 환경은 병렬 실행할 수 있다. 같은 state key를 만지는 job은 workflow가 달라도 `concurrency` group을 공유해야 한다.
+
+**승인:** dev는 자동 apply 가능, staging은 manual 또는 approval, prod/shared/global은 GitHub Environment required reviewer를 요구한다.
+
+**삭제:** 자동 apply에서 destroy/replace는 차단한다. 삭제는 별도 수동 workflow와 리뷰를 통해 실행한다.
+
+**인증:** GitHub Actions는 OIDC로 AWS IAM Role을 assume한다. 장기 access key는 사용하지 않는다.
+
+상세 workflow 설계와 현행 차이 분석은 `CICD.md`를 따른다.
