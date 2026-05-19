@@ -19,6 +19,7 @@ export const options = {
     'http_req_duration{name:/users/me/meetings}': ['p(95)<1000'],
     'http_req_duration{name:/users/me/meetings/today}': ['p(95)<1000'],
     'http_req_duration{name:/notifications}': ['p(95)<500'],
+    'http_req_duration{name:/reviews}': ['p(95)<1000'],
     errors: [`rate<${thresholds.errorRate}`],
   },
 };
@@ -130,6 +131,17 @@ export default function (data) {
         check(res, {
           'Mark as read - status 204': (r) => r.status === 204,
         });
+      });
+    }
+
+    thinkTime(3, 8);
+
+    // 9. 모임 리뷰 조회
+    if (myMeetingIds.length > 0) {
+      group('모임 리뷰 조회', function () {
+        const meetingId = randomItem(myMeetingIds);
+        const res = apiGet(`/reviews/meetings/${meetingId}`, {}, true);
+        checkResponse(res, 200, 'Meeting Reviews');
       });
     }
   });

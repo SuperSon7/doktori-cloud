@@ -1,7 +1,12 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { config } from './config.js';
+
+const tokenFileData = __ENV.TOKEN_FILE
+  ? new SharedArray('token-file-data', () => JSON.parse(open(__ENV.TOKEN_FILE)))
+  : null;
 
 // 커스텀 메트릭
 export const errorRate = new Rate('errors');           // SLO-1: 5xx만 카운트
@@ -280,30 +285,57 @@ export function initAuth() {
 
 // /api/dev/tokens 에서 테스트 유저 토큰 목록을 발급받아 반환 (setup에서 1회 호출)
 export function fetchMultiTokens(count = 500) {
+  if (Array.isArray(tokenFileData) && tokenFileData.length > 0) {
+    const tokens = tokenFileData
+      .slice(0, count)
+      .map(t => typeof t === 'string' ? t : (t.accessToken || t.token));
+    console.log(`로컬 토큰 파일 ${tokens.length}개 로드 성공`);
+    return tokens;
+  }
+
   const baseUrl = __ENV.BASE_URL || config.baseUrl;
-  const tokenUrl = `${baseUrl}/dev/tokens`;
+  const pageSize = Math.min(Number(__ENV.TOKEN_PAGE_SIZE || 1000), count);
+  const baseOffset = Number(__ENV.TOKEN_OFFSET || 0);
+  const tokens = [];
 
-  console.log(`멀티 토큰 발급: ${tokenUrl}`);
-  const res = http.get(tokenUrl, {
-    headers: { 'Accept': 'application/json' },
-    tags: { name: '/dev/tokens' },
-    timeout: '30s',
-  });
+  for (let fetched = 0; fetched < count; fetched += pageSize) {
+    const limit = Math.min(pageSize, count - fetched);
+    const offset = baseOffset + fetched;
+    const tokenUrl = `${baseUrl}/dev/tokens?limit=${limit}&offset=${offset}`;
 
-  if (res.status === 200) {
+    console.log(`멀티 토큰 발급: ${tokenUrl}`);
+    const res = http.get(tokenUrl, {
+      headers: { 'Accept': 'application/json' },
+      tags: { name: '/dev/tokens' },
+      timeout: __ENV.TOKEN_FETCH_TIMEOUT || '300s',
+    });
+
+    if (res.status !== 200) {
+      console.log(`멀티 토큰 발급 실패: ${res.status} (offset=${offset}, limit=${limit})`);
+      break;
+    }
+
     try {
       const json = res.json();
       const items = json.data || json.tokens || json;
-      if (Array.isArray(items) && items.length > 0) {
-        const tokens = items.map(t => typeof t === 'string' ? t : (t.accessToken || t.token));
-        console.log(`멀티 토큰 ${tokens.length}개 발급 성공`);
-        return tokens;
+      if (!Array.isArray(items) || items.length === 0) {
+        break;
+      }
+
+      tokens.push(...items.map(t => typeof t === 'string' ? t : (t.accessToken || t.token)));
+
+      if (items.length < limit) {
+        break;
       }
     } catch (e) {
-      console.log('멀티 토큰 파싱 실패:', e.message);
+      console.log(`멀티 토큰 파싱 실패(offset=${offset}):`, e.message);
+      break;
     }
-  } else {
-    console.log(`멀티 토큰 발급 실패: ${res.status}`);
+  }
+
+  if (tokens.length > 0) {
+    console.log(`멀티 토큰 ${tokens.length}개 발급 성공`);
+    return tokens;
   }
 
   // fallback: 단일 JWT_TOKEN

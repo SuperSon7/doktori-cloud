@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #
 # 분산 부하테스트 실행 스크립트 (SSH 방식)
@@ -8,11 +7,12 @@
 #   ./run-distributed.sh <시나리오> [옵션]
 #
 # 시나리오:
-#   smoke, load, stress, spike, soak
-#   guest-flow, user-flow, meeting-search, join-meeting
-#   chat-api, chat-ws, notification, cache-test
-#   image-upload, create-meeting
-#   custom <path>
+#   표준 프로파일: smoke, load, stress, spike, soak
+#   비즈니스:     guest-flow, user-flow, create-meeting, book-report, meeting-spike, meeting-lifecycle
+#   RDS 타겟:     meeting-search, today-meetings, my-meetings-n1, join-meeting
+#   카오스:       redis-chaos, mongodb-chaos, rabbitmq-chaos
+#   서비스별:     chat-api, chat-ws, notification, cache-test, image-upload
+#   기타:         custom <path>
 #
 # 옵션:
 #   --pull                 실행 전 git pull
@@ -20,11 +20,13 @@
 #   --status               러너 상태 확인
 #   --stop                 러너 중지
 #   --start                러너 시작
+#   --kill                 실행 중인 k6 프로세스 종료
+#   --result               최신 결과 확인
 #
 # 예시:
 #   ./run-distributed.sh smoke --pull --prom
+#   ./run-distributed.sh redis-chaos --prom
 #   ./run-distributed.sh load --prom
-#   ./run-distributed.sh stress
 #   ./run-distributed.sh --stop
 
 set -euo pipefail
@@ -34,14 +36,13 @@ AWS_PROFILE="${AWS_PROFILE:-doktori-first}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 SSH_KEY="${SSH_KEY:-~/.ssh/doktori-loadtest.pem}"
 SSH_USER="ubuntu"
-SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=5"
+SSH_OPTS=(-i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=5)
 BASE_URL="${BASE_URL:-https://api.doktori.kr/api}"
 WS_URL="${WS_URL:-wss://api.doktori.kr/ws/chat}"
 TAG_KEY="Purpose"
 TAG_VALUE="distributed-k6-loadtest"
 
 # 러너 1의 Prometheus (Grafana 연동용)
-# Grafana+Prometheus가 있는 러너 IP — terraform output grafana_url로 확인
 PROM_URL="${PROM_URL:-http://13.124.202.148:9090}"
 
 RED='\033[0;31m'
@@ -53,23 +54,36 @@ NC='\033[0m'
 # ── 시나리오 매핑 ──
 resolve_scenario() {
   case "$1" in
-    smoke)          echo "k6/scenarios/smoke.js" ;;
-    load)           echo "k6/scenarios/load.js" ;;
-    stress)         echo "k6/scenarios/stress.js" ;;
-    spike)          echo "k6/scenarios/spike.js" ;;
-    soak)           echo "k6/scenarios/soak.js" ;;
-    guest-flow)     echo "k6/scenarios/guest-flow.js" ;;
-    user-flow)      echo "k6/scenarios/user-flow.js" ;;
-    meeting-search) echo "k6/scenarios/meeting-search.js" ;;
-    join-meeting)   echo "k6/scenarios/join-meeting.js" ;;
-    chat-api)       echo "k6/scenarios/chat-api.js" ;;
-    chat-ws)        echo "k6/scenarios/chat-websocket.js" ;;
-    notification)   echo "k6/scenarios/notification.js" ;;
-    cache-test)     echo "k6/scenarios/cache-test.js" ;;
-    image-upload)   echo "k6/scenarios/image-upload.js" ;;
-    create-meeting) echo "k6/scenarios/create-meeting.js" ;;
-    custom)         echo "$2" ;;
-    *) echo "" ;;
+    # 표준 부하 프로파일
+    smoke)             echo "k6/scenarios/smoke.js" ;;
+    load)              echo "k6/scenarios/load.js" ;;
+    stress)            echo "k6/scenarios/stress.js" ;;
+    spike)             echo "k6/scenarios/spike.js" ;;
+    soak)              echo "k6/scenarios/soak.js" ;;
+    # 비즈니스 플로우
+    guest-flow)        echo "k6/scenarios/guest-flow.js" ;;
+    user-flow)         echo "k6/scenarios/user-flow.js" ;;
+    create-meeting)    echo "k6/scenarios/create-meeting.js" ;;
+    book-report)       echo "k6/scenarios/book-report.js" ;;
+    meeting-spike)     echo "k6/scenarios/meeting-spike.js" ;;
+    meeting-lifecycle) echo "k6/scenarios/meeting-lifecycle.js" ;;
+    # RDS 타겟
+    meeting-search)    echo "k6/scenarios/meeting-search.js" ;;
+    today-meetings)    echo "k6/scenarios/today-meetings.js" ;;
+    my-meetings-n1)    echo "k6/scenarios/my-meetings-n1.js" ;;
+    join-meeting)      echo "k6/scenarios/join-meeting.js" ;;
+    # 카오스 엔지니어링 타겟
+    redis-chaos)       echo "k6/scenarios/redis-chaos.js" ;;
+    mongodb-chaos)     echo "k6/scenarios/mongodb-chaos.js" ;;
+    rabbitmq-chaos)    echo "k6/scenarios/rabbitmq-chaos.js" ;;
+    # 서비스별
+    chat-api)          echo "k6/scenarios/chat-api.js" ;;
+    chat-ws)           echo "k6/scenarios/chat-websocket.js" ;;
+    notification)      echo "k6/scenarios/notification.js" ;;
+    cache-test)        echo "k6/scenarios/cache-test.js" ;;
+    image-upload)      echo "k6/scenarios/image-upload.js" ;;
+    custom)            echo "$2" ;;
+    *)                 echo "" ;;
   esac
 }
 
@@ -119,7 +133,8 @@ run_on_runner() {
   cmd="${cmd} && k6 run ${k6_args} ${scenario_file} 2>&1 | tee /tmp/k6-${timestamp}.log"
 
   echo -e "${CYAN}[${ip}]${NC} 시작: ${scenario_file}"
-  ssh ${SSH_OPTS} ${SSH_USER}@${ip} "${cmd}" &
+  # shellcheck disable=SC2029  # cmd is intentionally built locally and expanded before SSH
+  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${ip}" "${cmd}" &
 }
 
 # ── 메인 실행 ──
@@ -161,7 +176,6 @@ run_command() {
   done
   echo ""
 
-  # 3대 동시 실행 (백그라운드)
   for ip in $runner_ips; do
     run_on_runner "$ip" "$scenario_file" "$do_pull" "$use_prom"
   done
@@ -171,7 +185,6 @@ run_command() {
   echo -e "Grafana: ${PROM_URL:-없음}"
   echo ""
 
-  # 모든 백그라운드 프로세스 대기
   wait
   echo ""
   echo -e "${GREEN}전체 완료!${NC}"
@@ -189,7 +202,8 @@ kill_tests() {
 
   echo -e "${YELLOW}k6 프로세스 종료 중...${NC}"
   for ip in $runner_ips; do
-    ssh ${SSH_OPTS} ${SSH_USER}@${ip} "pkill -f k6 2>/dev/null; echo 'killed on ${ip}'" &
+    # shellcheck disable=SC2029  # ${ip} intentionally expands locally for the echo label
+    ssh "${SSH_OPTS[@]}" "${SSH_USER}@${ip}" "pkill -f k6 2>/dev/null; echo \"killed on ${ip}\"" &
   done
   wait
   echo -e "${GREEN}전체 중단 완료.${NC}"
@@ -212,17 +226,17 @@ show_results() {
 
   for ip in $runner_ips; do
     echo -e "${CYAN}=== Runner: ${ip} ===${NC}"
-    ssh ${SSH_OPTS} ${SSH_USER}@${ip} "
-      LATEST=\$(ls -t /tmp/k6-*.log 2>/dev/null | head -1)
-      if [ -z \"\$LATEST\" ]; then
-        echo '결과 파일 없음'
+    ssh "${SSH_OPTS[@]}" "${SSH_USER}@${ip}" '
+      LATEST=$(ls -t /tmp/k6-*.log 2>/dev/null | head -1)
+      if [ -z "$LATEST" ]; then
+        echo "결과 파일 없음"
       else
-        echo \"파일: \$LATEST\"
-        echo \"크기: \$(wc -c < \$LATEST) bytes\"
-        echo ''
-        grep -E '(checks|http_req_duration|http_req_failed|errors|http_reqs|vus_max|iterations|running.*VUs|thresholds)' \$LATEST | tail -15
+        echo "파일: $LATEST"
+        echo "크기: $(wc -c < "$LATEST") bytes"
+        echo ""
+        grep -E "(checks|http_req_duration|http_req_failed|errors|http_reqs|vus_max|iterations|running.*VUs|thresholds)" "$LATEST" | tail -15
       fi
-    " 2>&1
+    ' 2>&1
     echo ""
   done
 }
@@ -238,17 +252,20 @@ manage_runners() {
     exit 1
   fi
 
+  # ids는 공백 구분 인스턴스 ID 목록 → 배열로 분리
+  read -ra id_array <<< "$ids"
+
   case "$action" in
     start)
       echo -e "${YELLOW}러너 시작 중...${NC}"
       aws --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-        ec2 start-instances --instance-ids $ids > /dev/null
+        ec2 start-instances --instance-ids "${id_array[@]}" > /dev/null
       echo -e "${GREEN}시작됨. 1-2분 후 SSH 접속 가능.${NC}"
       ;;
     stop)
       echo -e "${YELLOW}러너 중지 중...${NC}"
       aws --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-        ec2 stop-instances --instance-ids $ids > /dev/null
+        ec2 stop-instances --instance-ids "${id_array[@]}" > /dev/null
       echo -e "${GREEN}중지됨.${NC}"
       ;;
     status)
@@ -264,7 +281,7 @@ manage_runners() {
 
 # ── 도움말 ──
 show_help() {
-  head -30 "$0" | tail -28
+  head -32 "$0" | tail -31
 }
 
 # ── 파싱 ──

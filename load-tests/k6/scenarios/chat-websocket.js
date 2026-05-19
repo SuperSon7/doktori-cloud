@@ -33,19 +33,42 @@ const wsErrorRate = new Rate('ws_errors');
 const WS_URL = __ENV.WS_URL || 'wss://api.doktori.kr/ws/chat';
 const CHAT_ROOM_IDS = (__ENV.CHAT_ROOM_IDS || '1,2,3').split(',').map(Number);
 const MESSAGE_INTERVAL_SEC = Number(__ENV.MSG_INTERVAL || 3);
+const MESSAGE_MIN = Number(__ENV.MSG_MIN || 3);
+const MESSAGE_MAX = Number(__ENV.MSG_MAX || 8);
+const SESSION_MIN_SEC = Number(__ENV.WS_SESSION_MIN || 10);
+const SESSION_MAX_SEC = Number(__ENV.WS_SESSION_MAX || 30);
+const TOKEN_COUNT = Number(__ENV.TOKEN_COUNT || 500);
+
+function parseStages() {
+  if (!__ENV.WS_STAGES) {
+    return [
+      { duration: '1m', target: 20 },
+      { duration: '3m', target: 50 },
+      { duration: '3m', target: 100 },
+      { duration: '2m', target: 50 },
+      { duration: '1m', target: 0 },
+    ];
+  }
+
+  return __ENV.WS_STAGES
+    .split(',')
+    .map((stage) => {
+      const [duration, target] = stage.split(':');
+      return {
+        duration: duration.trim(),
+        target: Number(target),
+      };
+    })
+    .filter((stage) => stage.duration && Number.isFinite(stage.target));
+}
 
 export const options = {
+  setupTimeout: __ENV.SETUP_TIMEOUT || '5m',
   scenarios: {
     ws_connections: {
       executor: 'ramping-vus',
-      startVUs: 5,
-      stages: [
-        { duration: '1m', target: 20 },
-        { duration: '3m', target: 50 },
-        { duration: '3m', target: 100 },
-        { duration: '2m', target: 50 },
-        { duration: '1m', target: 0 },
-      ],
+      startVUs: Number(__ENV.WS_START_VUS || 5),
+      stages: parseStages(),
     },
   },
   thresholds: {
@@ -55,7 +78,7 @@ export const options = {
 };
 
 export function setup() {
-  const tokens = fetchMultiTokens();
+  const tokens = fetchMultiTokens(TOKEN_COUNT);
   if (tokens.length === 0) {
     console.error('WebSocket 테스트에 토큰이 필요합니다.');
   }
@@ -113,7 +136,7 @@ export default function (data) {
     });
 
     // 메시지 전송 (주기적)
-    const messageCount = randomInt(3, 8);
+    const messageCount = randomInt(MESSAGE_MIN, MESSAGE_MAX + 1);
     for (let i = 0; i < messageCount; i++) {
       socket.send(stompSend(`/app/chat-rooms/${roomId}/messages`, {
         content: `부하테스트 메시지 VU${__VU} #${i + 1}`,
@@ -124,7 +147,7 @@ export default function (data) {
     }
 
     // 연결 유지 (실제 유저의 채팅방 체류 시뮬레이션)
-    sleep(randomInt(10, 30));
+    sleep(randomInt(SESSION_MIN_SEC, SESSION_MAX_SEC + 1));
 
     wsActiveConnections.add(-1);
     socket.close();
