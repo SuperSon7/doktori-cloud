@@ -28,6 +28,7 @@ override.tf.json
 *.plan
 *.tfplan
 tfplan
+tfplan-*
 plan.out
 
 # Packer

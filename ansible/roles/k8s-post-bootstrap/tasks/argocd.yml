@@ -21,51 +21,73 @@
 
 - name: Add External Secrets Helm repo
   shell: |
-    helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+    helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
     helm repo update external-secrets
+  args:
+    executable: /bin/bash
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: false
 
 - name: Install External Secrets Operator
   shell: |
-    if helm status external-secrets -n external-secrets &>/dev/null; then
+    set -euo pipefail
+
+    RELEASE_EXISTS="$(helm list -n external-secrets --all --filter '^external-secrets$' --short 2>/dev/null || true)"
+    RELEASE_STATUS="$(helm status external-secrets -n external-secrets 2>/dev/null | awk '/^STATUS:/ {print $2}' || true)"
+    if [ "${RELEASE_STATUS}" = "deployed" ]; then
       helm upgrade external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --version {{ external_secrets_chart_version }} \
         --set installCRDs=true
     else
+      if [ -n "${RELEASE_EXISTS}" ]; then
+        helm uninstall external-secrets -n external-secrets --wait || true
+      fi
       helm install external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --create-namespace \
         --version {{ external_secrets_chart_version }} \
         --set installCRDs=true
     fi
+  args:
+    executable: /bin/bash
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 
 - name: Add ArgoCD Helm repo
   shell: |
-    helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+    helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
     helm repo update argo
+  args:
+    executable: /bin/bash
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: false
 
 - name: Install ArgoCD
   shell: |
-    if helm status argocd -n argocd &>/dev/null; then
+    set -euo pipefail
+
+    RELEASE_EXISTS="$(helm list -n argocd --all --filter '^argocd$' --short 2>/dev/null || true)"
+    RELEASE_STATUS="$(helm status argocd -n argocd 2>/dev/null | awk '/^STATUS:/ {print $2}' || true)"
+    if [ "${RELEASE_STATUS}" = "deployed" ]; then
       helm upgrade argocd argo/argo-cd \
         --namespace argocd \
         --version {{ argocd_chart_version }} \
         -f {{ k8s_scripts_dir }}/helm/argocd-values.yaml
     else
+      if [ -n "${RELEASE_EXISTS}" ]; then
+        helm uninstall argocd -n argocd --wait || true
+      fi
       helm install argocd argo/argo-cd \
         --namespace argocd \
         --create-namespace \
         --version {{ argocd_chart_version }} \
         -f {{ k8s_scripts_dir }}/helm/argocd-values.yaml
     fi
+  args:
+    executable: /bin/bash
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 

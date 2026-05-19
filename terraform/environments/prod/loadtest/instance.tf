@@ -29,6 +29,7 @@ resource "aws_instance" "runner" {
   tags = {
     Name    = "${var.project_name}-${var.environment}-k6-runner-${count.index + 1}"
     Project = var.project_name
+    Purpose = "distributed-k6-loadtest"
   }
 
   depends_on = [aws_iam_role_policy_attachment.ssm_managed]

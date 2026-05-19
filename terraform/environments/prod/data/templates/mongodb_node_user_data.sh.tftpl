@@ -35,6 +35,18 @@ js_quote() {
   printf '%s' "$1" | jq -Rs .
 }
 
+enable_authorization() {
+  if grep -q '^security:' /etc/mongod.conf 2>/dev/null; then
+    if grep -q '^[[:space:]]*authorization:' /etc/mongod.conf 2>/dev/null; then
+      sed -i 's/^[[:space:]]*authorization:.*/  authorization: enabled/' /etc/mongod.conf
+    else
+      sed -i '/^security:/a\  authorization: enabled' /etc/mongod.conf
+    fi
+  else
+    printf '\nsecurity:\n  authorization: enabled\n' >>/etc/mongod.conf
+  fi
+}
+
 urlencode() {
   python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
 }
@@ -79,30 +91,32 @@ ADMIN_PASS_JSON="$(js_quote "$MONGO_ADMIN_PASSWORD")"
 APP_USER_JSON="$(js_quote "$MONGO_USERNAME")"
 APP_PASS_JSON="$(js_quote "$MONGO_PASSWORD")"
 
-if ! mongosh --quiet --host 127.0.0.1 --port 27017 \
+ADMIN_AUTH_OK=false
+if mongosh --quiet --host 127.0.0.1 --port 27017 \
     --username "$MONGO_ADMIN_USERNAME" \
     --password "$MONGO_ADMIN_PASSWORD" \
     --authenticationDatabase admin \
     --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+  ADMIN_AUTH_OK=true
+else
   cat >"$INIT_ADMIN_JS" <<JS
 const adminDb = db.getSiblingDB("admin");
 const adminUser = $ADMIN_USER_JSON;
 const adminPassword = $ADMIN_PASS_JSON;
+const adminRoles = [
+  { role: "userAdminAnyDatabase", db: "admin" },
+  { role: "dbAdminAnyDatabase", db: "admin" },
+  { role: "clusterMonitor", db: "admin" }
+];
 
 if (adminDb.getUser(adminUser) === null) {
-  adminDb.createUser({
-    user: adminUser,
-    pwd: adminPassword,
-    roles: [
-      { role: "userAdminAnyDatabase", db: "admin" },
-      { role: "dbAdminAnyDatabase", db: "admin" },
-      { role: "clusterMonitor", db: "admin" }
-    ]
-  });
+  adminDb.createUser({ user: adminUser, pwd: adminPassword, roles: adminRoles });
+} else {
+  adminDb.updateUser(adminUser, { pwd: adminPassword, roles: adminRoles });
 }
 JS
 
-  log "Creating MongoDB admin user from SSM parameters"
+  log "Creating/updating MongoDB admin user from SSM parameters"
   mongosh --quiet --host 127.0.0.1 --port 27017 "$INIT_ADMIN_JS"
 fi
 
@@ -139,11 +153,30 @@ appDb.messages.createIndex({ roundId: 1 }, { name: "idx_round_id" });
 JS
 
 log "Ensuring MongoDB app users, collections, and indexes"
-mongosh --quiet --host 127.0.0.1 --port 27017 \
-  --username "$MONGO_ADMIN_USERNAME" \
-  --password "$MONGO_ADMIN_PASSWORD" \
-  --authenticationDatabase admin \
-  "$INIT_APP_JS"
+if [ "$ADMIN_AUTH_OK" = true ]; then
+  mongosh --quiet --host 127.0.0.1 --port 27017 \
+    --username "$MONGO_ADMIN_USERNAME" \
+    --password "$MONGO_ADMIN_PASSWORD" \
+    --authenticationDatabase admin \
+    "$INIT_APP_JS"
+else
+  mongosh --quiet --host 127.0.0.1 --port 27017 "$INIT_APP_JS"
+fi
+
+log "Enabling MongoDB authorization"
+enable_authorization
+systemctl restart mongod
+
+for _ in $(seq 1 30); do
+  if mongosh --quiet --host 127.0.0.1 --port 27017 \
+      --username "$MONGO_ADMIN_USERNAME" \
+      --password "$MONGO_ADMIN_PASSWORD" \
+      --authenticationDatabase admin \
+      --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
 
 EXPORTER_USER="$(urlencode "$MONGO_ADMIN_USERNAME")"
 EXPORTER_PASS="$(urlencode "$MONGO_ADMIN_PASSWORD")"

@@ -13,8 +13,8 @@ curl -fsSL "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K
 k6 version
 
 cd /home/ubuntu
-git clone https://github.com/100-hours-a-week/5-team-service-cloud.git
-chown -R ubuntu:ubuntu 5-team-service-cloud
+git clone https://github.com/SuperSon7/doktori-cloud.git
+chown -R ubuntu:ubuntu doktori-cloud
 
 # ── Docker 설치 ──
 curl -fsSL https://get.docker.com | sh

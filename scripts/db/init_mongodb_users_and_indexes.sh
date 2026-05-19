@@ -58,30 +58,32 @@ APP_USER_JSON="$(js_quote "$MONGO_USERNAME")"
 APP_PASS_JSON="$(js_quote "$MONGO_PASSWORD")"
 MONGO_DB_JSON="$(js_quote "$MONGO_DB")"
 
-if ! mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" \
+ADMIN_AUTH_OK=false
+if mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" \
     --username "$MONGO_ADMIN_USERNAME" \
     --password "$MONGO_ADMIN_PASSWORD" \
     --authenticationDatabase admin \
     --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+  ADMIN_AUTH_OK=true
+else
   cat >"$INIT_ADMIN_JS" <<JS
 const adminDb = db.getSiblingDB("admin");
 const adminUser = $ADMIN_USER_JSON;
 const adminPassword = $ADMIN_PASS_JSON;
+const adminRoles = [
+  { role: "userAdminAnyDatabase", db: "admin" },
+  { role: "dbAdminAnyDatabase", db: "admin" },
+  { role: "clusterMonitor", db: "admin" }
+];
 
 if (adminDb.getUser(adminUser) === null) {
-  adminDb.createUser({
-    user: adminUser,
-    pwd: adminPassword,
-    roles: [
-      { role: "userAdminAnyDatabase", db: "admin" },
-      { role: "dbAdminAnyDatabase", db: "admin" },
-      { role: "clusterMonitor", db: "admin" }
-    ]
-  });
+  adminDb.createUser({ user: adminUser, pwd: adminPassword, roles: adminRoles });
+} else {
+  adminDb.updateUser(adminUser, { pwd: adminPassword, roles: adminRoles });
 }
 JS
 
-  log "creating admin user through localhost exception"
+  log "creating/updating admin user through localhost exception"
   mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" "$INIT_ADMIN_JS"
 fi
 
@@ -119,14 +121,29 @@ appDb.messages.createIndex({ roundId: 1 }, { name: "idx_round_id" });
 JS
 
 log "ensuring app users, collections, and indexes"
-mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" \
-  --username "$MONGO_ADMIN_USERNAME" \
-  --password "$MONGO_ADMIN_PASSWORD" \
-  --authenticationDatabase admin \
-  "$INIT_APP_JS"
+if [ "$ADMIN_AUTH_OK" = true ]; then
+  mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" \
+    --username "$MONGO_ADMIN_USERNAME" \
+    --password "$MONGO_ADMIN_PASSWORD" \
+    --authenticationDatabase admin \
+    "$INIT_APP_JS"
+else
+  mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" "$INIT_APP_JS"
+fi
 
 log "enabling MongoDB authorization"
 enable_authorization
 systemctl restart mongod
+
+for _ in $(seq 1 30); do
+  if mongosh --quiet --host "$MONGO_HOST" --port "$MONGO_PORT" \
+      --username "$MONGO_ADMIN_USERNAME" \
+      --password "$MONGO_ADMIN_PASSWORD" \
+      --authenticationDatabase admin \
+      --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
 
 log "done"

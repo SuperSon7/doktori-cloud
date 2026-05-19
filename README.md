@@ -55,7 +55,7 @@ main push → ArgoCD sync → K8s cluster apply
 
 ## 컴포넌트 버전 매트릭스
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-05-19
 
 ### 클러스터 코어
 
@@ -68,11 +68,20 @@ main push → ArgoCD sync → K8s cluster apply
 | Gateway API CRD | 1.4.1 | `k8s/cluster-init.sh` | |
 | Ubuntu | 22.04 LTS | Packer AMI | 지원: 2027-04 |
 
+### Packer AMI 운영 원칙
+
+- prod EC2는 raw Ubuntu AMI로 fallback하지 않고, Packer로 만든 AMI ID를 Terraform 변수에 고정한다.
+- `packer build packer` 실행 후 `./scripts/ami/update-ami-ids.sh`로 manifest의 AMI ID를 `terraform/environments/prod/{app,data}/variables.tf`에 반영한다.
+- Packer 임시 SSH 보안 그룹은 빌드 실행 호스트의 public IP만 허용한다.
+- 요청한 패키지 버전이 없으면 latest로 넘어가지 않고 빌드를 실패시켜 AMI 태그와 실제 바이너리 버전이 어긋나지 않게 한다.
+- Redis/RabbitMQ/MongoDB AMI는 설치 검증 후 런타임 데이터를 비우고, 실제 노드 상태와 비밀값은 첫 부팅 user_data에서 구성한다.
+- 설치 스크립트 작업 전 체크리스트는 `INSTALL-SCRIPT-AGENT-CHECKLIST.md`를 따른다.
+
 ### Helm 릴리스 (부트스트랩 시 설치)
 
 | 컴포넌트 | Chart 버전 | App 버전 | 관리 주체 | 정의 위치 |
 |---------|-----------|---------|----------|----------|
-| ArgoCD | 8.0.0+ | 3.2.x | Helm standalone | `k8s/config.env` |
+| ArgoCD | 8.0.14 | 3.2.x | Helm standalone | `k8s/config.env` |
 | NGINX Gateway Fabric | 2.4.2 | 2.4.2 | Helm standalone | `k8s/cluster-init.sh` |
 
 ### ArgoCD 관리 (Helm App)
@@ -87,7 +96,7 @@ main push → ArgoCD sync → K8s cluster apply
 
 | 컴포넌트 | 버전 | 정의 위치 |
 |---------|------|----------|
-| Alloy (Grafana) | 1.14.1 | `k8s/config.env`, `k8s/manifests/monitoring/alloy-daemonset.yaml` |
+| Alloy (Grafana) | 1.14.1 | `k8s/config.env`, `ansible/roles/k8s-post-bootstrap/defaults/main.yml`, `k8s/manifests/monitoring/alloy-daemonset.yaml` |
 | 워크로드 (api, chat) | - | `k8s/manifests/workloads/` |
 | HPA | - | `k8s/manifests/hpa/` |
 | NetworkPolicy | - | `k8s/manifests/security/` |
@@ -100,7 +109,7 @@ main push → ArgoCD sync → K8s cluster apply
 | Terraform | 1.14.x | 로컬 설치 |
 | Helm | 3.x | 노드 설치 스크립트 |
 | Chaos Mesh | 2.7.2 | `k8s/install-chaos-mesh.sh` |
-| ECR credential provider | v1.31.0 | `ansible/roles/k8s-post-bootstrap/tasks/ecr-credential-provider.yml` |
+| ECR credential provider | v1.31.0 | `packer/variables.pkr.hcl`, `ansible/roles/k8s-post-bootstrap/defaults/main.yml` |
 
 ## 디렉토리 구조
 
@@ -131,13 +140,13 @@ main push → ArgoCD sync → K8s cluster apply
 ### 인프라 관리자
 
 ```bash
-git clone https://github.com/100-hours-a-week/5-team-service-cloud.git
+git clone https://github.com/SuperSon7/doktori-cloud.git
 ```
 
 ### 팀원 (로컬 개발)
 
 ```bash
-git clone -b local-dev https://github.com/100-hours-a-week/5-team-service-cloud.git doktori
+git clone -b local-dev https://github.com/SuperSon7/doktori-cloud.git doktori
 cd doktori
 make setup
 # .env 파일 수정 (팀 노션 참고)

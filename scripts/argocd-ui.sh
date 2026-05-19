@@ -9,7 +9,7 @@
 # 동작:
 #   1. SSM send-command로 마스터에 kubectl port-forward 띄움
 #   2. SSM 포트포워딩으로 로컬:8443 → 마스터:8443 연결
-#   3. 브라우저에서 https://localhost:8443 접근
+#   3. 브라우저에서 http://localhost:8443 접근
 #
 # 종료: Ctrl+C
 # =============================================================================
@@ -40,7 +40,7 @@ else
   INSTANCE_ID=$(aws ec2 describe-instances \
     --filters \
       "Name=tag:Name,Values=*k8s-master*" \
-      "Name=tag:Role,Values=k8s-cp" \
+      "Name=tag:Service,Values=k8s-cp" \
       "Name=instance-state-name,Values=running" \
     --query 'Reservations[0].Instances[0].InstanceId' \
     --output text 2>/dev/null)
@@ -56,7 +56,7 @@ echo "============================================="
 echo " ArgoCD UI 접근"
 echo "============================================="
 echo "  Instance : ${INSTANCE_ID}"
-echo "  Local    : https://localhost:${LOCAL_PORT}"
+echo "  Local    : http://localhost:${LOCAL_PORT}"
 echo "  Username : admin"
 echo "============================================="
 echo ""
@@ -96,7 +96,7 @@ fi
 echo ""
 echo "[2/2] SSM 포트포워딩 연결..."
 echo ""
-echo "  → https://localhost:${LOCAL_PORT} 에서 ArgoCD UI 접근"
+echo "  → http://localhost:${LOCAL_PORT} 에서 ArgoCD UI 접근"
 echo "  → 종료: Ctrl+C"
 echo ""
 

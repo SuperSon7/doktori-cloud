@@ -114,7 +114,7 @@ run_on_runner() {
   local timestamp
   timestamp=$(date +%Y%m%d_%H%M%S)
 
-  local cmd="cd /home/ubuntu/5-team-service-cloud/load-tests"
+  local cmd="cd /home/ubuntu/doktori-cloud/load-tests"
 
   if [ "$do_pull" = "true" ]; then
     cmd="${cmd} && git pull --ff-only"
