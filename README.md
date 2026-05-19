@@ -91,12 +91,13 @@ main push → ArgoCD sync → K8s cluster apply
 | metrics-server | 3.12.2 | 0.7.2 | `k8s/manifests/argocd/apps/metrics-server.yaml` |
 | kube-state-metrics | 5.28.1 | 2.13.0 | `k8s/manifests/argocd/apps/kube-state-metrics.yaml` |
 | External Secrets | 2.2.0 | 2.2.0 | `k8s/manifests/argocd/apps/external-secrets.yaml` |
+| prometheus-adapter | 5.3.0 | - | `k8s/manifests/argocd/apps/prometheus-adapter.yaml` |
 
 ### ArgoCD 관리 (Raw Manifest)
 
 | 컴포넌트 | 버전 | 정의 위치 |
 |---------|------|----------|
-| Alloy (Grafana) | 1.14.1 | `k8s/config.env`, `ansible/roles/k8s-post-bootstrap/defaults/main.yml`, `k8s/manifests/monitoring/alloy-daemonset.yaml` |
+| Alloy (Grafana) | 1.15.0 | `k8s/config.env`, `ansible/roles/k8s-post-bootstrap/defaults/main.yml`, `k8s/manifests/monitoring/alloy-daemonset.yaml` |
 | 워크로드 (api, chat) | - | `k8s/manifests/workloads/` |
 | HPA | - | `k8s/manifests/hpa/` |
 | NetworkPolicy | - | `k8s/manifests/security/` |
