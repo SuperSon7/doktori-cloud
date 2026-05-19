@@ -10,10 +10,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT="${SCRIPT_DIR}/inventory/k8s-hosts.yml"
+PROJECT_NAME="${PROJECT_NAME:-doktori}"
+ENVIRONMENT="${ENVIRONMENT:-prod}"
+AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 
 mkdir -p "$(dirname "$OUTPUT")"
 
 echo "K8s inventory 생성 중..."
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+SSM_BUCKET="${ANSIBLE_AWS_SSM_BUCKET_NAME:-${PROJECT_NAME}-${ENVIRONMENT}-${ACCOUNT_ID}}"
 
 # Master 인스턴스
 MASTERS=$(aws ec2 describe-instances \
@@ -38,15 +44,25 @@ all:
   vars:
     ansible_user: ubuntu
     ansible_connection: community.aws.aws_ssm
-    ansible_aws_ssm_region: ap-northeast-2
+HEADER
+
+cat >> "$OUTPUT" <<HEADER
+    ansible_aws_ssm_region: ${AWS_REGION}
+    ansible_aws_ssm_bucket_name: ${SSM_BUCKET}
+HEADER
+
+cat >> "$OUTPUT" <<'HEADER'
     ansible_python_interpreter: /usr/bin/python3
   children:
     k8s_master:
       hosts:
 HEADER
 
-# Master 호스트 추가
 FIRST_MASTER=true
+PRIMARY_MASTER_ID=""
+PRIMARY_MASTER_IP=""
+
+# Master 호스트 추가
 while IFS=$'\t' read -r instance_id private_ip; do
   [ -z "$instance_id" ] && continue
   echo "        ${instance_id}:" >> "$OUTPUT"
@@ -54,9 +70,23 @@ while IFS=$'\t' read -r instance_id private_ip; do
   echo "          private_ip: ${private_ip}" >> "$OUTPUT"
   if [ "$FIRST_MASTER" = true ]; then
     echo "          primary_master: true" >> "$OUTPUT"
+    PRIMARY_MASTER_ID="$instance_id"
+    PRIMARY_MASTER_IP="$private_ip"
     FIRST_MASTER=false
   fi
 done <<< "$MASTERS"
+
+cat >> "$OUTPUT" <<'PRIMARY_HEADER'
+    k8s_primary_master:
+      hosts:
+PRIMARY_HEADER
+
+if [ -n "$PRIMARY_MASTER_ID" ]; then
+  echo "        ${PRIMARY_MASTER_ID}:" >> "$OUTPUT"
+  echo "          ansible_aws_ssm_instance_id: ${PRIMARY_MASTER_ID}" >> "$OUTPUT"
+  echo "          private_ip: ${PRIMARY_MASTER_IP}" >> "$OUTPUT"
+  echo "          primary_master: true" >> "$OUTPUT"
+fi
 
 cat >> "$OUTPUT" <<'WORKERS_HEADER'
     k8s_workers:

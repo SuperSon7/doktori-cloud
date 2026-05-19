@@ -2,7 +2,7 @@
 # K8s Post-Bootstrap Playbook
 #
 # Usage:
-#   # 전체 실행 (마스터에서)
+#   # 전체 실행 (k8s_primary_master 1대에서 post-bootstrap 실행)
 #   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml
 #
 #   # 특정 단계만
@@ -15,18 +15,65 @@
 #
 #   # ArgoCD Git 정보 전달
 #   ansible-playbook -i inventory/k8s-hosts.yml k8s-site.yml --tags argocd \
-#     -e git_repo_url=https://github.com/100-hours-a-week/5-team-service-cloud.git \
+#     -e git_repo_url=https://github.com/SuperSon7/doktori-cloud.git \
 #     -e git_username=SuperSon7 \
 #     -e git_pat=ghp_xxxxx
 # =============================================================================
 
-# --- Master: workloads + observability + argocd ---
-- name: K8s Post-Bootstrap (master)
-  hosts: k8s_master
-  become: false
-  roles:
-    - role: k8s-post-bootstrap
+# --- Primary master: workloads + observability + argocd ---
+- name: K8s Post-Bootstrap (primary master)
+  hosts: k8s_primary_master
+  become: true
+  vars_files:
+    - roles/k8s-post-bootstrap/defaults/main.yml
+  tasks:
+    - name: Verify cluster is ready
+      command: kubectl get nodes --no-headers
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: nodes_result
+      changed_when: false
+      failed_when: "'NotReady' in nodes_result.stdout"
       tags: [workloads, observability, argocd]
+
+    - name: Show cluster nodes
+      debug:
+        msg: "{{ nodes_result.stdout_lines }}"
+      tags: [workloads, observability, argocd]
+
+    - name: Upload k8s assets to primary master
+      copy:
+        src: ../k8s/
+        dest: "{{ k8s_scripts_dir }}/"
+        owner: ubuntu
+        group: ubuntu
+        mode: preserve
+        directory_mode: "0755"
+      tags: [workloads, observability, argocd]
+
+    - name: Deploy workloads
+      include_role:
+        name: k8s-post-bootstrap
+        tasks_from: workloads
+        apply:
+          tags: workloads
+      tags: [workloads]
+
+    - name: Install observability
+      include_role:
+        name: k8s-post-bootstrap
+        tasks_from: observability
+        apply:
+          tags: observability
+      tags: [observability]
+
+    - name: Install and configure ArgoCD
+      include_role:
+        name: k8s-post-bootstrap
+        tasks_from: argocd
+        apply:
+          tags: argocd
+      tags: [argocd]
 
 # --- All nodes: kubelet hardening ---
 - name: K8s Security Hardening (all nodes)
@@ -37,4 +84,6 @@
       include_role:
         name: k8s-post-bootstrap
         tasks_from: hardening
+        apply:
+          tags: hardening
       tags: [hardening]

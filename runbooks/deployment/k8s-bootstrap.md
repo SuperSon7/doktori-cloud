@@ -38,7 +38,7 @@ Terraform apply 후 prod K8s 클러스터(Master 3 + Worker 4, 3AZ HA)를 부트
 
    ```bash
    git clone --depth 1 --filter=blob:none --sparse \
-     https://github.com/100-hours-a-week/5-team-service-cloud.git k8s
+     https://github.com/SuperSon7/doktori-cloud.git k8s
    cd k8s
    git sparse-checkout set k8s
    cd k8s
@@ -187,7 +187,7 @@ Worker 노드는 user_data 자동 join을 사용한다. 수동 join이 필요한
    ```
 
    인터랙티브 프롬프트:
-   - Git 저장소 URL: `https://github.com/100-hours-a-week/5-team-service-cloud.git`
+   - Git 저장소 URL: `https://github.com/SuperSon7/doktori-cloud.git`
    - Git Username: GitHub 계정명
    - Git PAT: repo 스코프 Classic PAT
 

@@ -19,6 +19,7 @@ loki_port: "3100"
 metrics_server_version: "3.12.2"
 kube_state_metrics_version: "5.28.1"
 argocd_chart_version: "8.0.14"
+external_secrets_chart_version: "2.2.0"
 
 # --- 컨테이너 이미지 ---
 alloy_version: "v1.14.1"
@@ -33,7 +34,7 @@ argocd_nodeport: 31443
 
 # --- 스크립트 경로 (마스터 노드) ---
 k8s_scripts_dir: /home/ubuntu/k8s
-kubeconfig_path: /home/ubuntu/.kube/config
+kubeconfig_path: /etc/kubernetes/admin.conf
 
 # --- 워크로드 이미지 태그 (실행 시 --extra-vars로 지정) ---
 api_image_tag: "latest"

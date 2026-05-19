@@ -1,0 +1,103 @@
+# =============================================================================
+# ArgoCD Bootstrap Playbook
+#
+# Ansible is responsible only for bootstrapping ArgoCD. After this, ArgoCD owns
+# workloads, monitoring, HPA, security, and ExternalSecret custom resources.
+#
+# Usage:
+#   read -rsp "GitHub PAT: " GIT_PAT; echo
+#   ansible-playbook -i inventory/k8s-hosts.yml bootstrap-argocd.yml \
+#     -e git_repo_url=https://github.com/SuperSon7/doktori-cloud.git \
+#     -e git_username=SuperSon7 \
+#     -e git_pat="$GIT_PAT"
+#   unset GIT_PAT
+# =============================================================================
+
+- name: Bootstrap ArgoCD (primary master)
+  hosts: k8s_primary_master
+  become: true
+  vars_files:
+    - roles/k8s-post-bootstrap/defaults/main.yml
+  vars:
+    cloud_repo_dir: /home/ubuntu/doktori-cloud
+    cloud_repo_branch: main
+    k8s_scripts_dir: "{{ cloud_repo_dir }}/k8s"
+  tasks:
+    - name: Verify cluster is ready
+      command: kubectl get nodes --no-headers
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: nodes_result
+      changed_when: false
+      failed_when: "'NotReady' in nodes_result.stdout"
+
+    - name: Show cluster nodes
+      debug:
+        msg: "{{ nodes_result.stdout_lines }}"
+
+    - name: Ensure git is installed
+      package:
+        name: git
+        state: present
+
+    - name: Remove invalid existing cloud repo checkout
+      shell: |
+        set -euo pipefail
+
+        REPO_DIR="{{ cloud_repo_dir }}"
+        if [ -e "${REPO_DIR}" ] && [ ! -d "${REPO_DIR}/.git" ]; then
+          rm -rf "${REPO_DIR}"
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Check existing cloud repo checkout
+      stat:
+        path: "{{ cloud_repo_dir }}/.git"
+      register: cloud_repo_git_dir
+
+    - name: Clone cloud repo with sparse checkout
+      shell: |
+        set -euo pipefail
+
+        sudo -u ubuntu git clone \
+          --depth 1 \
+          --filter=blob:none \
+          --sparse \
+          --branch "{{ cloud_repo_branch }}" \
+          "{{ git_repo_url }}" \
+          "{{ cloud_repo_dir }}"
+      args:
+        executable: /bin/bash
+      when:
+        - git_repo_url | length > 0
+        - not cloud_repo_git_dir.stat.exists
+
+    - name: Update existing cloud repo checkout
+      shell: |
+        set -euo pipefail
+
+        sudo -u ubuntu git -C "{{ cloud_repo_dir }}" remote set-url origin "{{ git_repo_url }}"
+        sudo -u ubuntu git -C "{{ cloud_repo_dir }}" fetch --depth 1 origin "{{ cloud_repo_branch }}"
+        sudo -u ubuntu git -C "{{ cloud_repo_dir }}" checkout -f FETCH_HEAD
+      args:
+        executable: /bin/bash
+      when:
+        - git_repo_url | length > 0
+        - cloud_repo_git_dir.stat.exists
+
+    - name: Configure sparse checkout for k8s assets
+      shell: |
+        set -euo pipefail
+
+        sudo -u ubuntu git -C "{{ cloud_repo_dir }}" sparse-checkout set k8s
+        sudo -u ubuntu git -C "{{ cloud_repo_dir }}" remote set-url origin "{{ git_repo_url }}"
+        test -f "{{ k8s_scripts_dir }}/manifests/argocd/root-app.yaml"
+        test -f "{{ k8s_scripts_dir }}/helm/argocd-values.yaml"
+      args:
+        executable: /bin/bash
+
+    - name: Install and configure ArgoCD
+      include_role:
+        name: k8s-post-bootstrap
+        tasks_from: argocd

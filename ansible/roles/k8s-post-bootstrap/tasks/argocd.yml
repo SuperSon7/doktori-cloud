@@ -2,8 +2,45 @@
 # ArgoCD — install-argocd.sh + setup-argocd.sh 대응
 # =============================================================================
 
+- name: Ensure namespaces required by ArgoCD-managed manifests exist
+  command: kubectl create namespace {{ item }}
+  loop:
+    - "{{ k8s_namespace }}"
+    - monitoring
+    - external-secrets
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: namespace_create
+  changed_when: "'created' in namespace_create.stdout"
+  failed_when: false
+
 - name: Apply NetworkPolicy
   command: kubectl apply -f {{ k8s_scripts_dir }}/manifests/security/netpol-all.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Add External Secrets Helm repo
+  shell: |
+    helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+    helm repo update external-secrets
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+
+- name: Install External Secrets Operator
+  shell: |
+    if helm status external-secrets -n external-secrets &>/dev/null; then
+      helm upgrade external-secrets external-secrets/external-secrets \
+        --namespace external-secrets \
+        --version {{ external_secrets_chart_version }} \
+        --set installCRDs=true
+    else
+      helm install external-secrets external-secrets/external-secrets \
+        --namespace external-secrets \
+        --create-namespace \
+        --version {{ external_secrets_chart_version }} \
+        --set installCRDs=true
+    fi
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 
@@ -58,9 +95,8 @@
 
 - name: Deploy ArgoCD Applications
   shell: |
-    for f in {{ k8s_scripts_dir }}/manifests/argocd/application-*.yaml; do
-      sed "s|__GIT_REPO_URL__|{{ git_repo_url }}|g" "$f" | kubectl apply -f -
-    done
+    sed "s|__GIT_REPO_URL__|{{ git_repo_url }}|g" \
+      {{ k8s_scripts_dir }}/manifests/argocd/root-app.yaml | kubectl apply -f -
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   when: git_repo_url | length > 0

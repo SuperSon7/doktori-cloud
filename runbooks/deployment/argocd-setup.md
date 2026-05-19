@@ -21,7 +21,7 @@ ArgoCD 설치 후 Git 저장소 연결, Application 배포, UI 접근 방법.
    ```
 
    프롬프트에 다음을 입력:
-   - Git 저장소 URL: `https://github.com/100-hours-a-week/5-team-service-cloud.git`
+   - Git 저장소 URL: `https://github.com/SuperSon7/doktori-cloud.git`
    - Git Username: GitHub 계정명
    - Git PAT: Classic PAT (repo 스코프)
    - 새 비밀번호: 원하는 admin 비밀번호 (빈 값이면 건너뜀)
@@ -103,8 +103,8 @@ ArgoCD는 Git 레포의 **특정 폴더만** 감시한다:
 
 향후 자동화 (CI 이미지 태그 업데이트):
 
-1. BE팀 코드 push → CI 빌드 → ECR에 `prod-backend-api:<git-sha>` push
-2. CI가 `chat-deployment.yaml`의 image 태그를 `<git-sha>`로 업데이트 → 자동 commit
+1. BE팀 코드 push → CI 빌드 → ECR에 `backend-api:prod-<git-sha>` push
+2. CI가 backend workload manifest의 image 태그를 `prod-<git-sha>`로 업데이트 → 자동 commit
 3. ArgoCD auto-sync → 배포 완료
 
 ## Verify
