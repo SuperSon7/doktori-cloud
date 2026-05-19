@@ -1,0 +1,14 @@
+# ── IAM (SSM 접속용) ────────────────────────────────────────────────────────
+
+resource "aws_iam_role" "k6_runner" {
+  name = "${var.project_name}-loadtest-k6-runner"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}

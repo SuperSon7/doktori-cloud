@@ -23,7 +23,13 @@ variable "runner_count" {
 variable "instance_type" {
   description = "EC2 instance type for k6 runners"
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.medium"
+}
+
+variable "runner_ami_id" {
+  description = "Prebaked loadtest runner AMI ID. 비어 있으면 Canonical Ubuntu로 fallback"
+  type        = string
+  default     = ""
 }
 
 variable "root_volume_size" {
