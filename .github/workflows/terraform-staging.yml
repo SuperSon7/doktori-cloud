@@ -70,6 +70,7 @@ jobs:
           terraform init -backend-config=../../../backend.hcl
           terraform plan -out=tfplan
           terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
 
       - name: Notify Discord
         if: always()
@@ -113,6 +114,7 @@ jobs:
           terraform init -backend-config=../../../backend.hcl
           terraform plan -out=tfplan
           terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
 
       - name: Notify Discord
         if: always()
@@ -350,6 +352,7 @@ jobs:
           fi
           terraform plan $VARFILE -out=tfplan
           terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
 
       - name: Notify Discord
         if: always()

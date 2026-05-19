@@ -13,9 +13,7 @@ on:
     # Drift 감지 — 매일 09:00 KST (00:00 UTC)
     - cron: '0 0 * * *'
 
-concurrency:
-  group: terraform-${{ github.event_name }}-${{ github.ref_name }}
-  cancel-in-progress: false
+# concurrency는 각 job 레벨에서 state key 기준으로 설정한다
 
 permissions:
   contents: read
@@ -25,6 +23,7 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   TF_VERSION: "1.14.8"
+  APPLY_DISABLED: "true"  # TEMPORARY: 대량 변경 검증 완료 후 제거
 
 jobs:
   # -------------------------------------------------------
@@ -58,7 +57,7 @@ jobs:
           ENV_LAYERS=()
           CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
 
-          for layer in dev/base dev/app staging/base staging/app staging/data prod/base prod/app prod/data; do
+          for layer in dev/base dev/data dev/app staging/base staging/data staging/app staging/loadtest prod/base prod/data prod/app prod/cdn loadtest; do
             LAYER_DIR="terraform/environments/${layer}"
             [ -d "$LAYER_DIR" ] || continue
 
@@ -104,6 +103,56 @@ jobs:
 
           echo "Env layers: ${ENV_LAYERS[*]:-none}"
           echo "Shared layers: ${SHARED_LAYERS[*]:-none}"
+
+  # -------------------------------------------------------
+  # Format check (on PR)
+  # -------------------------------------------------------
+  fmt:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive terraform/
+
+  # -------------------------------------------------------
+  # Validate — changed layers (on PR)
+  # -------------------------------------------------------
+  validate:
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && (needs.detect-changes.outputs.env-matrix != '{"layer":[]}' || needs.detect-changes.outputs.shared-matrix != '{"layer":[]}')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Validate env layers
+        if: needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+        run: |
+          echo '${{ needs.detect-changes.outputs.env-matrix }}' | jq -r '.layer[]' | while read layer; do
+            echo "=== Validating environments/${layer} ==="
+            terraform -chdir="terraform/environments/${layer}" init -backend=false
+            terraform -chdir="terraform/environments/${layer}" validate
+          done
+
+      - name: Validate shared layers
+        if: needs.detect-changes.outputs.shared-matrix != '{"layer":[]}'
+        run: |
+          echo '${{ needs.detect-changes.outputs.shared-matrix }}' | jq -r '.layer[]' | while read layer; do
+            echo "=== Validating ${layer} ==="
+            terraform -chdir="terraform/${layer}" init -backend=false
+            terraform -chdir="terraform/${layer}" validate
+          done
 
   # -------------------------------------------------------
   # Security scan (on PR)
@@ -333,16 +382,16 @@ jobs:
             --behavior=update
 
   # -------------------------------------------------------
-  # Apply — shared layers (on merge, before env layers)
+  # Apply — global (on merge)
   # -------------------------------------------------------
-  apply-shared:
+  apply-global:
     needs: detect-changes
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.shared-matrix != '{"layer":[]}'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true'
     runs-on: ubuntu-latest
-    environment: terraform-apply
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.detect-changes.outputs.shared-matrix) }}
+    environment: terraform-shared
+    concurrency:
+      group: terraform-global
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -359,73 +408,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform Init
-        working-directory: terraform/${{ matrix.layer }}
-        run: terraform init -backend-config=../backend.hcl
-
-      - name: Terraform Plan
-        id: plan
-        working-directory: terraform/${{ matrix.layer }}
-        run: |
-          set +e
-          terraform plan -detailed-exitcode -out=tfplan
-          EXITCODE=$?
-          set -e
-          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
-          if [ $EXITCODE -eq 1 ]; then
-            echo "::error::Terraform plan failed"
-            exit 1
-          fi
-          if [ $EXITCODE -eq 2 ]; then
-            if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
-              echo "::error::Plan contains resource destruction — aborting"
-              exit 1
-            fi
-          fi
-
-      - name: Terraform Apply
-        if: steps.plan.outputs.exitcode == '2'
-        working-directory: terraform/${{ matrix.layer }}
-        run: terraform apply tfplan
-
-      - name: Notify Discord
-        if: always()
-        run: |
-          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
-          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
-          curl -sfS -o /dev/null -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }} (shared)\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
-
-  # -------------------------------------------------------
-  # Apply — base layers (on merge, after shared)
-  # -------------------------------------------------------
-  apply-base:
-    needs: [detect-changes, apply-shared]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
-    runs-on: ubuntu-latest
-    environment: terraform-apply
-    strategy:
-      fail-fast: false
-      matrix:
-        layer: [dev/base, staging/base, prod/base]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Check if layer changed
+      - name: Check if changed
         id: check
         run: |
           MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
@@ -434,50 +417,108 @@ jobs:
           else
             CHANGED=$(git diff --name-only HEAD~1)
           fi
-          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
-          LAYER_DIR="terraform/environments/${{ matrix.layer }}"
-
-          SHOULD_APPLY=false
-          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
-            SHOULD_APPLY=true
-          fi
-          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
-            for mod in $CHANGED_MODULES; do
-              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
-                SHOULD_APPLY=true
-                break
-              fi
-            done
-          fi
-          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+          echo "should_apply=$(echo "$CHANGED" | grep -q '^terraform/global/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Terraform Init
         if: steps.check.outputs.should_apply == 'true'
-        working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform init -backend-config=../../../backend.hcl
+        working-directory: terraform/global
+        run: terraform init -backend-config=../backend.hcl
 
-      - name: Terraform Plan
-        id: plan
+      - name: Terraform Plan & Apply
         if: steps.check.outputs.should_apply == 'true'
-        working-directory: terraform/environments/${{ matrix.layer }}
+        working-directory: terraform/global
         run: |
           set +e
           terraform plan -detailed-exitcode -out=tfplan
           EXITCODE=$?
           set -e
-          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
           if [ $EXITCODE -eq 1 ]; then exit 1; fi
           if [ $EXITCODE -eq 2 ]; then
-            if terraform show -no-color tfplan | grep -q 'will be destroyed'; then
-              echo "::error::Plan contains resource destruction — aborting"
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
               exit 1
             fi
+            terraform apply tfplan
+            bash ../scripts/assert-clean-plan.sh
           fi
 
-      - name: Terraform Apply
-        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
-        working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform apply tfplan
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: global\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — ecr + dns_zone (on merge, after global)
+  # -------------------------------------------------------
+  apply-shared:
+    needs: [detect-changes, apply-global]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true'
+    runs-on: ubuntu-latest
+    environment: terraform-shared
+    concurrency:
+      group: terraform-${{ matrix.layer }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: ecr
+            dir: terraform/ecr
+          - layer: dns_zone
+            dir: terraform/dns_zone
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          echo "should_apply=$(echo "$CHANGED" | grep -q '^${{ matrix.dir }}/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: terraform init -backend-config=../backend.hcl
+
+      - name: Terraform Plan & Apply
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+            terraform apply tfplan
+            bash ../scripts/assert-clean-plan.sh
+          fi
 
       - name: Notify Discord
         if: always() && steps.check.outputs.should_apply == 'true'
@@ -489,17 +530,230 @@ jobs:
             "${{ secrets.DISCORD_WEBHOOK_URL }}"
 
   # -------------------------------------------------------
-  # Apply — app/data layers (on merge, after base)
+  # Apply — monitoring/base (on merge, after ecr/dns_zone)
   # -------------------------------------------------------
-  apply-app:
-    needs: [detect-changes, apply-base]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+  apply-monitoring-base:
+    needs: [detect-changes, apply-shared]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true'
     runs-on: ubuntu-latest
-    environment: terraform-apply
+    environment: terraform-shared
+    concurrency:
+      group: terraform-monitoring-base
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          echo "should_apply=$(echo "$CHANGED" | grep -q '^terraform/monitoring/base/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/base
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan & Apply
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/base
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+            terraform apply tfplan
+            bash ../../scripts/assert-clean-plan.sh
+          fi
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: monitoring/base\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — monitoring/data (on merge, after monitoring/base)
+  # -------------------------------------------------------
+  apply-monitoring-data:
+    needs: [detect-changes, apply-monitoring-base]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true'
+    runs-on: ubuntu-latest
+    environment: terraform-shared
+    concurrency:
+      group: terraform-monitoring-data
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          echo "should_apply=$(echo "$CHANGED" | grep -q '^terraform/monitoring/data/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/data
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan & Apply
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/data
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+            terraform apply tfplan
+            bash ../../scripts/assert-clean-plan.sh
+          fi
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: monitoring/data\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — monitoring/app (on merge, after monitoring/data)
+  # -------------------------------------------------------
+  apply-monitoring-app:
+    needs: [detect-changes, apply-monitoring-data]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true'
+    runs-on: ubuntu-latest
+    environment: terraform-shared
+    concurrency:
+      group: terraform-monitoring-app
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          echo "should_apply=$(echo "$CHANGED" | grep -q '^terraform/monitoring/app/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/app
+        run: terraform init -backend-config=../../backend.hcl
+
+      - name: Terraform Plan & Apply
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/monitoring/app
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+            terraform apply tfplan
+            bash ../../scripts/assert-clean-plan.sh
+          fi
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: monitoring/app\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — base layers (on merge, after monitoring)
+  # -------------------------------------------------------
+  apply-base:
+    needs: [detect-changes, apply-monitoring-app]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-dev
+    concurrency:
+      group: terraform-${{ matrix.layer }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
-        layer: [dev/app, dev/data, staging/app, staging/data, prod/app, prod/data]
+        layer: [dev/base, staging/base]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -568,7 +822,477 @@ jobs:
       - name: Terraform Apply
         if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
         working-directory: terraform/environments/${{ matrix.layer }}
-        run: terraform apply tfplan
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }}\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — prod/base (on merge, after monitoring, prod environment)
+  # -------------------------------------------------------
+  apply-prod-base:
+    needs: [detect-changes, apply-monitoring-app]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-prod
+    concurrency:
+      group: terraform-prod/base
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
+          LAYER_DIR="terraform/environments/prod/base"
+
+          SHOULD_APPLY=false
+          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
+            SHOULD_APPLY=true
+          fi
+          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
+            for mod in $CHANGED_MODULES; do
+              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/base
+        run: terraform init -backend-config=../../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/base
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/prod/base
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: prod/base\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — data layers (on merge, after base)
+  # -------------------------------------------------------
+  apply-data:
+    needs: [detect-changes, apply-base]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-dev
+    concurrency:
+      group: terraform-${{ matrix.layer }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        layer: [dev/data, staging/data]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
+          LAYER_DIR="terraform/environments/${{ matrix.layer }}"
+
+          SHOULD_APPLY=false
+          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
+            SHOULD_APPLY=true
+          fi
+          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
+            for mod in $CHANGED_MODULES; do
+              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: ${{ matrix.layer }}\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — prod/data (on merge, after prod/base)
+  # -------------------------------------------------------
+  apply-prod-data:
+    needs: [detect-changes, apply-prod-base]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-prod
+    concurrency:
+      group: terraform-prod/data
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
+          LAYER_DIR="terraform/environments/prod/data"
+
+          SHOULD_APPLY=false
+          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
+            SHOULD_APPLY=true
+          fi
+          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
+            for mod in $CHANGED_MODULES; do
+              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/data
+        run: terraform init -backend-config=../../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/data
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/prod/data
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: prod/data\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — prod/app (on merge, after prod/data)
+  # -------------------------------------------------------
+  apply-prod-app:
+    needs: [detect-changes, apply-prod-data]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-prod
+    concurrency:
+      group: terraform-prod/app
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
+          LAYER_DIR="terraform/environments/prod/app"
+
+          SHOULD_APPLY=false
+          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
+            SHOULD_APPLY=true
+          fi
+          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
+            for mod in $CHANGED_MODULES; do
+              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/app
+        run: terraform init -backend-config=../../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/prod/app
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/prod/app
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
+
+      - name: Notify Discord
+        if: always() && steps.check.outputs.should_apply == 'true'
+        run: |
+          STATUS="${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"
+          COLOR="${{ job.status == 'success' && '3066993' || '15158332' }}"
+          curl -sfS -o /dev/null -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Terraform ${STATUS}: prod/app\",\"description\":\"by ${{ github.actor }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+  # -------------------------------------------------------
+  # Apply — app layers (dev/staging, on merge, after data)
+  # -------------------------------------------------------
+  apply-app:
+    needs: [detect-changes, apply-data]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.APPLY_DISABLED != 'true' && needs.detect-changes.outputs.env-matrix != '{"layer":[]}'
+    runs-on: ubuntu-latest
+    environment: terraform-dev
+    concurrency:
+      group: terraform-${{ matrix.layer }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        layer: [dev/app, staging/app]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if layer changed
+        id: check
+        run: |
+          MERGE_BASE=$(git log --merges -1 --format='%H' 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            CHANGED=$(git diff --name-only "${MERGE_BASE}^1"..."${MERGE_BASE}")
+          else
+            CHANGED=$(git diff --name-only HEAD~1)
+          fi
+          CHANGED_MODULES=$(echo "$CHANGED" | grep '^terraform/modules/' | cut -d'/' -f3 | sort -u)
+          LAYER_DIR="terraform/environments/${{ matrix.layer }}"
+
+          SHOULD_APPLY=false
+          if echo "$CHANGED" | grep -q "^${LAYER_DIR}/"; then
+            SHOULD_APPLY=true
+          fi
+          if [ "$SHOULD_APPLY" = "false" ] && [ -n "$CHANGED_MODULES" ]; then
+            for mod in $CHANGED_MODULES; do
+              if grep -rq "modules/${mod}" "$LAYER_DIR"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+          echo "should_apply=${SHOULD_APPLY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Init
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: terraform init -backend-config=../../../backend.hcl
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.check.outputs.should_apply == 'true'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXITCODE=$?
+          set -e
+          echo "exitcode=${EXITCODE}" >> "$GITHUB_OUTPUT"
+          if [ $EXITCODE -eq 1 ]; then exit 1; fi
+          if [ $EXITCODE -eq 2 ]; then
+            if terraform show -json tfplan | jq -e '.resource_changes[] | select(.change.actions | index("delete"))' > /dev/null 2>&1; then
+              echo "::error::Plan contains resource deletion/replacement — aborting"
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.check.outputs.should_apply == 'true' && steps.plan.outputs.exitcode == '2'
+        working-directory: terraform/environments/${{ matrix.layer }}
+        run: |
+          terraform apply tfplan
+          bash ../../../scripts/assert-clean-plan.sh
 
       - name: Notify Discord
         if: always() && steps.check.outputs.should_apply == 'true'
@@ -589,18 +1313,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - layer: dev/base
-            dir: terraform/environments/dev/base
-            backend: ../../../backend.hcl
-          - layer: dev/app
-            dir: terraform/environments/dev/app
-            backend: ../../../backend.hcl
-          - layer: prod/base
-            dir: terraform/environments/prod/base
-            backend: ../../../backend.hcl
-          - layer: prod/app
-            dir: terraform/environments/prod/app
-            backend: ../../../backend.hcl
+          - layer: global
+            dir: terraform/global
+            backend: ../backend.hcl
+          - layer: ecr
+            dir: terraform/ecr
+            backend: ../backend.hcl
+          - layer: dns_zone
+            dir: terraform/dns_zone
+            backend: ../backend.hcl
           - layer: monitoring/base
             dir: terraform/monitoring/base
             backend: ../../backend.hcl
@@ -610,6 +1331,39 @@ jobs:
           - layer: monitoring/app
             dir: terraform/monitoring/app
             backend: ../../backend.hcl
+          - layer: dev/base
+            dir: terraform/environments/dev/base
+            backend: ../../../backend.hcl
+          - layer: dev/data
+            dir: terraform/environments/dev/data
+            backend: ../../../backend.hcl
+          - layer: dev/app
+            dir: terraform/environments/dev/app
+            backend: ../../../backend.hcl
+          - layer: staging/base
+            dir: terraform/environments/staging/base
+            backend: ../../../backend.hcl
+          - layer: staging/data
+            dir: terraform/environments/staging/data
+            backend: ../../../backend.hcl
+          - layer: staging/app
+            dir: terraform/environments/staging/app
+            backend: ../../../backend.hcl
+          - layer: staging/loadtest
+            dir: terraform/environments/staging/loadtest
+            backend: ../../../backend.hcl
+          - layer: prod/base
+            dir: terraform/environments/prod/base
+            backend: ../../../backend.hcl
+          - layer: prod/data
+            dir: terraform/environments/prod/data
+            backend: ../../../backend.hcl
+          - layer: prod/app
+            dir: terraform/environments/prod/app
+            backend: ../../../backend.hcl
+          - layer: prod/cdn
+            dir: terraform/environments/prod/cdn
+            backend: ../../../backend.hcl
     steps:
       - uses: actions/checkout@v4
 
