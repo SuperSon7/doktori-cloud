@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# MongoDB node bootstrap for self-managed data layer monitoring.
+set -euo pipefail
+
+log() { echo "[mongodb] $*"; }
+
+PROJECT_NAME="${project_name}"
+ENVIRONMENT="${environment}"
+AWS_REGION="${aws_region}"
+NODE_NAME="${node_name}"
+
+ssm_get() {
+  local name="$1"
+  local path="/$PROJECT_NAME/$ENVIRONMENT/$name"
+  local attempt
+  for attempt in $(seq 1 30); do
+    if aws ssm get-parameter \
+      --region "$AWS_REGION" \
+      --cli-connect-timeout 5 \
+      --cli-read-timeout 15 \
+      --name "$path" \
+      --with-decryption \
+      --query 'Parameter.Value' \
+      --output text; then
+      return 0
+    fi
+    log "SSM get-parameter retry $attempt/30 for $path"
+    sleep 3
+  done
+  log "Failed to fetch SSM parameter: $path"
+  return 1
+}
+
+js_quote() {
+  printf '%s' "$1" | jq -Rs .
+}
+
+urlencode() {
+  python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+}
+
+hostnamectl set-hostname "$NODE_NAME"
+
+TOKEN="$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+LOCAL_IPV4="$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/local-ipv4")"
+if ! grep -q " $NODE_NAME" /etc/hosts; then
+  echo "$LOCAL_IPV4 $NODE_NAME" >>/etc/hosts
+fi
+
+MONGO_ADMIN_USERNAME="$(ssm_get MONGO_ADMIN_USERNAME)"
+MONGO_ADMIN_PASSWORD="$(ssm_get MONGO_ADMIN_PASSWORD)"
+MONGO_USERNAME="$(ssm_get MONGO_USERNAME)"
+MONGO_PASSWORD="$(ssm_get MONGO_PASSWORD)"
+
+systemctl enable mongod
+systemctl restart mongod
+
+for _ in $(seq 1 60); do
+  if mongosh --quiet --host 127.0.0.1 --port 27017 --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    break
+  fi
+  if mongosh --quiet --host 127.0.0.1 --port 27017 \
+      --username "$MONGO_ADMIN_USERNAME" \
+      --password "$MONGO_ADMIN_PASSWORD" \
+      --authenticationDatabase admin \
+      --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+INIT_ADMIN_JS="$(mktemp /run/mongo-init-admin.XXXXXX.js)"
+INIT_APP_JS="$(mktemp /run/mongo-init-app.XXXXXX.js)"
+trap 'rm -f "$INIT_ADMIN_JS" "$INIT_APP_JS"' EXIT
+chmod 0600 "$INIT_ADMIN_JS" "$INIT_APP_JS"
+
+ADMIN_USER_JSON="$(js_quote "$MONGO_ADMIN_USERNAME")"
+ADMIN_PASS_JSON="$(js_quote "$MONGO_ADMIN_PASSWORD")"
+APP_USER_JSON="$(js_quote "$MONGO_USERNAME")"
+APP_PASS_JSON="$(js_quote "$MONGO_PASSWORD")"
+
+if ! mongosh --quiet --host 127.0.0.1 --port 27017 \
+    --username "$MONGO_ADMIN_USERNAME" \
+    --password "$MONGO_ADMIN_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+  cat >"$INIT_ADMIN_JS" <<JS
+const adminDb = db.getSiblingDB("admin");
+const adminUser = $ADMIN_USER_JSON;
+const adminPassword = $ADMIN_PASS_JSON;
+
+if (adminDb.getUser(adminUser) === null) {
+  adminDb.createUser({
+    user: adminUser,
+    pwd: adminPassword,
+    roles: [
+      { role: "userAdminAnyDatabase", db: "admin" },
+      { role: "dbAdminAnyDatabase", db: "admin" },
+      { role: "clusterMonitor", db: "admin" }
+    ]
+  });
+}
+JS
+
+  log "Creating MongoDB admin user from SSM parameters"
+  mongosh --quiet --host 127.0.0.1 --port 27017 "$INIT_ADMIN_JS"
+fi
+
+cat >"$INIT_APP_JS" <<JS
+const adminDb = db.getSiblingDB("admin");
+
+function upsertAppUser(username, password, dbName) {
+  const roles = [{ role: "readWrite", db: dbName }];
+  if (adminDb.getUser(username) === null) {
+    adminDb.createUser({ user: username, pwd: password, roles });
+  } else {
+    adminDb.updateUser(username, { pwd: password, roles });
+  }
+}
+
+function ensureCollection(database, collectionName) {
+  if (!database.getCollectionNames().includes(collectionName)) {
+    database.createCollection(collectionName);
+  }
+}
+
+upsertAppUser($APP_USER_JSON, $APP_PASS_JSON, "doktoridb");
+
+const appDb = db.getSiblingDB("doktoridb");
+ensureCollection(appDb, "user_behavior_logs");
+appDb.user_behavior_logs.createIndex({ userId: 1, sentAt: -1 }, { name: "idx_user_sent_at" });
+appDb.user_behavior_logs.createIndex({ sessionId: 1, sentAt: -1 }, { name: "idx_session_sent_at" });
+appDb.user_behavior_logs.createIndex({ meetingId: 1, sentAt: -1 }, { name: "idx_meeting_sent_at" });
+
+ensureCollection(appDb, "messages");
+appDb.messages.createIndex({ roomId: 1, senderId: 1, clientMessageId: 1 }, { name: "uk_room_sender_client", unique: true });
+appDb.messages.createIndex({ roomId: 1 }, { name: "idx_room_id" });
+appDb.messages.createIndex({ roundId: 1 }, { name: "idx_round_id" });
+JS
+
+log "Ensuring MongoDB app users, collections, and indexes"
+mongosh --quiet --host 127.0.0.1 --port 27017 \
+  --username "$MONGO_ADMIN_USERNAME" \
+  --password "$MONGO_ADMIN_PASSWORD" \
+  --authenticationDatabase admin \
+  "$INIT_APP_JS"
+
+EXPORTER_USER="$(urlencode "$MONGO_ADMIN_USERNAME")"
+EXPORTER_PASS="$(urlencode "$MONGO_ADMIN_PASSWORD")"
+
+install -m 0750 -o root -g alloy -d /etc/alloy
+cat >/etc/alloy/config.alloy <<EOF
+prometheus.exporter.unix "host" {
+  set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
+}
+
+prometheus.exporter.mongodb "mongodb" {
+  mongodb_uri    = "mongodb://$EXPORTER_USER:$EXPORTER_PASS@127.0.0.1:27017/admin?authSource=admin"
+  direct_connect = true
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "30s"
+}
+
+prometheus.scrape "mongodb_metrics" {
+  targets         = prometheus.exporter.mongodb.mongodb.targets
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "15s"
+}
+
+prometheus.relabel "data_common" {
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+  rule {
+    replacement  = "${environment}"
+    target_label = "env"
+  }
+  rule {
+    replacement  = "mongodb"
+    target_label = "service"
+  }
+  rule {
+    replacement  = "$NODE_NAME"
+    target_label = "instance"
+  }
+}
+
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+  }
+}
+EOF
+
+chown root:alloy /etc/alloy/config.alloy
+chmod 0640 /etc/alloy/config.alloy
+systemctl enable alloy
+systemctl restart alloy
+
+log "MongoDB bootstrap complete for $NODE_NAME"

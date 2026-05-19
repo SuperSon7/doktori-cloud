@@ -1,0 +1,403 @@
+#!/usr/bin/env bash
+# =============================================================================
+# K8s Master Node — legacy user_data (ASG boot script)
+#
+# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
+# 이 스크립트는 동적 설정만 수행:
+#   - 첫 번째 마스터: kubeadm init → SSM에 join 정보 저장 → CNI/Helm/NGF 설치
+#   - 추가 마스터: SSM에서 join 정보 조회 → kubeadm join --control-plane
+#
+# TODO(user_data-slim): CNI/Helm/NGF 같은 클러스터 애드온 배포는
+# ArgoCD/Helm/Ansible 단계로 분리하고, user_data는 kubeadm init/join과
+# SSM 기반 조율만 남긴다. 정적 설치는 Packer AMI에 계속 둔다.
+#
+# NLB hairpin 회피:
+#   마스터에서는 /etc/hosts로 control-plane-endpoint를 127.0.0.1로 영구 설정.
+#   kubelet.conf, admin.conf 등 모든 kubeconfig이 자동으로 localhost 사용.
+#   워커는 /etc/hosts 없으므로 NLB로 정상 라우팅 (다른 인스턴스라 hairpin 아님).
+# =============================================================================
+set -euo pipefail
+exec > >(tee /var/log/k8s-master-init.log) 2>&1
+
+# --- 변수 (Terraform templatefile 주입) ---
+REGION="${region}"
+PROJECT="${project_name}"
+ENV="${environment}"
+CONTROL_PLANE_ENDPOINT="${control_plane_endpoint}"
+POD_CIDR="${pod_cidr}"
+SERVICE_CIDR="${service_cidr}"
+CALICO_VERSION="${calico_version}"
+GATEWAY_API_VERSION="${gateway_api_version}"
+NGF_VERSION="${ngf_version}"
+
+SSM_PREFIX="/$${PROJECT}/$${ENV}/k8s"
+LOCK_PARAM="$${SSM_PREFIX}/init-lock"
+JOIN_PARAM="$${SSM_PREFIX}/join-command"
+MASTER_JOIN_PARAM="$${SSM_PREFIX}/master-join-command"
+CERT_KEY_PARAM="$${SSM_PREFIX}/certificate-key"
+
+MASTER_IP=$(hostname -I | awk '{print $1}')
+
+echo "============================================="
+echo " K8s Master Bootstrap"
+echo " IP:       $${MASTER_IP}"
+echo " Endpoint: $${CONTROL_PLANE_ENDPOINT}:6443"
+echo " Pod CIDR: $${POD_CIDR}"
+echo " Svc CIDR: $${SERVICE_CIDR}"
+echo "============================================="
+
+legacy_static_prereqs() {
+  if command -v kubeadm >/dev/null 2>&1 &&
+     command -v kubelet >/dev/null 2>&1 &&
+     command -v kubectl >/dev/null 2>&1 &&
+     command -v containerd >/dev/null 2>&1 &&
+     command -v aws >/dev/null 2>&1 &&
+     command -v helm >/dev/null 2>&1 &&
+     command -v crictl >/dev/null 2>&1 &&
+     command -v nerdctl >/dev/null 2>&1 &&
+     [ -x /usr/local/bin/ecr-credential-provider ]; then
+    echo "[legacy-static] 정적 구성 이미 존재"
+    return
+  fi
+
+  echo "[legacy-static] Ubuntu 기본 AMI용 정적 구성 설치..."
+  export DEBIAN_FRONTEND=noninteractive
+
+  apt-get update
+  apt-get install -y software-properties-common
+  add-apt-repository -y universe || true
+  apt-get update
+  apt-get install -y \
+    apt-transport-https bash-completion ca-certificates chrony conntrack curl dnsutils \
+    ethtool gnupg htop iproute2 iptables jq less logrotate lsof net-tools nfs-common \
+    openssl psmisc rsync socat tcpdump traceroute unzip vim
+
+  swapoff -a
+  sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+  systemctl mask swap.target || true
+
+  cat >/etc/modules-load.d/k8s.conf <<'EOF'
+overlay
+br_netfilter
+EOF
+  modprobe overlay
+  modprobe br_netfilter
+
+  cat >/etc/sysctl.d/k8s.conf <<'EOF'
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+  sysctl --system >/dev/null
+  systemctl enable chrony
+
+  install -d -m 0755 \
+    /etc/containerd /etc/cni/net.d /etc/kubernetes /etc/kubernetes/manifests \
+    /etc/kubernetes/pki /opt/cni/bin /opt/doktori/bin /opt/doktori/logs \
+    /var/lib/containerd /var/lib/kubelet /var/log/containers /var/log/kubernetes \
+    /etc/apt/keyrings
+
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" >/etc/apt/sources.list.d/docker.list
+
+  curl -fsSL "https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /" >/etc/apt/sources.list.d/kubernetes.list
+
+  apt-get update
+  apt-get install -y containerd.io=1.7.25-1 kubelet kubeadm kubectl
+  apt-mark hold containerd.io kubelet kubeadm kubectl
+
+  containerd config default >/etc/containerd/config.toml
+  sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+  sed -i 's|sandbox_image = "registry.k8s.io/pause:3.8"|sandbox_image = "registry.k8s.io/pause:3.10.1"|g' /etc/containerd/config.toml
+  systemctl restart containerd
+  systemctl enable containerd
+
+  curl -fsSL "https://github.com/containernetworking/plugins/releases/download/v1.7.1/cni-plugins-linux-arm64-v1.7.1.tgz" -o /tmp/cni-plugins.tgz
+  tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin
+  rm -f /tmp/cni-plugins.tgz
+
+  curl -fsSL "https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-aws/v1.31.0/linux/arm64/ecr-credential-provider-linux-arm64" -o /usr/local/bin/ecr-credential-provider
+  chmod 0755 /usr/local/bin/ecr-credential-provider
+  cat >/etc/kubernetes/ecr-credential-provider-config.yaml <<'EOF'
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+      - "*.dkr.ecr.*.amazonaws.com.cn"
+      - "*.dkr.ecr-fips.*.amazonaws.com"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+EOF
+  cat >/etc/default/kubelet <<'EOF'
+KUBELET_EXTRA_ARGS="--image-credential-provider-config=/etc/kubernetes/ecr-credential-provider-config.yaml --image-credential-provider-bin-dir=/usr/local/bin"
+EOF
+
+  curl -fsSL "https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-arm64.tar.gz" -o /tmp/crictl.tgz
+  tar -xzf /tmp/crictl.tgz -C /usr/local/bin crictl
+  rm -f /tmp/crictl.tgz
+  cat >/etc/crictl.yaml <<'EOF'
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+debug: false
+pull-image-on-create: false
+EOF
+
+  curl -fsSL "https://github.com/containerd/nerdctl/releases/download/v1.7.7/nerdctl-1.7.7-linux-arm64.tar.gz" -o /tmp/nerdctl.tgz
+  tar -xzf /tmp/nerdctl.tgz -C /usr/local/bin nerdctl
+  rm -f /tmp/nerdctl.tgz
+  chmod 0755 /usr/local/bin/crictl /usr/local/bin/nerdctl
+
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+  (cd /tmp && unzip -qo awscliv2.zip && ./aws/install)
+  rm -rf /tmp/aws /tmp/awscliv2.zip
+
+  if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
+    snap install amazon-ssm-agent --classic
+  fi
+  systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+}
+
+legacy_static_prereqs
+
+# -----------------------------------------------------------------------------
+# /etc/hosts — NLB hairpin 영구 회피
+# 마스터 노드에서 control-plane-endpoint를 localhost로 해석.
+# kubelet, scheduler, controller-manager 모두 이 설정을 따름.
+# -----------------------------------------------------------------------------
+echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+echo "  → /etc/hosts: $${CONTROL_PLANE_ENDPOINT} → 127.0.0.1 (NLB hairpin 회피)"
+
+# -----------------------------------------------------------------------------
+# SSM 헬퍼 함수
+# -----------------------------------------------------------------------------
+ssm_get() {
+  aws ssm get-parameter \
+    --name "$1" \
+    --with-decryption \
+    --query "Parameter.Value" \
+    --output text \
+    --region "$${REGION}" 2>/dev/null
+}
+
+ssm_put() {
+  aws ssm put-parameter \
+    --name "$1" \
+    --value "$2" \
+    --type SecureString \
+    --overwrite \
+    --region "$${REGION}"
+}
+
+# -----------------------------------------------------------------------------
+# 리더 선출 — SSM init-lock 존재 여부로 판단
+# -----------------------------------------------------------------------------
+echo "[1/2] 리더 선출 확인..."
+
+IS_FIRST=false
+if ! ssm_get "$${LOCK_PARAM}" > /dev/null 2>&1; then
+  # init-lock 없음 → 첫 번째 마스터 시도
+  # 경합 방지: PutParameter로 선점 (기존 값 없을 때만 성공)
+  if aws ssm put-parameter \
+    --name "$${LOCK_PARAM}" \
+    --value "$${MASTER_IP}" \
+    --type String \
+    --region "$${REGION}" 2>/dev/null; then
+    IS_FIRST=true
+    echo "  → 이 노드가 첫 번째 마스터 (init 수행)"
+  else
+    echo "  → 다른 노드가 먼저 init-lock 선점"
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# 첫 번째 마스터: kubeadm init
+# -----------------------------------------------------------------------------
+if [ "$${IS_FIRST}" = true ]; then
+  echo "[2/2] kubeadm init..."
+
+  cat >/etc/kubernetes/kubeadm-init.yaml <<EOF
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "$${MASTER_IP}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+controlPlaneEndpoint: "$${CONTROL_PLANE_ENDPOINT}:6443"
+networking:
+  podSubnet: "$${POD_CIDR}"
+  serviceSubnet: "$${SERVICE_CIDR}"
+EOF
+
+  kubeadm init \
+    --config /etc/kubernetes/kubeadm-init.yaml \
+    --upload-certs \
+    2>&1 | tee /tmp/kubeadm-init.log
+
+  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
+  mkdir -p /home/ubuntu/.kube
+  cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+  chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+  # root에서도 kubectl 사용 가능
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+  # join 명령 저장 → SSM
+  WORKER_JOIN=$(kubeadm token create --print-join-command)
+  CERT_KEY=$(kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1)
+
+  ssm_put "$${JOIN_PARAM}" "$${WORKER_JOIN}"
+  ssm_put "$${CERT_KEY_PARAM}" "$${CERT_KEY}"
+  ssm_put "$${MASTER_JOIN_PARAM}" "$${WORKER_JOIN} --control-plane --certificate-key $${CERT_KEY}"
+
+  echo "  → join 정보 SSM 저장 완료"
+
+  # --- Calico CNI ---
+  echo "[CNI] Calico $${CALICO_VERSION} 설치..."
+  kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/tigera-operator.yaml"
+
+  # Operator CRD 등록 대기 (Installation 등)
+  echo "  → Calico Operator CRD 등록 대기..."
+  for i in $(seq 1 30); do
+    if kubectl get crd installations.operator.tigera.io &>/dev/null; then
+      echo "  → CRD 등록 완료"
+      break
+    fi
+    echo "  → 대기 중... ($${i}/30)"
+    sleep 5
+  done
+
+  curl -s -o /tmp/custom-resources.yaml "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/custom-resources.yaml"
+  sed -i "s|cidr: 192.168.0.0/16|cidr: $${POD_CIDR}|" /tmp/custom-resources.yaml
+  sed -i 's/encapsulation: .*/encapsulation: VXLAN/' /tmp/custom-resources.yaml
+  sed -i '/calicoNetwork:/a\    bgp: Disabled' /tmp/custom-resources.yaml
+  kubectl apply -f /tmp/custom-resources.yaml
+  rm -f /tmp/custom-resources.yaml
+
+  echo "  → Calico 설치 완료 (VXLAN, BGP Disabled, Pod CIDR $${POD_CIDR})"
+
+  # Calico Ready 대기
+  kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n calico-system --timeout=300s || \
+    echo "  ⚠ Calico Pod 아직 Ready 아님"
+
+  # --- Helm ---
+  echo "[Helm] 설치 확인..."
+  if ! command -v helm >/dev/null 2>&1; then
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  fi
+
+  # --- Gateway API CRD ---
+  echo "[Gateway API] CRD $${GATEWAY_API_VERSION} 설치..."
+  kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
+
+  # --- NGINX Gateway Fabric v2.x ---
+  echo "[NGF] $${NGF_VERSION} 설치..."
+  helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
+    --version "$${NGF_VERSION}" \
+    --namespace nginx-gateway \
+    --create-namespace \
+    --set nginx.service.type=NodePort \
+    --set nginx.service.externalTrafficPolicy=Cluster \
+    --set "nginx.service.nodePorts[0].port=30080,nginx.service.nodePorts[0].listenerPort=80" \
+    --set "nginx.service.nodePorts[1].port=30443,nginx.service.nodePorts[1].listenerPort=443" \
+    --set nginx.config.rewriteClientIP.mode=XForwardedFor \
+    --set nginx.config.rewriteClientIP.setIPRecursively=false \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].type=CIDR" \
+    --set "nginx.config.rewriteClientIP.trustedAddresses[0].value=10.0.0.0/8" \
+    --set "certGenerator.tolerations[0].key=node-role.kubernetes.io/control-plane" \
+    --set "certGenerator.tolerations[0].effect=NoSchedule" \
+    --set "nginxGateway.tolerations[0].key=node-role.kubernetes.io/control-plane" \
+    --set "nginxGateway.tolerations[0].effect=NoSchedule"
+
+  echo "  → 클러스터 초기화 완료"
+
+# -----------------------------------------------------------------------------
+# 추가 마스터: kubeadm join --control-plane
+# -----------------------------------------------------------------------------
+else
+  echo "[2/2] 추가 마스터 — SSM에서 join 정보 대기..."
+
+  # 최대 10분 대기 (첫 번째 마스터 init 완료까지)
+  MASTER_JOIN=""
+  for i in $(seq 1 60); do
+    MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
+    if [ -n "$${MASTER_JOIN}" ]; then
+      break
+    fi
+    echo "  → 대기 중... ($${i}/60)"
+    sleep 10
+  done
+
+  if [ -z "$${MASTER_JOIN}" ]; then
+    echo "ERROR: 10분 초과 — master join 정보를 찾을 수 없음"
+    exit 1
+  fi
+
+  # /etc/hosts를 일시 제거 — join은 NLB 경유로 첫 번째 마스터에 접속해야 함
+  sed -i "/127.0.0.1 $${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
+
+  echo "  → join 정보 수신. kubeadm join 실행..."
+
+  # join 명령 구성
+  JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
+
+  # retry loop — etcd learner sync, 네트워크 타이밍 등 일시적 실패 대응
+  JOIN_SUCCESS=false
+  for attempt in $(seq 1 5); do
+    echo "  → join 시도 $${attempt}/5..."
+
+    # 재시도 전 reset (첫 시도 제외)
+    if [ "$${attempt}" -gt 1 ]; then
+      kubeadm reset -f --cri-socket=unix:///run/containerd/containerd.sock 2>/dev/null || true
+      sleep 15
+
+      # certificate-key 만료 대응: SSM에서 최신 join 정보 다시 가져오기
+      MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
+      if [ -n "$${MASTER_JOIN}" ]; then
+        JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
+      fi
+    fi
+
+    echo "$${JOIN_CMD}" > /tmp/join-cmd.sh
+    if bash /tmp/join-cmd.sh; then
+      JOIN_SUCCESS=true
+      rm -f /tmp/join-cmd.sh
+      break
+    fi
+
+    echo "  ⚠ join 실패 (시도 $${attempt}/5). $((attempt * 15))초 후 재시도..."
+    sleep $((attempt * 15))
+  done
+
+  rm -f /tmp/join-cmd.sh
+
+  if [ "$${JOIN_SUCCESS}" = false ]; then
+    echo "ERROR: 5회 시도 모두 실패"
+    exit 1
+  fi
+
+  # join 완료 후 /etc/hosts 복원 (이 마스터도 hairpin 회피 필요)
+  echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+
+  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
+  mkdir -p /home/ubuntu/.kube
+  cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+  chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+  echo "  → 추가 마스터 join 완료"
+fi
+
+echo ""
+echo "============================================="
+echo " K8s Master Bootstrap 완료"
+echo " $(hostname) — $${MASTER_IP}"
+echo "============================================="

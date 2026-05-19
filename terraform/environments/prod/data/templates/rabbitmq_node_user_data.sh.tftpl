@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# RabbitMQ node bootstrap for a 3-node quorum-queue-ready cluster.
+set -euo pipefail
+
+log() { echo "[rabbitmq-ha] $*"; }
+
+SSM_PREFIX="/${project_name}/${environment}"
+AWS_REGION="${aws_region}"
+NODE_NAME="${node_name}"
+NODE_FQDN="${node_fqdn}"
+CLUSTER_ENABLED="${cluster_enabled}"
+PRIMARY_NODE_DNS="${primary_node_dns}"
+PRIMARY_NODENAME="${primary_nodename}"
+THIS_NODENAME="rabbit@$NODE_FQDN"
+
+get_param() {
+  local path="$SSM_PREFIX/$1"
+  local attempt
+  for attempt in $(seq 1 30); do
+    if aws ssm get-parameter \
+      --region "$AWS_REGION" \
+      --cli-connect-timeout 5 \
+      --cli-read-timeout 15 \
+      --name "$path" \
+      --with-decryption \
+      --query "Parameter.Value" \
+      --output text; then
+      return 0
+    fi
+    log "SSM get-parameter retry $attempt/30 for $path"
+    sleep 3
+  done
+  log "Failed to fetch SSM parameter: $path"
+  return 1
+}
+
+wait_for_dns() {
+  local name="$1"
+  until getent hosts "$name" >/dev/null 2>&1; do
+    log "waiting for DNS: $name"
+    sleep 5
+  done
+}
+
+wait_for_rabbit() {
+  local nodename="$1"
+  until rabbitmq-diagnostics -q ping -n "$nodename" >/dev/null 2>&1; do
+    log "waiting for RabbitMQ node: $nodename"
+    sleep 5
+  done
+}
+
+RABBITMQ_USER="$(get_param SPRING_RABBITMQ_USERNAME)"
+RABBITMQ_PASSWORD="$(get_param SPRING_RABBITMQ_PASSWORD)"
+ERLANG_COOKIE="$(get_param RABBITMQ_ERLANG_COOKIE)"
+
+for value in "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" "$ERLANG_COOKIE"; do
+  if [ -z "$value" ] || [ "$value" = "CHANGE_ME" ]; then
+    log "RabbitMQ credentials and Erlang cookie must be injected before bootstrap"
+    exit 1
+  fi
+done
+
+hostnamectl set-hostname "$NODE_FQDN"
+
+TOKEN="$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+LOCAL_IPV4="$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/local-ipv4")"
+if ! grep -q " $NODE_FQDN" /etc/hosts; then
+  echo "$LOCAL_IPV4 $NODE_FQDN $NODE_NAME" >>/etc/hosts
+fi
+
+cat >/etc/rabbitmq/rabbitmq-env.conf <<EOF
+RABBITMQ_USE_LONGNAME=true
+RABBITMQ_NODENAME=$THIS_NODENAME
+EOF
+
+install -m 0750 -o rabbitmq -g rabbitmq -d /var/lib/rabbitmq
+printf "%s" "$ERLANG_COOKIE" >/var/lib/rabbitmq/.erlang.cookie
+chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
+chmod 0400 /var/lib/rabbitmq/.erlang.cookie
+
+systemctl enable rabbitmq-server
+systemctl restart rabbitmq-server
+
+if [ "$CLUSTER_ENABLED" != "true" ]; then
+  rabbitmqctl await_startup
+elif [ "$NODE_NAME" = "rabbitmq-a" ]; then
+  rabbitmqctl await_startup
+else
+  wait_for_dns "$PRIMARY_NODE_DNS"
+  wait_for_rabbit "$PRIMARY_NODENAME"
+  rabbitmqctl stop_app
+  rabbitmqctl reset
+  rabbitmqctl join_cluster "$PRIMARY_NODENAME"
+  rabbitmqctl start_app
+fi
+
+rabbitmqctl add_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" 2>/dev/null || \
+  rabbitmqctl change_password "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
+rabbitmqctl set_permissions -p / "$RABBITMQ_USER" ".*" ".*" ".*"
+rabbitmqctl set_user_tags "$RABBITMQ_USER" management
+rabbitmq-plugins enable rabbitmq_prometheus
+
+install -m 0750 -o root -g alloy -d /etc/alloy
+cat >/etc/alloy/config.alloy <<EOF
+prometheus.exporter.unix "host" {
+  set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "30s"
+}
+
+prometheus.scrape "rabbitmq_metrics" {
+  targets = [{
+    __address__ = "127.0.0.1:15692",
+  }]
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "15s"
+}
+
+prometheus.relabel "data_common" {
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+  rule {
+    replacement  = "${environment}"
+    target_label = "env"
+  }
+  rule {
+    replacement  = "rabbitmq"
+    target_label = "service"
+  }
+  rule {
+    replacement  = "$NODE_NAME"
+    target_label = "instance"
+  }
+}
+
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+  }
+}
+EOF
+
+chown root:alloy /etc/alloy/config.alloy
+chmod 0640 /etc/alloy/config.alloy
+systemctl enable alloy
+systemctl restart alloy
+
+log "RabbitMQ HA bootstrap complete for $THIS_NODENAME"

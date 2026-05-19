@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# =============================================================================
+# K8s Worker Node — legacy user_data (ASG boot script)
+#
+# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
+# 이 스크립트는 동적 설정만 수행:
+#   - SSM에서 worker join 명령 조회 → kubeadm join
+#   - worker 라벨 자동 부여
+#
+# TODO(user_data-slim): user_data는 kubeadm join과 최소 라벨링만 담당하게
+# 유지하고, 정적 설치는 Packer AMI로, 클러스터 애드온/앱 배포는
+# ArgoCD/Helm/Ansible 단계로 분리한다.
+# =============================================================================
+set -euo pipefail
+exec > >(tee /var/log/k8s-worker-init.log) 2>&1
+
+# --- 변수 (Terraform templatefile 주입) ---
+REGION="${region}"
+PROJECT="${project_name}"
+ENV="${environment}"
+
+SSM_PREFIX="/$${PROJECT}/$${ENV}/k8s"
+JOIN_PARAM="$${SSM_PREFIX}/join-command"
+
+WORKER_IP=$(hostname -I | awk '{print $1}')
+
+echo "============================================="
+echo " K8s Worker Bootstrap"
+echo " IP: $${WORKER_IP}"
+echo "============================================="
+
+legacy_static_prereqs() {
+  if command -v kubeadm >/dev/null 2>&1 &&
+     command -v kubelet >/dev/null 2>&1 &&
+     command -v containerd >/dev/null 2>&1 &&
+     command -v aws >/dev/null 2>&1 &&
+     command -v crictl >/dev/null 2>&1 &&
+     command -v nerdctl >/dev/null 2>&1 &&
+     [ -x /usr/local/bin/ecr-credential-provider ]; then
+    echo "[legacy-static] 정적 구성 이미 존재"
+    return
+  fi
+
+  echo "[legacy-static] Ubuntu 기본 AMI용 정적 구성 설치..."
+  export DEBIAN_FRONTEND=noninteractive
+
+  apt-get update
+  apt-get install -y software-properties-common
+  add-apt-repository -y universe || true
+  apt-get update
+  apt-get install -y \
+    apt-transport-https bash-completion ca-certificates chrony conntrack curl dnsutils \
+    ethtool gnupg htop iproute2 iptables jq less logrotate lsof net-tools nfs-common \
+    openssl psmisc rsync socat tcpdump traceroute unzip vim
+
+  swapoff -a
+  sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+  systemctl mask swap.target || true
+
+  cat >/etc/modules-load.d/k8s.conf <<'EOF'
+overlay
+br_netfilter
+EOF
+  modprobe overlay
+  modprobe br_netfilter
+
+  cat >/etc/sysctl.d/k8s.conf <<'EOF'
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+  sysctl --system >/dev/null
+  systemctl enable chrony
+
+  install -d -m 0755 \
+    /etc/containerd /etc/cni/net.d /etc/kubernetes /etc/kubernetes/manifests \
+    /etc/kubernetes/pki /opt/cni/bin /opt/doktori/bin /opt/doktori/logs \
+    /var/lib/containerd /var/lib/kubelet /var/log/containers /var/log/kubernetes \
+    /etc/apt/keyrings
+
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" >/etc/apt/sources.list.d/docker.list
+
+  curl -fsSL "https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /" >/etc/apt/sources.list.d/kubernetes.list
+
+  apt-get update
+  apt-get install -y containerd.io=1.7.25-1 kubelet kubeadm kubectl
+  apt-mark hold containerd.io kubelet kubeadm kubectl
+
+  containerd config default >/etc/containerd/config.toml
+  sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+  sed -i 's|sandbox_image = "registry.k8s.io/pause:3.8"|sandbox_image = "registry.k8s.io/pause:3.10.1"|g' /etc/containerd/config.toml
+  systemctl restart containerd
+  systemctl enable containerd
+
+  curl -fsSL "https://github.com/containernetworking/plugins/releases/download/v1.7.1/cni-plugins-linux-arm64-v1.7.1.tgz" -o /tmp/cni-plugins.tgz
+  tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin
+  rm -f /tmp/cni-plugins.tgz
+
+  curl -fsSL "https://storage.googleapis.com/k8s-artifacts-prod/binaries/cloud-provider-aws/v1.31.0/linux/arm64/ecr-credential-provider-linux-arm64" -o /usr/local/bin/ecr-credential-provider
+  chmod 0755 /usr/local/bin/ecr-credential-provider
+  cat >/etc/kubernetes/ecr-credential-provider-config.yaml <<'EOF'
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+      - "*.dkr.ecr.*.amazonaws.com.cn"
+      - "*.dkr.ecr-fips.*.amazonaws.com"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+EOF
+  cat >/etc/default/kubelet <<'EOF'
+KUBELET_EXTRA_ARGS="--image-credential-provider-config=/etc/kubernetes/ecr-credential-provider-config.yaml --image-credential-provider-bin-dir=/usr/local/bin"
+EOF
+
+  curl -fsSL "https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-arm64.tar.gz" -o /tmp/crictl.tgz
+  tar -xzf /tmp/crictl.tgz -C /usr/local/bin crictl
+  rm -f /tmp/crictl.tgz
+  cat >/etc/crictl.yaml <<'EOF'
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+debug: false
+pull-image-on-create: false
+EOF
+
+  curl -fsSL "https://github.com/containerd/nerdctl/releases/download/v1.7.7/nerdctl-1.7.7-linux-arm64.tar.gz" -o /tmp/nerdctl.tgz
+  tar -xzf /tmp/nerdctl.tgz -C /usr/local/bin nerdctl
+  rm -f /tmp/nerdctl.tgz
+  chmod 0755 /usr/local/bin/crictl /usr/local/bin/nerdctl
+
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+  (cd /tmp && unzip -qo awscliv2.zip && ./aws/install)
+  rm -rf /tmp/aws /tmp/awscliv2.zip
+
+  if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
+    snap install amazon-ssm-agent --classic
+  fi
+  systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+}
+
+legacy_static_prereqs
+
+# -----------------------------------------------------------------------------
+# 1. SSM에서 join 명령 조회 (마스터 init 완료 대기)
+# -----------------------------------------------------------------------------
+echo "[1/2] SSM에서 join 명령 대기..."
+
+JOIN_CMD=""
+for i in $(seq 1 90); do
+  JOIN_CMD=$(aws ssm get-parameter \
+    --name "$${JOIN_PARAM}" \
+    --with-decryption \
+    --query "Parameter.Value" \
+    --output text \
+    --region "$${REGION}" 2>/dev/null || true)
+
+  if [ -n "$${JOIN_CMD}" ]; then
+    echo "  → join 명령 수신"
+    break
+  fi
+  echo "  → 대기 중... ($${i}/90)"
+  sleep 10
+done
+
+if [ -z "$${JOIN_CMD}" ]; then
+  echo "ERROR: 15분 초과 — join 명령을 찾을 수 없음"
+  exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# 2. kubeadm join
+# -----------------------------------------------------------------------------
+echo "[2/2] kubeadm join..."
+
+eval "$${JOIN_CMD}" \
+  --cri-socket=unix:///run/containerd/containerd.sock
+
+echo ""
+echo "============================================="
+echo " K8s Worker Bootstrap 완료"
+echo " $(hostname) — $${WORKER_IP}"
+echo "============================================="

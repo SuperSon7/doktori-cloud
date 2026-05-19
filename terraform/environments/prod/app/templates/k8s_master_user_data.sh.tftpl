@@ -2,20 +2,19 @@
 # =============================================================================
 # K8s Master Node — user_data (ASG boot script)
 #
-# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
-# 이 스크립트는 동적 설정만 수행:
-#   - 첫 번째 마스터: kubeadm init → SSM에 join 정보 저장 → CNI/Helm/NGF 설치
-#   - 추가 마스터: SSM에서 join 정보 조회 → kubeadm join --control-plane
+# Packer k8s base AMI에 정적 설치가 이미 포함됨.
+# 이 스크립트는 검증된 기존 bootstrap 흐름을 유지하고 동적 작업만 수행:
+#   - 첫 번째 마스터: kubeadm init -> SSM에 join 정보 저장 -> CNI/Helm/NGF 설치
+#   - 추가 마스터: SSM에서 join 정보 조회 -> kubeadm join --control-plane
 #
 # NLB hairpin 회피:
 #   마스터에서는 /etc/hosts로 control-plane-endpoint를 127.0.0.1로 영구 설정.
 #   kubelet.conf, admin.conf 등 모든 kubeconfig이 자동으로 localhost 사용.
-#   워커는 /etc/hosts 없으므로 NLB로 정상 라우팅 (다른 인스턴스라 hairpin 아님).
+#   워커는 /etc/hosts 없으므로 NLB로 정상 라우팅.
 # =============================================================================
 set -euo pipefail
 exec > >(tee /var/log/k8s-master-init.log) 2>&1
 
-# --- 변수 (Terraform templatefile 주입) ---
 REGION="${region}"
 PROJECT="${project_name}"
 ENV="${environment}"
@@ -31,6 +30,7 @@ LOCK_PARAM="$${SSM_PREFIX}/init-lock"
 JOIN_PARAM="$${SSM_PREFIX}/join-command"
 MASTER_JOIN_PARAM="$${SSM_PREFIX}/master-join-command"
 CERT_KEY_PARAM="$${SSM_PREFIX}/certificate-key"
+STALE_BOOTSTRAP_AFTER_SECONDS=900
 
 MASTER_IP=$(hostname -I | awk '{print $1}')
 
@@ -42,17 +42,37 @@ echo " Pod CIDR: $${POD_CIDR}"
 echo " Svc CIDR: $${SERVICE_CIDR}"
 echo "============================================="
 
-# -----------------------------------------------------------------------------
-# /etc/hosts — NLB hairpin 영구 회피
-# 마스터 노드에서 control-plane-endpoint를 localhost로 해석.
-# kubelet, scheduler, controller-manager 모두 이 설정을 따름.
-# -----------------------------------------------------------------------------
-echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
-echo "  → /etc/hosts: $${CONTROL_PLANE_ENDPOINT} → 127.0.0.1 (NLB hairpin 회피)"
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "ERROR: required command missing from k8s base AMI: $1"
+    exit 1
+  fi
+}
 
-# -----------------------------------------------------------------------------
-# SSM 헬퍼 함수
-# -----------------------------------------------------------------------------
+require_file() {
+  if [ ! -e "$1" ]; then
+    echo "ERROR: required file missing from k8s base AMI: $1"
+    exit 1
+  fi
+}
+
+echo "[0/2] Packer AMI 정적 구성 확인..."
+require_cmd aws
+require_cmd containerd
+require_cmd crictl
+require_cmd kubeadm
+require_cmd kubelet
+require_cmd kubectl
+require_cmd helm
+require_file /etc/containerd/config.toml
+require_file /etc/kubernetes/ecr-credential-provider-config.yaml
+require_file /usr/local/bin/ecr-credential-provider
+
+if swapon --summary | grep -q .; then
+  echo "ERROR: swap is enabled. Rebuild k8s base AMI or fix bootstrap image."
+  exit 1
+fi
+
 ssm_get() {
   aws ssm get-parameter \
     --name "$1" \
@@ -68,54 +88,82 @@ ssm_put() {
     --value "$2" \
     --type SecureString \
     --overwrite \
-    --region "$${REGION}"
+    --region "$${REGION}" >/dev/null
 }
 
-# -----------------------------------------------------------------------------
-# 리더 선출 — SSM init-lock 존재 여부로 판단
-# -----------------------------------------------------------------------------
-echo "[1/2] 리더 선출 확인..."
+ssm_delete_bootstrap_state() {
+  aws ssm delete-parameters \
+    --names "$${LOCK_PARAM}" "$${JOIN_PARAM}" "$${MASTER_JOIN_PARAM}" "$${CERT_KEY_PARAM}" \
+    --region "$${REGION}" >/dev/null 2>&1 || true
+}
 
-IS_FIRST=false
-if ! ssm_get "$${LOCK_PARAM}" > /dev/null 2>&1; then
-  # init-lock 없음 → 첫 번째 마스터 시도
-  # 경합 방지: PutParameter로 선점 (기존 값 없을 때만 성공)
-  if aws ssm put-parameter \
+ssm_lock_age_seconds() {
+  local modified
+  modified=$(aws ssm get-parameter \
+    --name "$${LOCK_PARAM}" \
+    --query "Parameter.LastModifiedDate" \
+    --output text \
+    --region "$${REGION}" 2>/dev/null)
+
+  local modified_epoch now_epoch
+  modified_epoch=$(date -d "$${modified}" +%s)
+  now_epoch=$(date +%s)
+  echo "$$((now_epoch - modified_epoch))"
+}
+
+api_endpoint_reachable() {
+  timeout 5 bash -c "</dev/tcp/$${CONTROL_PLANE_ENDPOINT}/6443" >/dev/null 2>&1
+}
+
+add_local_control_plane_host() {
+  sed -i "/[[:space:]]$${CONTROL_PLANE_ENDPOINT}$/d" /etc/hosts
+  echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+  echo "  -> /etc/hosts: $${CONTROL_PLANE_ENDPOINT} -> 127.0.0.1 (NLB hairpin 회피)"
+}
+
+remove_local_control_plane_host() {
+  sed -i "/[[:space:]]$${CONTROL_PLANE_ENDPOINT}$/d" /etc/hosts
+}
+
+try_acquire_init_lock() {
+  aws ssm put-parameter \
     --name "$${LOCK_PARAM}" \
     --value "$${MASTER_IP}" \
     --type String \
-    --region "$${REGION}" 2>/dev/null; then
-    IS_FIRST=true
-    echo "  → 이 노드가 첫 번째 마스터 (init 수행)"
-  else
-    echo "  → 다른 노드가 먼저 init-lock 선점"
-  fi
-fi
+    --region "$${REGION}" >/dev/null 2>&1
+}
 
-# -----------------------------------------------------------------------------
-# 첫 번째 마스터: kubeadm init
-# -----------------------------------------------------------------------------
-if [ "$${IS_FIRST}" = true ]; then
+do_first_master_bootstrap() {
   echo "[2/2] kubeadm init..."
+  add_local_control_plane_host
+
+  cat >/etc/kubernetes/kubeadm-init.yaml <<EOF
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "$${MASTER_IP}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+controlPlaneEndpoint: "$${CONTROL_PLANE_ENDPOINT}:6443"
+networking:
+  podSubnet: "$${POD_CIDR}"
+  serviceSubnet: "$${SERVICE_CIDR}"
+EOF
 
   kubeadm init \
-    --control-plane-endpoint="$${CONTROL_PLANE_ENDPOINT}:6443" \
+    --config /etc/kubernetes/kubeadm-init.yaml \
     --upload-certs \
-    --apiserver-advertise-address="$${MASTER_IP}" \
-    --pod-network-cidr="$${POD_CIDR}" \
-    --service-cidr="$${SERVICE_CIDR}" \
-    --cri-socket=unix:///run/containerd/containerd.sock \
     2>&1 | tee /tmp/kubeadm-init.log
 
-  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
   mkdir -p /home/ubuntu/.kube
   cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
   chown ubuntu:ubuntu /home/ubuntu/.kube/config
-
-  # root에서도 kubectl 사용 가능
   export KUBECONFIG=/etc/kubernetes/admin.conf
 
-  # join 명령 저장 → SSM
   WORKER_JOIN=$(kubeadm token create --print-join-command)
   CERT_KEY=$(kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1)
 
@@ -123,44 +171,36 @@ if [ "$${IS_FIRST}" = true ]; then
   ssm_put "$${CERT_KEY_PARAM}" "$${CERT_KEY}"
   ssm_put "$${MASTER_JOIN_PARAM}" "$${WORKER_JOIN} --control-plane --certificate-key $${CERT_KEY}"
 
-  echo "  → join 정보 SSM 저장 완료"
+  echo "  -> join 정보 SSM 저장 완료"
 
-  # --- Calico CNI ---
   echo "[CNI] Calico $${CALICO_VERSION} 설치..."
   kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/tigera-operator.yaml"
 
-  # Operator CRD 등록 대기 (Installation 등)
-  echo "  → Calico Operator CRD 등록 대기..."
+  echo "  -> Calico Operator CRD 등록 대기..."
   for i in $(seq 1 30); do
-    if kubectl get crd installations.operator.tigera.io &>/dev/null; then
-      echo "  → CRD 등록 완료"
+    if kubectl get crd installations.operator.tigera.io >/dev/null 2>&1; then
+      echo "  -> CRD 등록 완료"
       break
     fi
-    echo "  → 대기 중... ($${i}/30)"
+    echo "  -> 대기 중... ($${i}/30)"
     sleep 5
   done
 
   curl -s -o /tmp/custom-resources.yaml "https://raw.githubusercontent.com/projectcalico/calico/$${CALICO_VERSION}/manifests/custom-resources.yaml"
+  sed -i "s|cidr: 192.168.0.0/16|cidr: $${POD_CIDR}|" /tmp/custom-resources.yaml
   sed -i 's/encapsulation: .*/encapsulation: VXLAN/' /tmp/custom-resources.yaml
   sed -i '/calicoNetwork:/a\    bgp: Disabled' /tmp/custom-resources.yaml
   kubectl apply -f /tmp/custom-resources.yaml
   rm -f /tmp/custom-resources.yaml
 
-  echo "  → Calico 설치 완료 (VXLAN, BGP Disabled)"
+  echo "  -> Calico 설치 완료 (VXLAN, BGP Disabled, Pod CIDR $${POD_CIDR})"
 
-  # Calico Ready 대기
   kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n calico-system --timeout=300s || \
-    echo "  ⚠ Calico Pod 아직 Ready 아님"
+    echo "  WARN: Calico Pod 아직 Ready 아님"
 
-  # --- Helm ---
-  echo "[Helm] 설치..."
-  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-  # --- Gateway API CRD ---
   echo "[Gateway API] CRD $${GATEWAY_API_VERSION} 설치..."
   kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/$${GATEWAY_API_VERSION}/standard-install.yaml"
 
-  # --- NGINX Gateway Fabric v2.x ---
   echo "[NGF] $${NGF_VERSION} 설치..."
   helm install nginx-gw oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
     --version "$${NGF_VERSION}" \
@@ -179,49 +219,21 @@ if [ "$${IS_FIRST}" = true ]; then
     --set "nginxGateway.tolerations[0].key=node-role.kubernetes.io/control-plane" \
     --set "nginxGateway.tolerations[0].effect=NoSchedule"
 
-  echo "  → 클러스터 초기화 완료"
+  echo "  -> 클러스터 초기화 완료"
+}
 
-# -----------------------------------------------------------------------------
-# 추가 마스터: kubeadm join --control-plane
-# -----------------------------------------------------------------------------
-else
-  echo "[2/2] 추가 마스터 — SSM에서 join 정보 대기..."
+do_additional_master_join() {
+  remove_local_control_plane_host
 
-  # 최대 10분 대기 (첫 번째 마스터 init 완료까지)
-  MASTER_JOIN=""
-  for i in $(seq 1 60); do
-    MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
-    if [ -n "$${MASTER_JOIN}" ]; then
-      break
-    fi
-    echo "  → 대기 중... ($${i}/60)"
-    sleep 10
-  done
-
-  if [ -z "$${MASTER_JOIN}" ]; then
-    echo "ERROR: 10분 초과 — master join 정보를 찾을 수 없음"
-    exit 1
-  fi
-
-  # /etc/hosts를 일시 제거 — join은 NLB 경유로 첫 번째 마스터에 접속해야 함
-  sed -i "/127.0.0.1 $${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
-
-  echo "  → join 정보 수신. kubeadm join 실행..."
-
-  # join 명령 구성
   JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
-
-  # retry loop — etcd learner sync, 네트워크 타이밍 등 일시적 실패 대응
   JOIN_SUCCESS=false
-  for attempt in $(seq 1 5); do
-    echo "  → join 시도 $${attempt}/5..."
 
-    # 재시도 전 reset (첫 시도 제외)
+  for attempt in $(seq 1 5); do
+    echo "  -> join 시도 $${attempt}/5..."
+
     if [ "$${attempt}" -gt 1 ]; then
       kubeadm reset -f --cri-socket=unix:///run/containerd/containerd.sock 2>/dev/null || true
       sleep 15
-
-      # certificate-key 만료 대응: SSM에서 최신 join 정보 다시 가져오기
       MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
       if [ -n "$${MASTER_JOIN}" ]; then
         JOIN_CMD="$${MASTER_JOIN} --apiserver-advertise-address=$${MASTER_IP} --cri-socket=unix:///run/containerd/containerd.sock"
@@ -235,7 +247,7 @@ else
       break
     fi
 
-    echo "  ⚠ join 실패 (시도 $${attempt}/5). $((attempt * 15))초 후 재시도..."
+    echo "  WARN: join 실패 (시도 $${attempt}/5). $((attempt * 15))초 후 재시도..."
     sleep $((attempt * 15))
   done
 
@@ -246,19 +258,85 @@ else
     exit 1
   fi
 
-  # join 완료 후 /etc/hosts 복원 (이 마스터도 hairpin 회피 필요)
-  echo "127.0.0.1 $${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+  add_local_control_plane_host
 
-  # kubectl 설정 (admin.conf는 /etc/hosts 덕분에 자동으로 localhost 사용)
   mkdir -p /home/ubuntu/.kube
   cp -f /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
   chown ubuntu:ubuntu /home/ubuntu/.kube/config
 
-  echo "  → 추가 마스터 join 완료"
+  echo "  -> 추가 마스터 join 완료"
+}
+
+echo "[1/2] 리더 선출 확인..."
+
+IS_FIRST=false
+MASTER_JOIN=""
+
+if ! ssm_get "$${LOCK_PARAM}" >/dev/null 2>&1; then
+  if try_acquire_init_lock; then
+    IS_FIRST=true
+    echo "  -> 이 노드가 첫 번째 마스터 (init 수행)"
+  else
+    echo "  -> 다른 노드가 먼저 init-lock 선점"
+  fi
+else
+  LOCK_VALUE=$(ssm_get "$${LOCK_PARAM}" || echo "unknown")
+  echo "  -> init-lock 존재: $${LOCK_VALUE}"
+fi
+
+if [ "$${IS_FIRST}" = true ]; then
+  do_first_master_bootstrap
+else
+  echo "[2/2] 추가 마스터 - SSM에서 join 정보 대기..."
+
+  for i in $(seq 1 90); do
+    MASTER_JOIN=$(ssm_get "$${MASTER_JOIN_PARAM}" 2>/dev/null || true)
+    if [ -n "$${MASTER_JOIN}" ] && api_endpoint_reachable; then
+      break
+    fi
+
+    if [ -n "$${MASTER_JOIN}" ]; then
+      echo "  -> join 명령은 있으나 API endpoint 대기 중... ($${i}/90)"
+    else
+      echo "  -> master join 명령 대기 중... ($${i}/90)"
+    fi
+
+    if [ "$$((i % 6))" -eq 0 ]; then
+      LOCK_AGE=$(ssm_lock_age_seconds 2>/dev/null || echo 0)
+      if [ "$${LOCK_AGE}" -gt "$${STALE_BOOTSTRAP_AFTER_SECONDS}" ] && ! api_endpoint_reachable; then
+        echo "  WARN: init-lock이 $${LOCK_AGE}초 지났지만 API endpoint가 응답하지 않음. stale bootstrap state 정리 시도."
+        ssm_delete_bootstrap_state
+        if try_acquire_init_lock; then
+          IS_FIRST=true
+          echo "  -> stale state 정리 후 이 노드가 첫 번째 마스터 (init 수행)"
+          break
+        fi
+        echo "  -> 다른 노드가 새 init-lock 선점. 계속 대기."
+      fi
+    fi
+
+    sleep 10
+  done
+
+  if [ "$${IS_FIRST}" = true ]; then
+    do_first_master_bootstrap
+  else
+    if [ -z "$${MASTER_JOIN}" ]; then
+      echo "ERROR: 15분 초과 - master join 정보를 찾을 수 없음"
+      exit 1
+    fi
+
+    if ! api_endpoint_reachable; then
+      echo "ERROR: 15분 초과 - API endpoint가 응답하지 않아 master join 불가"
+      exit 1
+    fi
+
+    do_additional_master_join
+  fi
 fi
 
 echo ""
 echo "============================================="
 echo " K8s Master Bootstrap 완료"
-echo " $(hostname) — $${MASTER_IP}"
+echo " $(hostname) - $${MASTER_IP}"
 echo "============================================="

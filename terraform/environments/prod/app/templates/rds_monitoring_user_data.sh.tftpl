@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# =============================================================================
+# RDS Monitoring — boot-time secret injection
+#
+# Golden Image(Packer AMI)에 mysqld_exporter, AWS CLI, SSM Agent, systemd unit이
+# 이미 설치되어 있다. 이 스크립트는 부팅 시점의 동적 값만 주입한다.
+# =============================================================================
+set -euo pipefail
+exec > >(tee /var/log/rds-monitoring-init.log) 2>&1
+
+REGION="${region}"
+DB_HOST="${db_host}"
+DB_PORT="${db_port}"
+DB_USERNAME="${db_username}"
+DB_PASSWORD_PARAM="${db_password_ssm_path}"
+
+echo "============================================="
+echo " RDS Monitoring Bootstrap"
+echo " Host: $${DB_HOST}:$${DB_PORT}"
+echo " User: $${DB_USERNAME}"
+echo "============================================="
+
+DB_PASSWORD=$(aws ssm get-parameter \
+  --name "$${DB_PASSWORD_PARAM}" \
+  --with-decryption \
+  --query "Parameter.Value" \
+  --output text \
+  --region "$${REGION}")
+
+if [ -z "$${DB_PASSWORD}" ] || [ "$${DB_PASSWORD}" = "None" ]; then
+  echo "ERROR: DB password parameter is empty: $${DB_PASSWORD_PARAM}"
+  exit 1
+fi
+
+install -o root -g mysqld_exporter -m 0640 /dev/null /etc/mysqld_exporter.env
+cat > /etc/mysqld_exporter.env <<EOF
+DATA_SOURCE_NAME="$${DB_USERNAME}:$${DB_PASSWORD}@($${DB_HOST}:$${DB_PORT})/"
+EOF
+
+systemctl daemon-reload
+systemctl enable mysqld_exporter
+systemctl restart mysqld_exporter
+
+echo "mysqld_exporter: $(systemctl is-active mysqld_exporter)"

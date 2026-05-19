@@ -8,13 +8,22 @@ output "compute" {
   }
 }
 
-output "chat_observer_public_ip" {
-  description = "Public IP for the doktori-chat-observer instance"
-  value       = try(module.compute.eip_public_ips["chat_observer"], null)
+output "app_alb_dns" {
+  value = module.frontend.alb_dns_name
+}
+
+output "app_alb_internal_fqdn" {
+  description = "Internal public app ALB alias. Routes frontend default traffic and /api, /ws to K8s."
+  value       = "app-alb.prod.doktori.internal"
 }
 
 output "frontend_alb_dns" {
   value = module.frontend.alb_dns_name
+}
+
+output "frontend_alb_fqdn" {
+  description = "CloudFront → ALB HTTPS origin 도메인. front.doktori.kr ACM 인증서와 쌍으로 동작."
+  value       = "front.${var.domain_name}"
 }
 
 output "frontend_asg_configuration" {
@@ -51,30 +60,14 @@ output "frontend_codedeploy" {
     application_name      = aws_codedeploy_app.frontend_prod.name
     deployment_group_name = aws_codedeploy_deployment_group.frontend_prod.deployment_group_name
     service_role_arn      = aws_iam_role.frontend_codedeploy_service.arn
-    revision_bucket_name  = aws_s3_bucket.frontend_codedeploy_revisions.bucket
+    revision_bucket_name  = data.terraform_remote_state.data.outputs.codedeploy_revisions.bucket
     frontend_asg_name     = module.frontend.asg_name
     target_group_name     = module.frontend.target_group_name
     target_group_arn      = module.frontend.target_group_arn
   }
 }
 
-output "codedeploy_application_name_prod" {
-  value = aws_codedeploy_app.frontend_prod.name
-}
-
-output "codedeploy_deployment_group_name_prod" {
-  value = aws_codedeploy_deployment_group.frontend_prod.deployment_group_name
-}
-
-output "codedeploy_revision_bucket_prod" {
-  value = aws_s3_bucket.frontend_codedeploy_revisions.bucket
-}
-
-output "frontend_prod_target_group_arn" {
-  value = module.frontend.target_group_arn
-}
-
 output "frontend_codedeploy_stack_version" {
-  description = "Marker output used to force a safe prod/app Terraform apply when CodeDeploy stack wiring changes."
-  value       = "2026-03-19"
+  description = "CodeDeploy 스택 배선이 바뀔 때 var.codedeploy_stack_version을 올려서 apply를 강제"
+  value       = var.codedeploy_stack_version
 }

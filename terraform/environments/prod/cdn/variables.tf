@@ -21,16 +21,10 @@ variable "static_bucket_name" {
   type        = string
 }
 
-variable "ssr_origin_domain" {
-  description = "SSR origin domain. Empty string = auto-resolve from app layer ALB DNS via remote state."
-  type        = string
-  default     = ""
-}
-
 variable "ssr_origin_protocol_policy" {
   description = "Protocol policy to connect to SSR origin"
   type        = string
-  default     = "http-only"
+  default     = "https-only"
 
   validation {
     condition     = contains(["http-only", "https-only", "match-viewer"], var.ssr_origin_protocol_policy)

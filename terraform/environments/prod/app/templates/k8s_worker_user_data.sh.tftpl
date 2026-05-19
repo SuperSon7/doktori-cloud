@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-# K8s Worker Node — user_data (ASG boot script)
+# K8s Worker Node — bootstrap-only user_data
 #
-# Golden Image(Packer AMI)에 containerd/kubeadm/kubelet이 이미 설치됨.
-# 이 스크립트는 동적 설정만 수행:
-#   - SSM에서 worker join 명령 조회 → kubeadm join
-#   - worker 라벨 자동 부여
+# Packer k8s base AMI에 정적 설치가 포함되어 있어야 한다.
+# 이 스크립트 책임은 SSM join-command 대기 후 kubeadm join 실행만이다.
 # =============================================================================
 set -euo pipefail
-exec > >(tee /var/log/k8s-worker-init.log) 2>&1
+exec > >(tee /var/log/k8s-worker-bootstrap.log) 2>&1
 
-# --- 변수 (Terraform templatefile 주입) ---
 REGION="${region}"
 PROJECT="${project_name}"
 ENV="${environment}"
@@ -21,14 +18,40 @@ JOIN_PARAM="$${SSM_PREFIX}/join-command"
 WORKER_IP=$(hostname -I | awk '{print $1}')
 
 echo "============================================="
-echo " K8s Worker Bootstrap"
+echo " K8s Worker Bootstrap Only"
 echo " IP: $${WORKER_IP}"
 echo "============================================="
 
-# -----------------------------------------------------------------------------
-# 1. SSM에서 join 명령 조회 (마스터 init 완료 대기)
-# -----------------------------------------------------------------------------
-echo "[1/2] SSM에서 join 명령 대기..."
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "ERROR: required command missing from k8s base AMI: $1"
+    exit 1
+  fi
+}
+
+require_file() {
+  if [ ! -e "$1" ]; then
+    echo "ERROR: required file missing from k8s base AMI: $1"
+    exit 1
+  fi
+}
+
+echo "[0/2] Packer AMI 정적 구성 확인..."
+require_cmd aws
+require_cmd containerd
+require_cmd crictl
+require_cmd kubeadm
+require_cmd kubelet
+require_file /etc/containerd/config.toml
+require_file /etc/kubernetes/ecr-credential-provider-config.yaml
+require_file /usr/local/bin/ecr-credential-provider
+
+if swapon --summary | grep -q .; then
+  echo "ERROR: swap is enabled. Rebuild k8s base AMI or fix bootstrap image."
+  exit 1
+fi
+
+echo "[1/2] SSM에서 worker join 명령 대기..."
 
 JOIN_CMD=""
 for i in $(seq 1 90); do
@@ -40,21 +63,19 @@ for i in $(seq 1 90); do
     --region "$${REGION}" 2>/dev/null || true)
 
   if [ -n "$${JOIN_CMD}" ]; then
-    echo "  → join 명령 수신"
+    echo "  -> join 명령 수신"
     break
   fi
-  echo "  → 대기 중... ($${i}/90)"
+
+  echo "  -> 대기 중... ($${i}/90)"
   sleep 10
 done
 
 if [ -z "$${JOIN_CMD}" ]; then
-  echo "ERROR: 15분 초과 — join 명령을 찾을 수 없음"
+  echo "ERROR: 15분 초과 - worker join 명령을 찾을 수 없음"
   exit 1
 fi
 
-# -----------------------------------------------------------------------------
-# 2. kubeadm join
-# -----------------------------------------------------------------------------
 echo "[2/2] kubeadm join..."
 
 eval "$${JOIN_CMD}" \
@@ -63,5 +84,5 @@ eval "$${JOIN_CMD}" \
 echo ""
 echo "============================================="
 echo " K8s Worker Bootstrap 완료"
-echo " $(hostname) — $${WORKER_IP}"
+echo " $(hostname) - $${WORKER_IP}"
 echo "============================================="

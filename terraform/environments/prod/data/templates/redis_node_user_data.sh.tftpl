@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Redis node bootstrap for self-managed HA:
+# - redis-a starts as the initial writable node
+# - redis-c/redis-b start as replicas
+# - every node runs Sentinel with quorum 2
+set -euo pipefail
+
+log() { echo "[redis-ha] $*"; }
+
+SSM_PREFIX="/${project_name}/${environment}"
+AWS_REGION="${aws_region}"
+NODE_NAME="${node_name}"
+NODE_ROLE="${node_role}"
+REDIS_SENTINEL_ENABLED="${redis_sentinel_enabled}"
+REDIS_MASTER_NAME="${redis_master_name}"
+REDIS_PRIMARY_DNS="${redis_primary_dns}"
+REDIS_SENTINEL_QUORUM="${redis_sentinel_quorum}"
+
+get_param() {
+  local path="$SSM_PREFIX/$1"
+  local attempt
+  for attempt in $(seq 1 30); do
+    if aws ssm get-parameter \
+      --region "$AWS_REGION" \
+      --cli-connect-timeout 5 \
+      --cli-read-timeout 15 \
+      --name "$path" \
+      --with-decryption \
+      --query "Parameter.Value" \
+      --output text; then
+      return 0
+    fi
+    log "SSM get-parameter retry $attempt/30 for $path"
+    sleep 3
+  done
+  log "Failed to fetch SSM parameter: $path"
+  return 1
+}
+
+wait_for_dns() {
+  local name="$1"
+  until getent hosts "$name" >/dev/null 2>&1; do
+    log "waiting for DNS: $name"
+    sleep 5
+  done
+}
+
+REDIS_PASSWORD="$(get_param SPRING_REDIS_PASSWORD)"
+if [ -z "$REDIS_PASSWORD" ] || [ "$REDIS_PASSWORD" = "CHANGE_ME" ]; then
+  log "SPRING_REDIS_PASSWORD must be injected before Redis bootstrap"
+  exit 1
+fi
+
+hostnamectl set-hostname "$NODE_NAME"
+
+TOKEN="$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+LOCAL_IPV4="$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/local-ipv4")"
+if ! grep -q " $NODE_NAME" /etc/hosts; then
+  echo "$LOCAL_IPV4 $NODE_NAME" >>/etc/hosts
+fi
+
+install -m 0755 -d /etc/redis
+
+cat >/etc/redis/redis.conf <<EOF
+bind 0.0.0.0
+protected-mode no
+port 6379
+supervised systemd
+dir /var/lib/redis
+appendonly yes
+requirepass $REDIS_PASSWORD
+masterauth $REDIS_PASSWORD
+EOF
+
+if [ "$NODE_ROLE" = "replica" ]; then
+  wait_for_dns "$REDIS_PRIMARY_DNS"
+  echo "replicaof $REDIS_PRIMARY_DNS 6379" >>/etc/redis/redis.conf
+fi
+
+if [ "$REDIS_SENTINEL_ENABLED" = "true" ]; then
+cat >/etc/redis/sentinel.conf <<EOF
+bind 0.0.0.0
+protected-mode no
+port 26379
+dir /var/lib/redis
+sentinel monitor $REDIS_MASTER_NAME $REDIS_PRIMARY_DNS 6379 $REDIS_SENTINEL_QUORUM
+sentinel auth-pass $REDIS_MASTER_NAME $REDIS_PASSWORD
+sentinel down-after-milliseconds $REDIS_MASTER_NAME 5000
+sentinel failover-timeout $REDIS_MASTER_NAME 60000
+sentinel parallel-syncs $REDIS_MASTER_NAME 1
+EOF
+
+chown redis:redis /etc/redis/redis.conf /etc/redis/sentinel.conf
+chmod 0640 /etc/redis/redis.conf /etc/redis/sentinel.conf
+
+cat >/etc/systemd/system/redis-sentinel.service <<'EOF'
+[Unit]
+Description=Redis Sentinel
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/redis-sentinel /etc/redis/sentinel.conf --supervised systemd --daemonize no
+User=redis
+Group=redis
+RuntimeDirectory=redis
+RuntimeDirectoryMode=2755
+
+[Install]
+WantedBy=multi-user.target
+EOF
+else
+  chown redis:redis /etc/redis/redis.conf
+  chmod 0640 /etc/redis/redis.conf
+fi
+
+systemctl daemon-reload
+systemctl enable redis-server
+systemctl restart redis-server
+if [ "$REDIS_SENTINEL_ENABLED" = "true" ]; then
+  systemctl enable redis-sentinel
+  systemctl restart redis-sentinel
+fi
+
+install -m 0750 -o root -g alloy -d /etc/alloy
+printf "%s" "$REDIS_PASSWORD" >/etc/alloy/redis-password
+chown root:alloy /etc/alloy/redis-password
+chmod 0640 /etc/alloy/redis-password
+
+cat >/etc/alloy/config.alloy <<EOF
+prometheus.exporter.unix "host" {
+  set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
+}
+
+prometheus.exporter.redis "redis" {
+  redis_addr          = "127.0.0.1:6379"
+  redis_password_file = "/etc/alloy/redis-password"
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "30s"
+}
+
+prometheus.scrape "redis_metrics" {
+  targets         = prometheus.exporter.redis.redis.targets
+  forward_to      = [prometheus.relabel.data_common.receiver]
+  scrape_interval = "15s"
+}
+
+prometheus.relabel "data_common" {
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+  rule {
+    replacement  = "${environment}"
+    target_label = "env"
+  }
+  rule {
+    replacement  = "redis"
+    target_label = "service"
+  }
+  rule {
+    replacement  = "$NODE_NAME"
+    target_label = "instance"
+  }
+  rule {
+    replacement  = "$NODE_ROLE"
+    target_label = "role"
+  }
+}
+
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+  }
+}
+EOF
+
+chown root:alloy /etc/alloy/config.alloy
+chmod 0640 /etc/alloy/config.alloy
+systemctl enable alloy
+systemctl restart alloy
+
+log "Redis HA bootstrap complete for $NODE_NAME ($NODE_ROLE)"
