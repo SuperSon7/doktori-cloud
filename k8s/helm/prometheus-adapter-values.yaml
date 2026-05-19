@@ -26,7 +26,7 @@ resources:
 rules:
   custom:
     # Chat WebSocket 세션 수 → HPA에서 type: Pods로 조회
-    - seriesQuery: 'chat_ws_sessions_active'
+    - seriesQuery: 'chat_ws_sessions_active{namespace!="",pod!=""}'
       resources:
         overrides:
           namespace:
@@ -35,4 +35,4 @@ rules:
             resource: pod
       name:
         as: "chat_ws_sessions_active"
-      metricsQuery: '<<.Series>>{<<.LabelMatchers>>}'
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'

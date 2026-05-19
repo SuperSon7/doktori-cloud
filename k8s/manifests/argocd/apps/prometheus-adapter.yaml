@@ -1,0 +1,56 @@
+# ArgoCD Application — prometheus-adapter (sync-wave: 0, HPA custom metrics)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-adapter
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-adapter
+    targetRevision: 5.3.0
+    helm:
+      values: |
+        prometheus:
+          url: http://monitoring.mgmt.doktori.internal
+          port: 9090
+
+        metricsRelistInterval: 1m
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+
+        rules:
+          custom:
+            - seriesQuery: 'chat_ws_sessions_active{namespace!="",pod!=""}'
+              resources:
+                overrides:
+                  namespace:
+                    resource: namespace
+                  pod:
+                    resource: pod
+              name:
+                as: "chat_ws_sessions_active"
+              metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

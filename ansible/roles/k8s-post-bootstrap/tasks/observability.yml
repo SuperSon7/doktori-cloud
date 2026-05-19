@@ -1,6 +1,6 @@
 # =============================================================================
 # Observability — install-observability.sh 대응
-# metrics-server + kube-state-metrics + Alloy + HPA
+# metrics-server + kube-state-metrics + prometheus-adapter + Alloy + HPA
 # =============================================================================
 
 - name: Check Helm installed
@@ -75,6 +75,15 @@
         --set resources.requests.memory=128Mi \
         --set resources.limits.memory=256Mi
     fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Install prometheus-adapter
+  shell: |
+    helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
+      --namespace monitoring \
+      --version {{ prometheus_adapter_version }} \
+      -f {{ k8s_scripts_dir }}/helm/prometheus-adapter-values.yaml
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 

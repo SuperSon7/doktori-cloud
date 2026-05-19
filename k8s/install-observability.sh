@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 06. Observability 설치 스크립트
-# metrics-server + kube-state-metrics (Helm) + HPA + Alloy DaemonSet
+# metrics-server + kube-state-metrics + prometheus-adapter + HPA + Alloy DaemonSet
 #
 # 사용법: master 노드에서 실행
 #   chmod +x install-observability.sh
@@ -29,7 +29,7 @@ fi
 # 1. metrics-server (Helm)
 # -----------------------------------------------------------------------------
 echo ""
-echo "[1/5] metrics-server 설치..."
+echo "[1/6] metrics-server 설치..."
 
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ 2>/dev/null || true
 helm repo update metrics-server
@@ -61,7 +61,7 @@ echo "  → metrics-server 설치 완료. 메트릭 수집까지 1~2분 소요."
 # 2. monitoring 네임스페이스
 # -----------------------------------------------------------------------------
 echo ""
-echo "[2/5] monitoring 네임스페이스..."
+echo "[2/6] monitoring 네임스페이스..."
 
 kubectl create namespace monitoring 2>/dev/null || echo "  → 이미 존재"
 kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite
@@ -70,7 +70,7 @@ kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --over
 # 3. kube-state-metrics (Helm)
 # -----------------------------------------------------------------------------
 echo ""
-echo "[3/5] kube-state-metrics 설치..."
+echo "[3/6] kube-state-metrics 설치..."
 
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
 helm repo update prometheus-community
@@ -93,10 +93,21 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 4. Alloy DaemonSet
+# 4. prometheus-adapter (Helm)
 # -----------------------------------------------------------------------------
 echo ""
-echo "[4/5] Alloy DaemonSet 배포..."
+echo "[4/6] prometheus-adapter 설치..."
+
+helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
+  --namespace monitoring \
+  --version "${PROMETHEUS_ADAPTER_VERSION}" \
+  -f "${SCRIPT_DIR}/helm/prometheus-adapter-values.yaml"
+
+# -----------------------------------------------------------------------------
+# 5. Alloy DaemonSet
+# -----------------------------------------------------------------------------
+echo ""
+echo "[5/6] Alloy DaemonSet 배포..."
 
 kubectl apply -f "${SCRIPT_DIR}/manifests/monitoring/alloy-rbac.yaml"
 kubectl apply -f "${SCRIPT_DIR}/manifests/monitoring/alloy-configmap.yaml"
@@ -106,10 +117,10 @@ sed "s|__ALLOY_VERSION__|${ALLOY_VERSION}|g" \
   "${SCRIPT_DIR}/manifests/monitoring/alloy-daemonset.yaml" | kubectl apply -f -
 
 # -----------------------------------------------------------------------------
-# 5. HPA
+# 6. HPA
 # -----------------------------------------------------------------------------
 echo ""
-echo "[5/5] HPA 적용..."
+echo "[6/6] HPA 적용..."
 
 kubectl apply -f "${SCRIPT_DIR}/manifests/hpa/chat-hpa.yaml"
 kubectl apply -f "${SCRIPT_DIR}/manifests/hpa/api-hpa.yaml"
@@ -131,6 +142,10 @@ echo "--- monitoring namespace pods ---"
 kubectl get pods -n monitoring
 
 echo ""
+echo "--- custom metrics API ---"
+kubectl get apiservice v1beta1.custom.metrics.k8s.io 2>/dev/null || true
+
+echo ""
 echo "--- HPA ---"
 kubectl get hpa -n "${NAMESPACE}"
 
@@ -143,6 +158,7 @@ echo "============================================="
 echo " 다음 단계:"
 echo "   1. kubectl top pods -n ${NAMESPACE}  → 메트릭 확인"
 echo "   2. HPA TARGETS에 CPU % 표시 확인"
-echo "   3. Alloy UI: kubectl port-forward -n monitoring ds/alloy 12345:12345"
-echo "   4. Grafana에서 up{env=\"prod-k8s\"} 쿼리로 수신 확인"
+echo "   3. kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1"
+echo "   4. Alloy UI: kubectl port-forward -n monitoring ds/alloy 12345:12345"
+echo "   5. Grafana에서 up{env=\"prod-k8s\"} 쿼리로 수신 확인"
 echo "============================================="

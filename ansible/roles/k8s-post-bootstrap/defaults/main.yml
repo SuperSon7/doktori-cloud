@@ -18,6 +18,7 @@ loki_port: "3100"
 # --- Helm 차트 버전 ---
 metrics_server_version: "3.12.2"
 kube_state_metrics_version: "5.28.1"
+prometheus_adapter_version: "5.3.0"
 argocd_chart_version: "8.0.14"
 external_secrets_chart_version: "2.2.0"
 

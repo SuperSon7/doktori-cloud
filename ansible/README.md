@@ -34,7 +34,7 @@ ansible/
 │       └── tasks/
 │           ├── main.yml              # 오케스트레이션
 │           ├── workloads.yml         # ECR + Deployments + Gateway
-│           ├── observability.yml     # metrics-server + Alloy + HPA
+│           ├── observability.yml     # metrics-server + prometheus-adapter + Alloy + HPA
 │           ├── argocd.yml            # ArgoCD + Git 연결
 │           └── hardening.yml         # etcd 암호화 + kubelet 보안
 ```
