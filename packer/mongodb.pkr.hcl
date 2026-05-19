@@ -1,13 +1,10 @@
 # =============================================================================
-# Frontend AMI — Docker CE + Compose + AWS CLI + SSM + CodeDeploy
+# MongoDB AMI — MongoDB server + Alloy + AWS CLI + SSM Agent
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Source: Ubuntu 22.04 arm64
-# -----------------------------------------------------------------------------
-source "amazon-ebs" "frontend" {
-  ami_name        = "${var.project_name}-frontend-arm64-${local.timestamp}"
-  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent, CodeDeploy Agent"
+source "amazon-ebs" "mongodb" {
+  ami_name        = "${var.project_name}-mongodb-arm64-${local.timestamp}"
+  ami_description = "MongoDB ${var.mongodb_version}, Grafana Alloy, AWS CLI v2, SSM Agent"
   instance_type   = "t4g.small"
   region          = var.aws_region
 
@@ -39,33 +36,30 @@ source "amazon-ebs" "frontend" {
   temporary_security_group_source_public_ip = true
 
   tags = {
-    Name         = "${var.project_name}-frontend-arm64-${local.timestamp}"
+    Name         = "${var.project_name}-mongodb-arm64-${local.timestamp}"
     Project      = var.project_name
-    AMI_Type     = "frontend"
-    Docker       = var.docker_version
+    AMI_Type     = "mongodb"
+    MongoDB      = var.mongodb_version
     Architecture = "arm64"
     BuildDate    = local.timestamp
   }
 }
 
-# -----------------------------------------------------------------------------
-# Build
-# -----------------------------------------------------------------------------
 build {
-  sources = ["source.amazon-ebs.frontend"]
+  sources = ["source.amazon-ebs.mongodb"]
 
   provisioner "shell" {
-    script = "packer/scripts/frontend-setup.sh"
+    script = "packer/scripts/mongodb-setup.sh"
     environment_vars = [
-      "DOCKER_VERSION=${var.docker_version}",
-      "AWS_REGION=${var.aws_region}",
+      "MONGODB_VERSION=${var.mongodb_version}",
+      "ALLOY_VERSION=${var.alloy_version}",
       "DEBIAN_FRONTEND=noninteractive",
     ]
     execute_command = "sudo -S env {{ .Vars }} bash '{{ .Path }}'"
   }
 
   post-processor "manifest" {
-    output     = "packer/manifest-frontend.json"
+    output     = "packer/manifest-mongodb.json"
     strip_path = true
   }
 }

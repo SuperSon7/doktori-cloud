@@ -1,13 +1,10 @@
 # =============================================================================
-# Frontend AMI — Docker CE + Compose + AWS CLI + SSM + CodeDeploy
+# Loadtest Runner AMI — k6 + Docker + AWS CLI + SSM
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Source: Ubuntu 22.04 arm64
-# -----------------------------------------------------------------------------
-source "amazon-ebs" "frontend" {
-  ami_name        = "${var.project_name}-frontend-arm64-${local.timestamp}"
-  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent, CodeDeploy Agent"
+source "amazon-ebs" "loadtest_runner" {
+  ami_name        = "${var.project_name}-loadtest-runner-arm64-${local.timestamp}"
+  ami_description = "Loadtest runner arm64: k6 ${var.k6_version}, Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent"
   instance_type   = "t4g.small"
   region          = var.aws_region
 
@@ -39,25 +36,23 @@ source "amazon-ebs" "frontend" {
   temporary_security_group_source_public_ip = true
 
   tags = {
-    Name         = "${var.project_name}-frontend-arm64-${local.timestamp}"
+    Name         = "${var.project_name}-loadtest-runner-arm64-${local.timestamp}"
     Project      = var.project_name
-    AMI_Type     = "frontend"
+    AMI_Type     = "loadtest-runner"
+    K6           = var.k6_version
     Docker       = var.docker_version
     Architecture = "arm64"
     BuildDate    = local.timestamp
   }
 }
 
-# -----------------------------------------------------------------------------
-# Build
-# -----------------------------------------------------------------------------
 build {
-  sources = ["source.amazon-ebs.frontend"]
+  sources = ["source.amazon-ebs.loadtest_runner"]
 
   provisioner "shell" {
-    script = "packer/scripts/frontend-setup.sh"
+    script = "packer/scripts/loadtest-runner-setup.sh"
     environment_vars = [
-      "DOCKER_VERSION=${var.docker_version}",
+      "K6_VERSION=${var.k6_version}",
       "AWS_REGION=${var.aws_region}",
       "DEBIAN_FRONTEND=noninteractive",
     ]
@@ -65,7 +60,7 @@ build {
   }
 
   post-processor "manifest" {
-    output     = "packer/manifest-frontend.json"
+    output     = "packer/manifest-loadtest-runner.json"
     strip_path = true
   }
 }

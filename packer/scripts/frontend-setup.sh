@@ -30,6 +30,9 @@ install_base_packages() {
   log "[1/7] Installing base packages"
   wait_for_apt
   apt-get update -qq
+  apt-get install -y -qq software-properties-common
+  add-apt-repository -y universe
+  apt-get update -qq
   apt-get install -y -qq \
     ca-certificates curl gnupg \
     unzip jq htop net-tools \
@@ -58,10 +61,8 @@ install_docker() {
       docker-buildx-plugin \
       docker-compose-plugin
   else
-    log "Requested Docker version unavailable, installing latest"
-    apt-get install -y -qq \
-      docker-ce docker-ce-cli containerd.io \
-      docker-buildx-plugin docker-compose-plugin
+    log "Requested Docker version unavailable: ${DOCKER_VERSION}"
+    exit 1
   fi
 
   apt-mark hold docker-ce docker-ce-cli

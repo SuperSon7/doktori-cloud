@@ -1,13 +1,10 @@
 # =============================================================================
-# Frontend AMI — Docker CE + Compose + AWS CLI + SSM + CodeDeploy
+# NAT AMI — IP forwarding + persistent MASQUERADE + WireGuard tools + AWS CLI + SSM
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Source: Ubuntu 22.04 arm64
-# -----------------------------------------------------------------------------
-source "amazon-ebs" "frontend" {
-  ami_name        = "${var.project_name}-frontend-arm64-${local.timestamp}"
-  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent, CodeDeploy Agent"
+source "amazon-ebs" "nat" {
+  ami_name        = "${var.project_name}-nat-arm64-${local.timestamp}"
+  ami_description = "NAT instance arm64 base: ip_forward, persistent MASQUERADE, WireGuard tools, AWS CLI v2, SSM Agent"
   instance_type   = "t4g.small"
   region          = var.aws_region
 
@@ -39,25 +36,20 @@ source "amazon-ebs" "frontend" {
   temporary_security_group_source_public_ip = true
 
   tags = {
-    Name         = "${var.project_name}-frontend-arm64-${local.timestamp}"
+    Name         = "${var.project_name}-nat-arm64-${local.timestamp}"
     Project      = var.project_name
-    AMI_Type     = "frontend"
-    Docker       = var.docker_version
+    AMI_Type     = "nat"
     Architecture = "arm64"
     BuildDate    = local.timestamp
   }
 }
 
-# -----------------------------------------------------------------------------
-# Build
-# -----------------------------------------------------------------------------
 build {
-  sources = ["source.amazon-ebs.frontend"]
+  sources = ["source.amazon-ebs.nat"]
 
   provisioner "shell" {
-    script = "packer/scripts/frontend-setup.sh"
+    script = "packer/scripts/nat-setup.sh"
     environment_vars = [
-      "DOCKER_VERSION=${var.docker_version}",
       "AWS_REGION=${var.aws_region}",
       "DEBIAN_FRONTEND=noninteractive",
     ]
@@ -65,7 +57,7 @@ build {
   }
 
   post-processor "manifest" {
-    output     = "packer/manifest-frontend.json"
+    output     = "packer/manifest-nat.json"
     strip_path = true
   }
 }

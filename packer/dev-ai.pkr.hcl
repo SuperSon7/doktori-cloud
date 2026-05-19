@@ -1,13 +1,10 @@
 # =============================================================================
-# Frontend AMI — Docker CE + Compose + AWS CLI + SSM + CodeDeploy
+# Dev AI AMI — Docker host for dev AI, batch, and Qdrant workloads
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Source: Ubuntu 22.04 arm64
-# -----------------------------------------------------------------------------
-source "amazon-ebs" "frontend" {
-  ami_name        = "${var.project_name}-frontend-arm64-${local.timestamp}"
-  ami_description = "Frontend: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent, CodeDeploy Agent"
+source "amazon-ebs" "dev_ai" {
+  ami_name        = "${var.project_name}-dev-ai-arm64-${local.timestamp}"
+  ami_description = "Dev AI Docker host: Docker CE ${var.docker_version}, AWS CLI v2, SSM Agent"
   instance_type   = "t4g.small"
   region          = var.aws_region
 
@@ -39,23 +36,20 @@ source "amazon-ebs" "frontend" {
   temporary_security_group_source_public_ip = true
 
   tags = {
-    Name         = "${var.project_name}-frontend-arm64-${local.timestamp}"
+    Name         = "${var.project_name}-dev-ai-arm64-${local.timestamp}"
     Project      = var.project_name
-    AMI_Type     = "frontend"
+    AMI_Type     = "dev-ai"
     Docker       = var.docker_version
     Architecture = "arm64"
     BuildDate    = local.timestamp
   }
 }
 
-# -----------------------------------------------------------------------------
-# Build
-# -----------------------------------------------------------------------------
 build {
-  sources = ["source.amazon-ebs.frontend"]
+  sources = ["source.amazon-ebs.dev_ai"]
 
   provisioner "shell" {
-    script = "packer/scripts/frontend-setup.sh"
+    script = "packer/scripts/dev-ai-setup.sh"
     environment_vars = [
       "DOCKER_VERSION=${var.docker_version}",
       "AWS_REGION=${var.aws_region}",
@@ -65,7 +59,7 @@ build {
   }
 
   post-processor "manifest" {
-    output     = "packer/manifest-frontend.json"
+    output     = "packer/manifest-dev-ai.json"
     strip_path = true
   }
 }

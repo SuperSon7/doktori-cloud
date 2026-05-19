@@ -33,6 +33,9 @@ plan.out
 # Packer
 packer/manifest-*.json
 
+# Local Alloy config overrides (machine-specific)
+*.alloy.local
+
 # State backups (local only)
 state-backup/
 **/state-backup/
@@ -119,6 +122,11 @@ load-tests/result/
 # Local Docs
 # =============================================================================
 docs/
+
+# =============================================================================
+# Claude Code session artifacts
+# =============================================================================
+agent.md
 
 # =============================================================================
 # MVP Backup (contains credentials)
