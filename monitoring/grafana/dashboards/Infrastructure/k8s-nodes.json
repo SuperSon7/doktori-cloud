@@ -1441,7 +1441,7 @@
           "refId": "A"
         }
       ],
-      "title": "Number of CPU Core Throttled",
+      "title": "CPU Steal Time",
       "type": "timeseries"
     },
     {
