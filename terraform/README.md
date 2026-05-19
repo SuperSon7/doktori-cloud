@@ -1,350 +1,488 @@
-# Doktori — Terraform Infrastructure
+# Doktori Terraform 인프라
 
-dev / staging / prod 3개 환경의 AWS 인프라를 관리하는 Terraform 구성.
+AWS 인프라를 Terraform으로 관리한다. 환경은 디렉터리 기반으로 분리하고, 각 환경은 `base` / `data` / `app` 레이어를 독립 state로 나누어 변경 영향 범위를 제한한다.
 
-환경은 디렉토리 기반으로 완전 분리하고, 각 환경을 base / app / data 3계층으로 나누어 변경의 영향 범위(Blast Radius) 를 최소화한다.
+현재 운영 기준은 다음과 같다.
 
-## Architecture
+- `base`: VPC, 서브넷, NAT 인스턴스, Route53 프라이빗 호스팅 영역, 환경 공통 SSM 파라미터 껍데기
+- `data`: RDS, S3, 상태 저장 데이터 서비스, `data`와 `app`이 공유하는 상태 리소스
+- `app`: EC2, ASG, ALB/NLB, K8s worker 라우팅, 배포 대상 컴퓨팅 리소스
+- `monitoring`: 별도 mgmt VPC, Loki S3, Prometheus/Loki/Grafana EC2
+- `global`, `ecr`, `dns_zone`: 계정/리전/도메인 공통 리소스
+
+## 아키텍처
 
 ```
-                          ┌─────────────────────────────────┐
-                          │           global/                │
-                          │  OIDC, IAM Groups, Budget Alert  │
-                          └──────────────┬──────────────────┘
-                                         │
-               ┌─────────────────────────┼─────────────────────────┐
-               │                         │                         │
-        ┌──────▼──────┐           ┌──────▼──────┐          ┌──────▼──────┐
-        │   dev/base  │           │staging/base │          │  prod/base  │
-        │ VPC 10.0/16 │           │ VPC 10.2/16 │          │ VPC 10.1/16 │
-        │ NAT+VPN inst│           │ NAT Instance│          │ NAT Instance│
-        └──────┬──────┘           └──────┬──────┘          │+VPC Endpoint│
-          ┌────┴────┐               ┌────┴────┐            └──────┬──────┘
-        ┌─▼───┐ ┌───▼─────┐  ┌────▼───┐ ┌───▼─────┐       ┌────┴────┐
-        │dev/ │ │ dev/app │  │stg/app │ │stg/data │  ┌────▼───┐ ┌──▼─────┐
-        │data │ │2 inst.  │  │6 inst. │ │  RDS    │  │prod/app│ │prod/dat│
-        │ S3  │ │all-in-1 │  │(micro) │ │(dispos.)│  │6 inst. │ │  RDS   │
-        └─────┘ └─────────┘  └────────┘ └─────────┘  └────────┘ └────────┘
+                          +--------------------------------+
+                          |            global/             |
+                          | OIDC, IAM 그룹/역할, Budget    |
+                          +---------------+----------------+
+                                          |
+             +----------------------------+-----------------------------+
+             |                            |                             |
+      +------v------+              +------v------+              +------v------+
+      |  dev/base   |              |staging/base |              | prod/base   |
+      | VPC 10.0/16 |              | VPC 10.2/16 |              | VPC 10.1/16 |
+      | NAT 1대     |              | NAT 1대     |              | 3 AZ + NAT 3|
+      +------+------+              +------+------+              +------+------+
+             |                            |                            |
+      +------v------+              +------v------+              +------v------+
+      |  dev/data   |              |staging/data |              | prod/data   |
+      | S3 + SSM    |              | RDS + S3    |              | RDS Proxy   |
+      +------+------+              +------+------+              | S3 + Redis  |
+             |                            |                     | RabbitMQ    |
+      +------v------+              +------v------+              | MongoDB     |
+      |  dev/app    |              |staging/app  |              +------+------+
+      | app/front/ai|              | nginx+서비스|                     |
+      | qdrant/batch|              | 선택 hK8s   |              +------v------+
+      +-------------+              +-------------+              | prod/app    |
+                                                                 | 프론트 ASG |
+      +----------------------------+                             | 공개 ALB   |
+      |        monitoring/         |                             | K8s ASG    |
+      | mgmt VPC 172.16.0.0/16    |                             | 내부 NLB   |
+      | base / data / app          |                             +------+------+
+      | dev/prod VPC 피어링        |                                    |
+      +----------------------------+                             +------v------+
+                                                                 | prod/cdn    |
+                                                                 | CloudFront  |
+                                                                 | S3 OAC      |
+                                                                 +-------------+
 
-        ┌──────────────────────┐      ┌─────────────┐      ┌─────────────┐
-        │     monitoring/      │      │  dns_zone/  │      │ prod CDN    │
-        │  mgmt VPC 172.16/16  │      │  Route53 +  │      │ CloudFront  │
-        │  base / data / app   │      │  Google WS  │      │  + S3 OAC   │
-        │  (VPC Peering: dev)  │      └─────────────┘      │  + S3 OAC   │
-        └──────────────────────┘                           └─────────────┘
+      +-------------+       +----------------+       +----------------------+
+      | dns_zone/   |       | ecr/           |       | 부하 테스트 루트     |
+      | Route53 +   |       | 공용 저장소    |       | staging/prod 러너    |
+      | Google WS   |       | dev/prod 태그  |       | 별도 계정            |
+      +-------------+       +----------------+       +----------------------+
 ```
 
-## Directory Structure
+운영 공개 트래픽 흐름:
+
+```
+doktori.kr          -> CloudFront -> front.doktori.kr ALB 오리진 -> 프론트 ASG
+doktori.kr/api/*    -> CloudFront -> ALB -> K8s worker NodePort 30080 -> NGF
+api.doktori.kr      -> ALB 직접 접근 -> K8s worker NodePort 30080 -> NGF
+api.doktori.kr/ws/* -> ALB 직접 접근 -> K8s WebSocket 경로
+```
+
+## 디렉터리 구조
 
 ```
 terraform/
 ├── backend.hcl                    # S3 backend 공통 설정
-├── backend/                       # State backend 부트스트랩 (S3)
-├── global/                        # 계정 수준 리소스 (OIDC, IAM, Budget)
+├── backend/                       # Terraform state S3 버킷 부트스트랩
+├── global/                        # 계정 수준 리소스: OIDC, IAM, Budget
+├── ecr/                           # 공용 ECR 저장소
+├── dns_zone/                      # Route53 Hosted Zone + Google Workspace 레코드
 ├── modules/
-│   ├── networking/                # VPC, Subnet, NAT Instance, VPC Endpoint
-│   ├── compute/                   # EC2, SG, IAM Role, EIP
-│   ├── database/                  # RDS, Parameter Group, DB Password (SSM)
-│   ├── storage/                   # S3, KMS, IAM (per-env)
-│   └── ssm-parameters/            # SSM Parameter Store (앱 시크릿 write)
-├── ecr/                           # ECR repositories (cross-env)
+│   ├── networking/                # VPC, 서브넷, NAT 인스턴스, S3 Gateway Endpoint, 선택 Interface Endpoint
+│   ├── compute/                   # EC2, SG, IAM Role/Profile, 선택 EIP
+│   ├── database/                  # RDS MySQL, Parameter Group, 선택 RDS Proxy
+│   ├── storage/                   # S3, 선택 KMS/IAM/ECR
+│   ├── ssm-parameters/            # SSM Parameter Store 껍데기 리소스
+│   ├── frontend/                  # 공개 ALB + 프론트 ASG
+│   └── k8s-cluster/               # K8s master/worker ASG + 내부 NLB
 ├── environments/
 │   ├── dev/
-│   │   ├── base/                  # VPC (10.0.0.0/16), NAT+VPN Instance
-│   │   ├── data/                  # S3 버킷, SSM 파라미터
-│   │   └── app/                   # EC2 x2 (all-in-one)
+│   │   ├── base/                  # VPC 10.0.0.0/16, NAT, dev SSM/Qdrant 파라미터
+│   │   ├── data/                  # dev S3 app 버킷 + S3 SSM 파라미터
+│   │   └── app/                   # app, front, ai, ai-qdrant, ai-batch EC2
 │   ├── staging/
-│   │   ├── base/                  # VPC (10.2.0.0/16)
-│   │   ├── data/                  # RDS (disposable)
-│   │   ├── app/                   # EC2 x6 (service-per-instance)
-│   │   ├── loadtest/              # k6 runner (staging 내 부하테스트)
-│   │   └── prod-spec.tfvars       # Prod-equivalent specs for load testing
+│   │   ├── base/                  # VPC 10.2.0.0/16
+│   │   ├── data/                  # 폐기 가능한 RDS + staging S3
+│   │   ├── app/                   # nginx/front/api/chat/ai/data 보조 EC2 + 선택 h-k8s 노드
+│   │   ├── loadtest/              # staging VPC 내부 k6 러너
+│   │   └── prod-spec.tfvars       # 부하 테스트용 운영 사양 프로파일
 │   ├── prod/
-│   │   ├── base/                  # VPC (10.1.0.0/16) + VPC Endpoints
-│   │   ├── data/                  # RDS (protected)
-│   │   ├── app/                   # EC2 x6 (service-per-instance)
-│   │   └── cdn/                   # CloudFront + S3 static assets
-│   └── loadtest/                  # Standalone 부하테스트 (별도 계정, remote_state 없음)
-├── monitoring/                    # Prometheus + Loki + Grafana (mgmt VPC 172.16.0.0/16)
-│   ├── base/                      # VPC, NAT+VPN Instance, VPC Peering
-│   ├── data/                      # EBS 볼륨 (Prometheus TSDB, Loki chunks)
-│   └── app/                       # EC2 (monitoring 서버), SG
-└── dns_zone/                      # Route53 Hosted Zone + Google Workspace MX
+│   │   ├── base/                  # VPC 10.1.0.0/16, 3개 AZ의 공개/app/db 서브넷, NAT 3대
+│   │   ├── data/                  # RDS Proxy, app S3, CodeDeploy revision 버킷, Redis/RabbitMQ/MongoDB EC2
+│   │   ├── app/                   # 프론트 ASG/ALB, K8s ASG/NLB, front/AI/RDS exporter 보조 EC2
+│   │   ├── cdn/                   # CloudFront + 정적 S3 + OAC + DNS
+│   │   └── loadtest/              # prod VPC k6 러너
+│   └── loadtest/                  # 별도 부하 테스트 계정 VPC/러너, 기본 local state
+├── monitoring/
+│   ├── base/                      # mgmt VPC, NAT/WireGuard, PHZ, VPC 피어링 라우트
+│   ├── data/                      # Loki S3 버킷 + 수명주기
+│   └── app/                       # 프라이빗 서브넷의 monitoring EC2 + IAM/SG
+└── scripts/
+    └── assert-clean-plan.sh       # apply 후 clean plan 검증
 ```
 
-## Prerequisites
+## 사전 준비
 
-- Terraform >= 1.10.0
-- AWS CLI configured with appropriate IAM permissions
-- Access to `doktori-terraform-state` S3 bucket
+- Terraform `>= 1.10.0` (`.github/workflows`는 현재 `1.14.8` 사용)
+- 필요한 IAM 권한으로 설정된 AWS CLI
+- `doktori-terraform-state` S3 버킷 접근 권한
+- CI 방식의 plan JSON 검사를 위한 `jq`
 
-## Quick Start
+## 빠른 시작
+
+단일 루트 모듈 실행:
 
 ```bash
-# Single layer
 cd terraform/environments/prod/base
 terraform init -backend-config=../../../backend.hcl
 terraform plan
 terraform apply
-
-# All layers (local plan)
-./scripts/plan-all.sh              # all environments
-./scripts/plan-all.sh prod         # prod only
-./scripts/plan-all.sh staging dev  # staging + dev
 ```
 
-### Apply Order
+공통 루트 모듈은 backend 설정 파일의 상대 경로가 다르다.
 
-New environment setup requires sequential apply:
+| 루트 유형 | 예시 | backend 설정 |
+|-----------|------|--------------|
+| 공통 | `terraform/global`, `terraform/ecr`, `terraform/dns_zone` | `../backend.hcl` |
+| 모니터링 | `terraform/monitoring/base` | `../../backend.hcl` |
+| 환경 | `terraform/environments/prod/app` | `../../../backend.hcl` |
+| 독립 부하 테스트 | `terraform/environments/loadtest` | 기본 local state |
 
-```
-backend → global → ecr → dns_zone → monitoring/base → monitoring/data → monitoring/app
-→ {env}/base → monitoring re-apply → {env}/data → {env}/app → prod/cdn
-```
+검증:
 
-`base` must complete before `data`/`app` because they reference base outputs via `terraform_remote_state`.  
-`app` must run after `data` when it reads stateful outputs such as S3 bucket ARNs, RDS endpoints, or CodeDeploy revision buckets.
-
-### Base 변경 시 PR 분리 (필수)
-
-`base` 레이어에 **새 output이 추가**되는 변경이 있으면 반드시 PR을 분리한다:
-
-```
-1. PR #1: base 변경만 (modules/ + base layers + outputs)
-   → merge → CI가 base apply → remote state에 새 output 반영
-
-2. PR #2: app/data 변경 (새 output을 참조하는 리소스)
-   → 이제 plan이 정상 동작 → 리뷰에서 실제 변경 확인 가능
+```bash
+terraform fmt -check -recursive terraform/
+terraform -chdir=terraform/environments/prod/app init -backend=false
+terraform -chdir=terraform/environments/prod/app validate
 ```
 
-**이유**: app/data는 `terraform_remote_state`로 base output을 읽는다. base가 apply되기 전에는 새 output이 state에 없으므로 app/data plan이 실패한다. 한 PR에 합치면 CI plan에서 app/data 검증이 불가능하다.
+현재 로컬 전체 plan 스크립트는 없다. 루트 모듈별로 실행하거나 GitHub Actions PR plan을 사용한다.
 
-`plan-all.sh`도 이 의존성을 인식하여, base에 changes가 있으면 하위 레이어를 자동으로 skip한다.
+## 적용 순서
 
-## State Management
+새 환경 생성 또는 의존성 변경은 아래 순서로 적용한다.
 
-| Item | Value |
-|------|-------|
+```
+backend
+-> global
+-> ecr
+-> dns_zone
+-> monitoring/base
+-> monitoring/data
+-> monitoring/app
+-> {env}/base
+-> monitoring/base 재적용
+-> {env}/data
+-> {env}/app
+-> prod/cdn
+```
+
+`data`와 `app`은 `base` 출력값을 `terraform_remote_state`로 읽으므로 `base`가 먼저 적용되어야 한다. `app`은 S3 버킷, RDS endpoint, CodeDeploy revision 버킷 같은 상태 리소스 출력값을 읽으므로 `data` 이후에 적용한다. `prod/cdn`은 `prod/app` 출력값을 읽는다.
+
+부하 테스트 레이어:
+
+- `staging/loadtest`: staging base 이후 적용
+- `prod/loadtest`: prod base 이후 적용
+- `environments/loadtest`: 별도 부하 테스트 계정용 독립 VPC이며 기본은 local state
+
+### `base` 변경 시 PR 분리
+
+`base` 레이어에 새 출력값이 추가되거나 기존 출력값 구조가 바뀌면 PR을 분리한다.
+
+```
+1. PR #1: base 변경만
+   -> merge -> CI 또는 수동 apply로 원격 state 갱신
+
+2. PR #2: data/app/cdn 변경
+   -> 새 출력값 참조 가능
+```
+
+한 PR에 합치면 하위 레이어 plan이 아직 원격 state에 없는 출력값을 읽다가 실패할 수 있다.
+
+## 상태 관리
+
+| 항목 | 값 |
+|------|----|
 | Backend | S3 (`doktori-terraform-state`) |
-| Locking | S3 native lockfile (`use_lockfile = true`) |
-| Encryption | AES-256 (S3 SSE) |
-| Versioning | Enabled |
+| 잠금 | S3 native lockfile (`use_lockfile = true`) |
+| 암호화 | AES-256 S3 SSE |
+| 버전 관리 | 활성화 |
 
-공통 backend 설정은 `backend.hcl`에 정의하고, 각 레이어의 `providers.tf`에서 state key만 지정한다.
+각 루트 모듈의 `providers.tf`는 state key만 지정하고, 공통 버킷/리전/lockfile 설정은 `backend.hcl`에서 주입한다.
 
 ```
-# State key 구조
 global/terraform.tfstate
 ecr/terraform.tfstate
 dns_zone/terraform.tfstate
 monitoring/base/terraform.tfstate
 monitoring/data/terraform.tfstate
 monitoring/app/terraform.tfstate
-{env}/base/terraform.tfstate
-{env}/data/terraform.tfstate
-{env}/app/terraform.tfstate
+dev/base/terraform.tfstate
+dev/data/terraform.tfstate
+dev/app/terraform.tfstate
+staging/base/terraform.tfstate
+staging/data/terraform.tfstate
+staging/app/terraform.tfstate
+staging/loadtest/terraform.tfstate
+prod/base/terraform.tfstate
+prod/data/terraform.tfstate
+prod/app/terraform.tfstate
 prod/cdn/terraform.tfstate
+prod/loadtest/terraform.tfstate
 ```
 
-> `backend/` 디렉토리에서 state S3 bucket 자체를 Terraform으로 관리 (부트스트랩).
+`backend/` 디렉터리는 state S3 버킷 자체를 관리하는 부트스트랩 루트 모듈이다. `environments/loadtest`에는 별도 S3 backend 예시가 주석으로 남아 있지만 현재 기본은 local state다.
 
-## Environment Comparison
+## 환경 비교
 
-| | dev | staging | prod |
+| 항목 | dev | staging | prod |
 |---|---|---|---|
-| VPC CIDR | 10.0.0.0/16 | 10.2.0.0/16 | 10.1.0.0/16 |
-| Instance layout | All-in-one x2 | Service-per-instance x6 | Service-per-instance x6 |
-| App subnet | Public | Private | Private |
-| VPC Endpoints | None | None | SSM, ECR, Logs (x6) |
-| RDS | None (EC2 MySQL) | Disposable | Protected (GTID, 7d backup) |
-| S3 | doktori-dev | — | doktori-prod |
-| NAT | Ubuntu NAT Instance + WireGuard VPN | Amazon Linux NAT Instance | Amazon Linux NAT Instance |
-| Monitoring 연결 | VPC Peering (dev ↔ mgmt) | — | VPC Peering (prod ↔ mgmt) |
+| VPC CIDR | `10.0.0.0/16` | `10.2.0.0/16` | `10.1.0.0/16` |
+| AZ 구성 | 단일 AZ | 단일 AZ 중심 + 보조 서브넷 | 3개 AZ app/db 서브넷 |
+| NAT | NAT 인스턴스 1대 | NAT 인스턴스 1대 | NAT 인스턴스 3대 |
+| Interface VPC Endpoint | 없음 | 없음 | 없음 |
+| S3 Gateway Endpoint | 있음 | 있음 | 있음 |
+| 앱 구성 | 프라이빗 EC2: app/front/ai/qdrant/batch | 공개 nginx + 프라이빗 서비스 EC2, 선택 h-k8s | 프론트 ASG/ALB + K8s master/worker ASG/NLB + 보조 EC2 |
+| 데이터 구성 | S3만 Terraform 관리, DB는 dev app host 내부 | RDS + S3 | RDS MySQL 8.4 + RDS Proxy + S3 + Redis/RabbitMQ/MongoDB EC2 |
+| RDS | 없음 | 폐기 가능, 직접 endpoint | 삭제 보호, GTID 파라미터, RDS Proxy |
+| CDN | 없음 | 없음 | CloudFront + S3 OAC |
+| 모니터링 피어링 | dev <-> mgmt | 없음 | prod <-> mgmt |
+| 비용 제어 | AutoStop 태그, 주간 배치 기본 정지 | 수동 start/stop/scale 워크플로우 | prod 승인 + 보호 리소스 |
 
-## Network CIDR Plan
+`networking` 모듈은 Interface Endpoint를 지원하지만 현재 모든 환경에서 비활성화되어 있다. S3 Gateway Endpoint는 기본 생성된다.
 
-| Network | CIDR | Notes |
+## 네트워크 CIDR 계획
+
+| 네트워크 | CIDR | 비고 |
 |---|---:|---|
-| dev VPC | 10.0.0.0/16 | Development environment VPC |
-| prod VPC | 10.1.0.0/16 | Production environment VPC |
-| staging VPC | 10.2.0.0/16 | Disposable staging VPC |
-| mgmt VPC | 172.16.0.0/16 | Monitoring server and WireGuard/NAT VPC |
-| prod K8s Pod CIDR | 100.64.0.0/16 | Calico pod network, outside the 10/8 VPC plan |
-| prod K8s Service CIDR | 198.18.16.0/20 | ClusterIP range, avoids 10/8 and mgmt 172.16/16 |
+| dev VPC | `10.0.0.0/16` | 개발 환경 |
+| prod VPC | `10.1.0.0/16` | 운영 환경 |
+| staging VPC | `10.2.0.0/16` | 폐기 가능한 staging 환경 |
+| 독립 부하 테스트 VPC | `10.200.0.0/16` | 별도 부하 테스트 계정/모듈 |
+| mgmt VPC | `172.16.0.0/16` | 모니터링과 WireGuard/NAT VPC |
+| prod K8s Pod CIDR | `100.64.0.0/16` | Calico pod 네트워크 |
+| prod K8s Service CIDR | `198.18.16.0/20` | ClusterIP 범위 |
 
-CIDR allocation rules:
+CIDR 할당 규칙:
 
-- Environment VPCs use non-overlapping `/16` blocks under `10.0.0.0/8`.
-- mgmt uses `172.16.0.0/16` and must not overlap with any Kubernetes Service CIDR.
-- Kubernetes Pod CIDRs use `100.64.0.0/10` space, split per cluster as needed.
-- Kubernetes Service CIDRs use small `/20` blocks under `198.18.0.0/15`; do not use broad `10.96.0.0/12` because it conflicts with future `10.x.0.0/16` VPC expansion.
-- Security group descriptions should read as `from <source> to <target/service>` so source CIDRs and SG references stay understandable in AWS.
+- 환경 VPC는 `10.0.0.0/8` 아래에서 서로 겹치지 않는 `/16` 블록을 사용한다.
+- mgmt는 `172.16.0.0/16`을 사용하며 Kubernetes Service CIDR와 겹치면 안 된다.
+- Kubernetes Pod CIDR는 `100.64.0.0/10` 대역을 사용한다.
+- Kubernetes Service CIDR는 `198.18.0.0/15` 아래 작은 `/20` 블록을 사용한다. 향후 `10.x.0.0/16` VPC 확장과 충돌하므로 넓은 `10.96.0.0/12`는 사용하지 않는다.
+- 보안 그룹 description은 AWS 콘솔에서 출발지와 목적지를 이해하기 쉽도록 `from <source> to <target/service>` 형태를 유지한다.
 
-## Timeout And Keepalive Plan
+## 운영 라우팅과 런타임 구성
 
-Ingress timeout order should keep the outer client-facing layer slightly longer than the inner service deadline, so users receive application errors instead of edge/proxy disconnects.
+### prod/base
 
-| Path | Timeout / keepalive | Rationale |
+- 공개 서브넷: `public`, `public_c`, `public_b`
+- App 프라이빗 서브넷: `private_app`, `private_app_c`, `private_app_b`
+- DB 프라이빗 서브넷: `private_db_a`, `private_db_c`, `private_db_b`
+- NAT 인스턴스: `primary`, `secondary`, `tertiary`
+- 프라이빗 호스팅 영역: `prod.doktori.internal`
+
+### prod/data
+
+- RDS MySQL `8.4.8`, `mysql8.4` 파라미터 그룹, 백업 보관 7일
+- RDS Proxy 활성화, `db-proxy.prod.doktori.internal`이 proxy를 가리킴
+- App S3 버킷은 `/images/*` prefix만 공개 읽기 허용
+- 프론트 CodeDeploy revision 버킷은 `prevent_destroy` 적용
+- Redis/RabbitMQ/MongoDB는 DB 서브넷의 자체 관리 EC2로 운영
+- `enable_data_ha = false`가 기본값이며, true로 바꾸면 Redis/RabbitMQ가 3개 AZ 노드와 Sentinel/quorum 클러스터 입력값으로 확장된다.
+
+### prod/app
+
+- `frontend` 모듈: 공개 ALB, 프론트 ASG, HTTP listener와 target group
+- `api.doktori.kr`, `front.doktori.kr`용 HTTPS listener와 ACM 검증
+- 경로 라우팅: `/api/*`, `/ws/*`는 K8s worker NodePort `30080`으로 전달
+- `k8s-cluster` 모듈: master ASG desired 3, worker ASG desired 4/min 2/max 6, 내부 NLB
+- 보조 compute: front, AI, RDS monitoring exporter EC2
+- 프론트 ASG 배포용 CodeDeploy 애플리케이션/배포 그룹
+
+### prod/cdn
+
+- `doktori.kr`, `www.doktori.kr`용 CloudFront 배포
+- Origin Access Control을 사용하는 정적 S3 오리진
+- `front.doktori.kr` ALB 오리진
+- Route53 alias record와 CloudFront ACM 검증
+
+## 타임아웃과 Keepalive 계획
+
+인그레스 타임아웃은 사용자와 맞닿는 바깥 계층이 내부 서비스 제한보다 약간 길게 잡히도록 맞춘다. 이렇게 해야 사용자가 edge/proxy 연결 끊김 대신 애플리케이션 오류를 받을 수 있다.
+
+| 경로 | 타임아웃 / keepalive | 이유 |
 |---|---:|---|
-| Browser API calls | 5s default, 70s for AI recommendation requests | Normal UX fails fast; AI actions can wait for model work |
-| CloudFront → frontend ALB origin | connect 10s, read 60s, keepalive 60s | Site origin ceiling for `doktori.kr`; not for long-lived API/SSE/WS |
-| Public ALB idle timeout | 3600s | Keeps WebSocket/SSE connections alive when using direct ALB domains |
-| NGF `/api/` route | backendRequest 65s | Slightly longer than Spring's fixed AI read timeout |
-| Spring API/Chat → AI service | connect 10s, read 60s | Fixed in backend code; no extra SSM timeout parameters |
-| AI → RunPod | submit 8s, status 5s, poll 40s | Submit/status are fixed code constants; poll uses the existing RunPod poll timeout setting |
-| NGF `/api/chat-rooms` route | backendRequest 31m | Waiting-room SSE emitter is 30m with 30s heartbeat |
-| NGF `/ws/chat` route | backendRequest 1h | WebSocket lane; paired with ALB 3600s idle timeout |
-| NGF upstream keepAlive | 64 connections, 1000 requests, 1h max age, 60s idle | Reuses pod upstream TCP connections without keeping idle sockets forever |
+| 브라우저 API 호출 | 기본 5초, AI 추천 요청 70초 | 일반 UX는 빠르게 실패시키고, AI 작업은 모델 처리 시간을 기다림 |
+| CloudFront -> 프론트 ALB 오리진 | connect 10초, read 60초, keepalive 60초 | `doktori.kr` 사이트 오리진 한도이며 장기 API/SSE/WS 용도가 아님 |
+| 공개 ALB idle timeout | 3600초 | 직접 ALB 도메인을 쓰는 WebSocket/SSE 연결 유지 |
+| NGF `/api/` route | backendRequest 65초 | Spring의 고정 AI read timeout보다 약간 길게 설정 |
+| Spring API/Chat -> AI service | connect 10초, read 60초 | 백엔드 코드에 고정되어 있으며 추가 SSM timeout parameter 없음 |
+| AI -> RunPod | submit 8초, status 5초, poll 40초 | submit/status는 코드 상수, poll은 기존 RunPod poll timeout 설정 사용 |
+| NGF `/api/chat-rooms` route | backendRequest 31분 | waiting-room SSE emitter 30분 + 30초 heartbeat |
+| NGF `/ws/chat` route | backendRequest 1시간 | WebSocket 경로이며 ALB 3600초 idle timeout과 맞춤 |
+| NGF upstream keepAlive | 연결 64개, 요청 1000회, max age 1시간, idle 60초 | pod upstream TCP 연결을 재사용하되 유휴 socket을 과도하게 유지하지 않음 |
 
-Direct real-time traffic should use `api.doktori.kr` so WebSocket/SSE bypass CloudFront and rely on ALB + NGF long-connection settings. `doktori.kr/api/*` through CloudFront is acceptable for normal/short API calls and OAuth callbacks, but not for long-lived SSE streams.
+실시간 트래픽은 `api.doktori.kr`를 사용해 WebSocket/SSE가 CloudFront를 우회하고 ALB + NGF 장기 연결 설정을 따르게 한다. `doktori.kr/api/*`를 CloudFront 경유로 쓰는 것은 일반/짧은 API 호출과 OAuth 콜백에는 가능하지만, 장기 SSE 스트림에는 적합하지 않다.
 
-### Staging Lifecycle
+## `staging` 수명주기
 
-staging은 상시 운영이 아닌 필요 시 기동하는 환경이다. GitHub Actions workflow dispatch로 관리:
+`staging`은 상시 운영 환경이 아니다. `.github/workflows/terraform-staging.yml`로 수동 관리한다.
 
-| Action | Description |
-|--------|-------------|
-| `apply` | base → app + data 전체 생성 |
-| `start` | EC2 + RDS 시작, nginx 헬스체크 |
-| `stop` | EC2 + RDS 정지 |
-| `scale` | staging ↔ prod 사양 전환 (`prod-spec.tfvars`) |
-| `deploy` | api/chat 서비스 배포 |
-| `destroy` | 전체 환경 삭제 (data → app → base) |
+| 동작 | 설명 |
+|------|------|
+| `apply` | `staging/base`를 먼저 적용한 뒤 현재 워크플로우는 `staging/app`과 `staging/data`를 병렬 적용 |
+| `start` | EC2와 RDS 시작 후 nginx 헬스 체크 실행 |
+| `stop` | EC2와 RDS 정지 |
+| `scale` | `staging/app`을 기본 사양과 `prod-spec.tfvars` 프로파일 사이에서 전환 |
+| `deploy` | `api`, `chat` 서비스 배포 |
+| `destroy` | `data`, `app`, `base` 순서로 삭제하며 data destroy 전에 RDS를 state에서 제거 |
 
-## Modules
+[CICD.md](./CICD.md)는 의존성 안전성을 위해 `data`를 `app`보다 먼저 적용하는 순서를 권장한다. 현재 staging 워크플로우는 `base` 이후 `app`과 `data`를 같은 매트릭스에서 병렬 실행하므로, 새로운 app -> data 원격 state 의존성을 추가할 때 주의한다.
+
+## 모듈
 
 ### networking
 
-VPC, Subnet, NAT Instance, Route Table, VPC Endpoint.
+VPC, 서브넷, 라우트 테이블, NAT 인스턴스, S3 Gateway Endpoint, 선택 Interface Endpoint, Route53 프라이빗 호스팅 영역을 만든다.
 
-- `subnets` map으로 `for_each` 생성
-- `vpc_interface_endpoints` list로 환경별 Endpoint 선택
-- NAT Instance AMI/user_data 외부 주입 가능
-- S3 Gateway Endpoint 기본 포함 (무료)
+- `subnets` map으로 서브넷 생성
+- `nat_instances` map으로 multi-AZ NAT 인스턴스 생성 가능
+- 프라이빗 라우트 테이블은 NAT key별 생성
+- S3 Gateway Endpoint는 기본 생성
+- Interface Endpoint는 `vpc_interface_endpoints` list로 선택
 
 ### compute
 
-EC2, Security Group, IAM Role, EIP.
+EC2, Security Group, IAM Role/Profile, IAM policy, 선택 EIP를 만든다.
 
-- `services` map으로 N개 인스턴스 선언적 정의
-- `sg_cross_rules`로 SG간 참조 규칙 별도 관리
-- ARM/x86 아키텍처 서비스별 선택
+- `services` map으로 N개 인스턴스 선언
+- `sg_cross_rules`로 SG 간 참조 규칙 분리
+- 서비스별 AMI, architecture, volume, user_data 재정의 가능
 - `associate_eip` flag로 EIP 조건부 할당
 - IMDSv2 강제, EBS 암호화 기본 적용
+- `enable_batch_self_stop`로 태그가 붙은 batch 인스턴스의 self-stop 권한 부여 가능
 
-TODO(user_data-slim): Launch Template/EC2 `user_data`는 부팅 시 동적 조율(kubeadm init/join, SSM에서 join 정보 조회, 최소 라벨링)만 담당하게 줄인다. 정적 설치는 Packer AMI에 굽고, CNI/NGF/앱/애드온 배포는 ArgoCD/Helm/Ansible 단계로 분리한다.
+### frontend
+
+공개 ALB와 프론트 Auto Scaling Group을 만든다.
+
+- ALB idle timeout 기본값은 3600초
+- 프론트 ASG는 프라이빗 서브넷에 배치
+- app layer에서 경로 기반 rule을 추가할 수 있도록 HTTP listener ARN을 출력값으로 제공
+- CodeDeploy 연동에 필요한 ASG/TG/LT 출력값 제공
+
+### k8s-cluster
+
+Kubernetes control-plane/worker Auto Scaling Group과 내부 NLB를 만든다.
+
+- master ASG는 desired/min/max를 동일하게 유지
+- worker ASG는 desired/min/max를 별도로 설정
+- 내부 NLB는 control-plane endpoint로 사용
+- worker ASG target group attachment는 prod app layer에서 ALB backend TG와 연결
 
 ### database
 
-RDS, DB Parameter Group, Password.
+RDS MySQL, DB 서브넷 그룹, 파라미터 그룹, password SSM, 선택 RDS Proxy를 만든다.
 
-- `random_password` → SSM Parameter Store (SecureString) 저장
-- `db_extra_parameters`로 환경별 추가 파라미터 주입
-- `deletion_protection`, `skip_final_snapshot` 환경별 제어
-- `prevent_destroy` lifecycle (prod)
+- DB password는 `random_password`로 생성 후 SSM SecureString에 저장
+- RDS instance password와 RDS Proxy secret은 SSM 값을 ephemeral로 읽어 `*_wo` 속성에 주입
+- `db_extra_parameters`로 환경별 파라미터 그룹 추가 설정
+- `enable_rds_proxy`로 RDS Proxy/Secrets Manager 리소스 생성
+- RDS instance에는 `prevent_destroy` lifecycle이 있다
 
 ### storage
 
-S3, ECR, KMS.
+S3, 버전 관리, CORS, 암호화, 공개 읽기 prefix policy, 선택 KMS/IAM/ECR을 만든다.
 
-- `s3_buckets` map으로 버킷별 설정 (public_read, CORS, 암호화)
-- ECR lifecycle policy (최근 10개 이미지 유지)
-- KMS key rotation 활성화
+- `s3_buckets` map으로 버킷별 설정
+- `folders`로 prefix 자리표시자 object 생성
+- 환경 `data` 레이어에서는 주로 S3 버킷 용도로 사용
+- ECR은 현재 `terraform/ecr` 루트 모듈에서 공용 관리
 
 ### ssm-parameters
 
-SSM Parameter Store write (앱 시크릿 관리).
+SSM Parameter Store 껍데기 리소스를 만든다.
 
-- 앱 설정값(DB URL, 외부 API 키 등)을 SSM에 기록
-- `ephemeral` 리소스 + `_wo` suffix 패턴으로 state에 시크릿 미저장
-- DB 비밀번호 등 민감값은 `SecureString` 타입으로 저장
+- 앱 설정값의 이름과 타입을 Terraform으로 선생성
+- 기본값은 `CHANGE_ME`
+- `ignore_changes = [value, description]`으로 CLI/운영 주입 값을 덮어쓰지 않음
+- Terraform이 계산 가능한 값은 환경 `base`/`data` 레이어에서 별도 `aws_ssm_parameter`로 직접 쓴다
 
-## Global Resources
+## 전역 리소스
 
-`terraform/global/` — 환경에 종속되지 않는 계정 수준 리소스:
+`terraform/global/`은 계정 수준 리소스를 관리한다.
 
-- **GitHub OIDC Provider** — GitHub Actions ↔ AWS 인증 (장기 Access Key 미사용)
-- **Deploy IAM Role** — ECR push + SSM SendCommand (전체 서비스 레포)
-- **Terraform IAM Role** — 인프라 변경 (Cloud 레포 전용)
-- **CDN Deploy Policy** — S3 upload + CloudFront invalidation
-- **IAM Groups** — Admin (AdministratorAccess), 팀별 SSM 접근 제어 (cloud/be/fe/ai)
-- **IAM Users** — Admin users, 팀 members, 서비스 계정 (grafana-billing-reader)
-- **Budget Alert** — 50% / 80% / 100% threshold
+- GitHub OIDC provider
+- GitHub Actions deploy role
+- GitHub Actions Terraform role
+- IAM group: cloud, be, fe, ai
+- IAM user와 그룹 membership
+- 팀별 SSM 접근 policy
+- SSM, Auto Scaling service-linked role
+- 월간 예산 알림
 
 ## CI/CD
 
-상세 설계와 현행 workflow 차이 분석은 [CICD.md](./CICD.md)를 기준으로 한다.
+상세 설계와 차이 분석은 [CICD.md](./CICD.md)를 기준으로 한다.
 
-### Target GitHub Actions Structure
+현재 워크플로우:
+
+| 워크플로우 | 트리거 | 역할 |
+|------------|--------|------|
+| `.github/workflows/terraform.yml` | PR, main push, schedule | fmt, validate, tfsec, plan comment, Infracost, drift, 순서형 apply 작업 |
+| `.github/workflows/terraform-staging.yml` | workflow_dispatch | staging apply/start/stop/scale/deploy/destroy |
+
+현재 `terraform.yml`의 `APPLY_DISABLED`가 `"true"`라 main push 자동 apply 작업은 실행되지 않는다. PR 검증과 schedule drift는 계속 사용한다.
+
+PR 워크플로우:
+
+- `terraform fmt -check -recursive terraform/`
+- 변경된 루트 모듈 `init -backend=false` + `validate`
+- `tfsec`는 경고로 처리
+- 변경된 루트 모듈 plan
+- destroy 문자열 감지와 PR comment
+- Infracost diff comment
+
+Apply 워크플로우가 다시 활성화될 때의 순서:
 
 ```
-PR open  → detect changes → fmt/validate/security scan → plan comment + Infracost
-main push → ordered apply with GitHub Environment approval
-schedule → drift detection plan only
-manual   → staging start/stop/scale/deploy/destroy
+global -> ecr -> dns_zone -> monitoring/base -> monitoring/data -> monitoring/app
+-> env/base -> env/data -> env/app -> prod/cdn
 ```
 
-권장 workflow 파일:
+자동 apply는 plan JSON에서 delete action을 감지하면 실패하도록 되어 있다. `prod`/shared는 GitHub Environment 승인을 사용한다.
 
-| Workflow | Trigger | Responsibility |
-|----------|---------|----------------|
-| `terraform-pr.yml` | `pull_request` | 정적 검증, security scan, changed root module plan, PR comment, Infracost |
-| `terraform-apply.yml` | `push` to `main`, `workflow_dispatch` | shared/env 레이어를 의존성 순서대로 apply |
-| `terraform-drift.yml` | `schedule`, `workflow_dispatch` | 전체 root module drift plan, 알림만 수행 |
-| `terraform-staging.yml` | `workflow_dispatch` | staging 수명주기 start/stop/scale/deploy/destroy |
-
-### Apply Gates
-
-- 배포 단위는 `modules/`가 아니라 state를 가진 root module이다.
-- `dev`는 main merge 후 자동 apply 가능하다.
-- `staging`은 manual workflow 또는 GitHub Environment approval을 둔다.
-- `prod`와 shared/global 레이어는 GitHub Environment required reviewer를 필수로 둔다.
-- 자동 apply에서 destroy 또는 replace가 포함되면 실패시키고, 삭제는 별도 수동 workflow에서만 수행한다.
-- 같은 state key는 `concurrency`로 동시에 실행되지 않게 한다.
-- AWS 인증은 GitHub OIDC + IAM Role assume만 사용하고 장기 access key는 사용하지 않는다.
-
-### terraform-staging.yml (manual dispatch)
-
-staging 환경 수명주기 관리. 위 [Staging Lifecycle](#staging-lifecycle) 참조.
-
-## Security
+## 보안
 
 ### IAM
-- OIDC 토큰 기반 인증 (장기 자격증명 미사용)
-- Deploy / Terraform 역할 분리
-- 팀별 SSM 접근 제어 (태그 기반 조건: Service, Environment)
-- EC2 IAM Role: SSM + 해당 환경 S3/SSM Parameter/ECR만
 
-### Network
-- prod/staging: 앱 서버 프라이빗 서브넷 배치, nginx만 퍼블릭
-- SG cross-rule: nginx → backend 방향만 허용 (SG 참조 기반)
-- IMDSv2 강제 (`http_tokens = "required"`)
-- EBS 전체 암호화
+- GitHub OIDC token 기반 인증
+- Deploy role과 Terraform role 분리
+- 팀별 SSM Session Manager 및 Parameter Store 접근 제어
+- EC2 role은 필요한 S3/SSM/ECR/CloudWatch 범위로 제한
 
-### Secrets
-- DB password: `random_password` → SSM Parameter Store (SecureString)
-- KMS key rotation 활성화
-- `.tfvars` gitignore 처리
+### 네트워크
 
-## Operational Notes
+- prod/staging 서비스 노드는 대부분 프라이빗 서브넷에 배치
+- prod 공개 ALB만 인터넷 인입을 받음
+- SG cross-rule은 출발지 SG 또는 제한된 CIDR 기반으로 관리
+- IMDSv2 강제
+- EBS/S3 암호화 기본 적용
+
+### 시크릿
+
+- DB password는 SSM SecureString에 저장
+- RDS password, RDS Proxy secret, DB URL/Mongo URI는 가능한 `*_wo`와 ephemeral read를 사용
+- 앱 시크릿 껍데기는 SSM Parameter Store에 만들고 실제 값은 CLI/운영 절차로 주입
+- `.tfvars`는 gitignore 대상
+
+## 운영 메모
 
 ### Destroy 시 주의
 
-- prod RDS는 `prevent_destroy` lifecycle — 삭제 시 `terraform state rm` 후 수동 삭제 필요
-- staging RDS destroy는 workflow에서 자동으로 state rm 처리
-- CI/CD auto-apply는 destroy를 차단한다. 삭제가 필요하면 수동 실행
+- prod RDS와 CodeDeploy revision 버킷은 보호 리소스다.
+- database 모듈의 RDS에는 `prevent_destroy`가 있으므로 삭제하려면 state 조작과 별도 수동 절차가 필요하다.
+- staging destroy 워크플로우는 RDS를 먼저 state에서 제거한 뒤 destroy한다.
+- 자동 apply는 delete action을 차단한다.
 
 ### 모듈 변경 영향
 
-`modules/` 변경 시 해당 모듈을 사용하는 **모든 환경**에 plan/apply가 실행된다. 변경 전 `./scripts/plan-all.sh`로 전체 영향 확인 권장.
+`modules/` 변경은 해당 모듈을 참조하는 모든 루트 모듈의 plan 대상이 된다. 특히 `networking`, `compute`, `storage`, `database`는 여러 환경에 재사용되므로 변경 전 영향 범위를 확인한다.
 
 ### Drift 방지
 
-- 모든 리소스에 `ManagedBy=Terraform` 태그 자동 부여
-- 콘솔 수동 변경 금지. drift 발생 시 다음 apply에서 의도치 않은 덮어쓰기 발생
-- `terraform state mv/rm`은 팀 공유 후 실행
+- 모든 리소스에 `ManagedBy=Terraform` 기본 tag를 부여한다.
+- AWS Console 수동 변경은 다음 apply에서 덮어써질 수 있다.
+- `terraform state mv/rm`은 팀 공유 후 실행한다.
+- apply 후 `scripts/assert-clean-plan.sh`로 clean plan을 확인한다.
 
-### Naming Convention
+### 이름 규칙
 
 ```
 {project}-{environment}-{resource}
@@ -352,10 +490,12 @@ staging 환경 수명주기 관리. 위 [Staging Lifecycle](#staging-lifecycle) 
 
 예: `doktori-prod-vpc`, `doktori-staging-nginx-sg`, `doktori-dev-ec2-ssm`
 
-## Known Limitations
+## 알려진 제한 사항
 
-- **Single AZ**: NAT Instance + RDS 모두 단일 AZ 배치 (비용 우선)
-- **ECR prod-* repo 중복**: prod 전용 ECR repo가 별도로 존재 — 태그 기반 분리로 통합 예정
-- **Terraform state 내 DB 비밀번호**: S3 암호화로 보완하나 완전한 해결은 아님
-- **Terraform Role 권한**: EC2/RDS/S3에 `*` resource 사용 — 리소스 수준 제한 필요
-- **모니터링 서버 네트워크**: mgmt 전용 VPC(172.16.0.0/16) 사용. dev/prod와는 VPC Peering 구성됨. staging은 peering 추가 전까지 VPN 경유 접근
+- `prod/data`의 Redis/RabbitMQ HA는 `enable_data_ha = false`가 기본이라 현재 첫 apply 기준은 단일 노드다.
+- RDS는 prod에서도 단일 AZ 인스턴스이며 Multi-AZ RDS가 아니다.
+- prod Interface VPC Endpoint는 비용 절감을 위해 비활성화되어 있고 NAT 인스턴스 경유를 사용한다.
+- DB password 초기 생성 경로는 `random_password`와 SSM parameter value를 사용하므로 일부 민감값이 Terraform state에 남을 수 있다.
+- Terraform IAM role은 일부 EC2/RDS/S3 권한에서 넓은 리소스 범위를 사용한다.
+- staging은 mgmt VPC peering이 없어 monitoring 접근은 VPN 또는 별도 경로가 필요하다.
+- `prod/loadtest` 루트 모듈은 존재하지만 현재 `terraform.yml` 감지/drift 매트릭스에는 포함되어 있지 않다.
