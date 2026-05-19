@@ -8,7 +8,7 @@ terraform {
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.6"
+      version = "~> 3.7" # ephemeral "random_password" 사용을 위해 3.7+ 필요
     }
   }
 
