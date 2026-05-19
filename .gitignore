@@ -26,6 +26,8 @@ override.tf.json
 
 # Terraform plan output
 *.plan
+*.tfplan
+tfplan
 plan.out
 
 # Packer
