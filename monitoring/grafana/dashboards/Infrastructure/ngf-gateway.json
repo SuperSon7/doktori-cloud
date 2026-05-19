@@ -3,6 +3,11 @@
   "title": "Nginx Gateway Fabric",
   "editable": true,
   "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -12,12 +17,27 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(nginx_gateway_fabric_nginx_reloads_total, env)",
+        "query": "label_values(up{job=\"ngf\"}, env)",
         "refresh": 1,
         "includeAll": false,
         "current": {
           "text": "prod",
           "value": "prod"
+        }
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(kube_pod_info{env=\"$env\"}, namespace)",
+        "refresh": 1,
+        "includeAll": false,
+        "current": {
+          "text": "nginx-gateway",
+          "value": "nginx-gateway"
         }
       }
     ]
@@ -26,12 +46,12 @@
     {
       "type": "row",
       "title": "Overview",
-      "collapsed": true,
+      "collapsed": false,
       "panels": []
     },
     {
       "type": "stat",
-      "title": "NGF Up",
+      "title": "NGF Scrape Up",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -45,7 +65,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "short",
           "thresholds": {
             "steps": [
               {
@@ -69,21 +89,21 @@
     },
     {
       "type": "stat",
-      "title": "Config Reloads",
+      "title": "Ready Pods",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "sum(nginx_gateway_fabric_nginx_reloads_total{env=\"$env\"})",
+          "expr": "sum(kube_pod_status_ready{env=\"$env\", namespace=\"$namespace\", condition=\"true\"} == 1)",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": ""
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -95,21 +115,21 @@
     },
     {
       "type": "stat",
-      "title": "Reload Errors",
+      "title": "Pod Restarts (1h)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "sum(nginx_gateway_fabric_nginx_reload_errors_total{env=\"$env\"})",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{env=\"$env\", namespace=\"$namespace\"}[1h]))",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "short",
           "thresholds": {
             "steps": [
               {
@@ -133,33 +153,21 @@
     },
     {
       "type": "stat",
-      "title": "Stale Config",
+      "title": "Config Reloads",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "nginx_gateway_fabric_nginx_stale_config{env=\"$env\"}",
+          "expr": "sum(nginx_config_reloads_total{job=\"ngf\", env=\"$env\"}) or sum(nginx_gateway_fabric_nginx_reloads_total{job=\"ngf\", env=\"$env\"})",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "",
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -178,14 +186,14 @@
       },
       "targets": [
         {
-          "expr": "sum(nginx_connections_active{env=\"$env\"})",
+          "expr": "sum(nginx_http_connection_count_connections{job=\"ngf\", env=\"$env\"}) or sum(nginx_connections_active{job=\"ngf\", env=\"$env\"})",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": ""
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -204,7 +212,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_http_requests_total{env=\"$env\"}[5m]))",
+          "expr": "sum(rate(nginx_http_requests_total{job=\"ngf\", env=\"$env\"}[5m])) or (sum(nginx_http_request_count_requests{job=\"ngf\", env=\"$env\"}) / 30)",
           "refId": "A",
           "instant": true
         }
@@ -224,7 +232,7 @@
     {
       "type": "row",
       "title": "Traffic",
-      "collapsed": true,
+      "collapsed": false,
       "panels": []
     },
     {
@@ -236,7 +244,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_http_requests_total{env=\"$env\"}[5m]))",
+          "expr": "sum(rate(nginx_http_requests_total{job=\"ngf\", env=\"$env\"}[5m])) or (sum(nginx_http_request_count_requests{job=\"ngf\", env=\"$env\"}) / 30)",
           "legendFormat": "requests/s",
           "refId": "A"
         }
@@ -266,29 +274,34 @@
       },
       "targets": [
         {
-          "expr": "sum(nginx_connections_active{env=\"$env\"})",
-          "legendFormat": "active",
+          "expr": "sum(nginx_http_connection_count_connections{job=\"ngf\", env=\"$env\"}) by (state)",
+          "legendFormat": "{{state}}",
           "refId": "A"
         },
         {
-          "expr": "sum(nginx_connections_reading{env=\"$env\"})",
-          "legendFormat": "reading",
+          "expr": "sum(nginx_connections_active{job=\"ngf\", env=\"$env\"})",
+          "legendFormat": "active",
           "refId": "B"
         },
         {
-          "expr": "sum(nginx_connections_writing{env=\"$env\"})",
-          "legendFormat": "writing",
+          "expr": "sum(nginx_connections_reading{job=\"ngf\", env=\"$env\"})",
+          "legendFormat": "reading",
           "refId": "C"
         },
         {
-          "expr": "sum(nginx_connections_waiting{env=\"$env\"})",
-          "legendFormat": "waiting",
+          "expr": "sum(nginx_connections_writing{job=\"ngf\", env=\"$env\"})",
+          "legendFormat": "writing",
           "refId": "D"
+        },
+        {
+          "expr": "sum(nginx_connections_waiting{job=\"ngf\", env=\"$env\"})",
+          "legendFormat": "waiting",
+          "refId": "E"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "short",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
@@ -304,8 +317,8 @@
     },
     {
       "type": "row",
-      "title": "Config & Reloads",
-      "collapsed": true,
+      "title": "Config & Controller",
+      "collapsed": false,
       "panels": []
     },
     {
@@ -317,14 +330,9 @@
       },
       "targets": [
         {
-          "expr": "rate(nginx_gateway_fabric_nginx_reloads_total{env=\"$env\"}[5m])",
-          "legendFormat": "reloads",
+          "expr": "sum(rate(nginx_config_reloads_total{job=\"ngf\", env=\"$env\"}[5m])) or sum(rate(nginx_gateway_fabric_nginx_reloads_total{job=\"ngf\", env=\"$env\"}[5m]))",
+          "legendFormat": "reloads/s",
           "refId": "A"
-        },
-        {
-          "expr": "rate(nginx_gateway_fabric_nginx_reload_errors_total{env=\"$env\"}[5m])",
-          "legendFormat": "errors",
-          "refId": "B"
         }
       ],
       "fieldConfig": {
@@ -345,21 +353,21 @@
     },
     {
       "type": "timeseries",
-      "title": "Stale Config",
+      "title": "Event Batch Processing",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "nginx_gateway_fabric_nginx_stale_config{env=\"$env\"}",
-          "legendFormat": "stale",
+          "expr": "sum(rate(nginx_gateway_fabric_event_batch_processing_milliseconds_sum{job=\"ngf\", env=\"$env\"}[5m])) / sum(rate(nginx_gateway_fabric_event_batch_processing_milliseconds_count{job=\"ngf\", env=\"$env\"}[5m]))",
+          "legendFormat": "avg",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "",
+          "unit": "ms",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
@@ -375,8 +383,8 @@
     },
     {
       "type": "row",
-      "title": "Resources (Pod)",
-      "collapsed": true,
+      "title": "Kubernetes Resources",
+      "collapsed": false,
       "panels": []
     },
     {
@@ -388,14 +396,14 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"nginx-gateway\", container!=\"\"}[5m])) by (pod)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{env=\"$env\", namespace=\"$namespace\", container!=\"\"}[5m])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "cores",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
@@ -418,7 +426,7 @@
       },
       "targets": [
         {
-          "expr": "sum(container_memory_working_set_bytes{namespace=\"nginx-gateway\", container!=\"\"}) by (pod)",
+          "expr": "sum(container_memory_working_set_bytes{env=\"$env\", namespace=\"$namespace\", container!=\"\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
@@ -435,6 +443,66 @@
       "gridPos": {
         "x": 12,
         "y": 27,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pod Restarts",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{env=\"$env\", namespace=\"$namespace\"}[5m])) by (pod, container)",
+          "legendFormat": "{{pod}} / {{container}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pod Ready",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "kube_pod_status_ready{env=\"$env\", namespace=\"$namespace\", condition=\"true\"}",
+          "legendFormat": "{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 35,
         "w": 12,
         "h": 8
       }
