@@ -1,0 +1,62 @@
+storage:
+  tsdb:
+    out_of_order_time_window: 1h
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# =============================================================================
+# 메트릭 수집 구조
+#
+# [Push — Alloy remote_write]
+# 각 서버의 Alloy 에이전트가 로컬에서 수집 후 Prometheus로 push
+#   - 호스트 메트릭 (prometheus.exporter.unix)
+#   - Spring Boot actuator (prometheus.scrape)
+#   - MySQL (prometheus.exporter.mysql)
+#   - Nginx (nginx-exporter 사이드카 → Alloy scrape)
+# Prometheus는 --web.enable-remote-write-receiver 플래그로 수신
+#
+# [Pull — Blackbox Exporter]
+# 모니터링 서버에서 외부 URL 프로빙 (엔드포인트 가용성)
+# =============================================================================
+
+scrape_configs:
+  # Prometheus 자체 메트릭
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # ──────────────────────────────────────────────
+  # cAdvisor — 모니터링 서버 컨테이너 리소스 메트릭
+  # ──────────────────────────────────────────────
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          env: monitoring
+
+  # ──────────────────────────────────────────────
+  # Blackbox Exporter — 외부 엔드포인트 가용성 프로빙
+  # 유일하게 Pull 유지: 모니터링 서버 → HTTPS URL
+  # ──────────────────────────────────────────────
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://doktori.kr/api/actuator/health   # ALB → Gateway → API Pod (E2E)
+          - https://doktori.kr/                       # 프론트엔드 진입점 (CloudFront)
+        labels:
+          env: prod
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

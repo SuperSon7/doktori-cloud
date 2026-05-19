@@ -112,10 +112,13 @@
   → `monitoring/prometheus/prometheus.yml`
 
 - 모니터링 서버 IP 변경 시  
-  → `terraform/variables.tf` + `terraform/security_groups.tf`
+  → `terraform/monitoring/app/outputs.tf`와 `monitoring/.env`
 
 - 접근 허용 CIDR 변경 시  
-  → `terraform/variables.tf` + `terraform/security_groups.tf`
+  → `terraform/monitoring/app/variables.tf` (`allowed_admin_cidrs`, `peered_vpc_cidrs`)
+
+- Kubernetes NetworkPolicy의 mgmt VPC 허용 CIDR 변경 시  
+  → `k8s/manifests/security/netpol-all.yaml` (`172.16.0.0/16`)
 
 - 현재 인프라 IP 확인  
   → `terraform/outputs.tf`
