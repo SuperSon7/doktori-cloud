@@ -282,7 +282,7 @@ data:
     // 4. 호스트 메트릭
     // =============================================================
     prometheus.exporter.unix "host" {
-      set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
+      set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev", "conntrack", "vmstat", "filefd", "timex"]
     }
 
     prometheus.scrape "host_metrics" {

@@ -1434,9 +1434,9 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_cpu_core_throttles_total{node=\"$node\"}[$__rate_interval]))",
+          "expr": "sum(rate(node_cpu_seconds_total{mode=\"steal\", node=\"$node\"}[$__rate_interval]))",
           "interval": "$resolution",
-          "legendFormat": "Nb of cpu core throttles",
+          "legendFormat": "CPU Steal Time",
           "range": true,
           "refId": "A"
         }
