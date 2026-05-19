@@ -1,64 +1,100 @@
 {
   "uid": "ngf-gateway",
-  "title": "Nginx Gateway Fabric",
+  "title": "Nginx Gateway",
+  "description": "Nginx 게이트웨이 진입점 모니터링 — 트래픽, 레이턴시, 에러, 커넥션",
   "editable": true,
   "schemaVersion": 39,
   "refresh": "30s",
-  "time": {
-    "from": "now-6h",
-    "to": "now"
+  "graphTooltip": 1,
+  "time": { "from": "now-3h", "to": "now" },
+  "tags": ["nginx", "gateway", "infrastructure"],
+  "links": [],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
   },
   "templating": {
     "list": [
       {
         "name": "env",
+        "label": "Env",
         "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": "label_values(up{job=\"ngf\"}, env)",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(nginx_up{job=\"nginx\"}, env)",
         "refresh": 1,
         "includeAll": false,
-        "current": {
-          "text": "prod",
-          "value": "prod"
-        }
-      },
-      {
-        "name": "namespace",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": "label_values(kube_pod_info{env=\"$env\"}, namespace)",
-        "refresh": 1,
-        "includeAll": false,
-        "current": {
-          "text": "nginx-gateway",
-          "value": "nginx-gateway"
-        }
+        "current": {}
       }
     ]
   },
   "panels": [
     {
       "type": "row",
+      "id": 1,
       "title": "Overview",
       "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
       "panels": []
     },
     {
       "type": "stat",
-      "title": "NGF Scrape Up",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 2,
+      "title": "Nginx 상태",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "count(up{job=\"ngf\", env=\"$env\"} == 1)",
+          "expr": "nginx_up{job=\"nginx\", env=\"$env\"}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Down", "color": "red", "index": 0 },
+                "1": { "text": "Up", "color": "green", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "id": 3,
+      "title": "Active 커넥션",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "nginx_connections_active{job=\"nginx\", env=\"$env\"}",
           "refId": "A",
           "instant": true
         }
@@ -67,62 +103,71 @@
         "defaults": {
           "unit": "short",
           "thresholds": {
+            "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
             ]
           }
-        }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 }
     },
     {
       "type": "stat",
-      "title": "Ready Pods",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 4,
+      "title": "요청 속도 (5m)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(kube_pod_status_ready{env=\"$env\", namespace=\"$namespace\", condition=\"true\"} == 1)",
+          "expr": "irate(nginx_http_requests_total{job=\"nginx\", env=\"$env\"}[5m])",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
-        }
+          "unit": "reqps",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 4,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 }
     },
     {
       "type": "stat",
-      "title": "Pod Restarts (1h)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 5,
+      "title": "Waiting 커넥션",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{env=\"$env\", namespace=\"$namespace\"}[1h]))",
+          "expr": "nginx_connections_waiting{job=\"nginx\", env=\"$env\"}",
           "refId": "A",
           "instant": true
         }
@@ -131,120 +176,114 @@
         "defaults": {
           "unit": "short",
           "thresholds": {
+            "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 300 }
             ]
           }
-        }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 8,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 }
     },
     {
       "type": "stat",
-      "title": "Config Reloads",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 6,
+      "title": "Accepted/s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(nginx_config_reloads_total{job=\"ngf\", env=\"$env\"}) or sum(nginx_gateway_fabric_nginx_reloads_total{job=\"ngf\", env=\"$env\"})",
+          "expr": "irate(nginx_connections_accepted{job=\"nginx\", env=\"$env\"}[5m])",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
-        }
+          "unit": "short",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 }
     },
     {
       "type": "stat",
-      "title": "Active Connections",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 7,
+      "title": "Handled/s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(nginx_http_connection_count_connections{job=\"ngf\", env=\"$env\"}) or sum(nginx_connections_active{job=\"ngf\", env=\"$env\"})",
+          "expr": "irate(nginx_connections_handled{job=\"nginx\", env=\"$env\"}[5m])",
           "refId": "A",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
-        }
+          "unit": "short",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 16,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Request Rate",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "targets": [
-        {
-          "expr": "sum(rate(nginx_http_requests_total{job=\"ngf\", env=\"$env\"}[5m])) or (sum(nginx_http_request_count_requests{job=\"ngf\", env=\"$env\"}) / 30)",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        }
-      },
-      "gridPos": {
-        "x": 20,
-        "y": 1,
-        "w": 4,
-        "h": 4
-      }
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 }
     },
     {
       "type": "row",
+      "id": 10,
       "title": "Traffic",
       "collapsed": false,
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "HTTP Requests Rate",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 11,
+      "title": "HTTP 요청 속도",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(nginx_http_requests_total{job=\"ngf\", env=\"$env\"}[5m])) or (sum(nginx_http_request_count_requests{job=\"ngf\", env=\"$env\"}) / 30)",
+          "expr": "irate(nginx_http_requests_total{job=\"nginx\", env=\"$env\"}[5m])",
           "legendFormat": "requests/s",
           "refId": "A"
         }
@@ -252,260 +291,645 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "color": { "mode": "palette-classic" },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 10
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
           }
-        }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 12,
-        "h": 8
-      }
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
-      "title": "Connections",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 12,
+      "title": "HTTP 상태 분포",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "30s",
       "targets": [
         {
-          "expr": "sum(nginx_http_connection_count_connections{job=\"ngf\", env=\"$env\"}) by (state)",
-          "legendFormat": "{{state}}",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({job=\"nginx-access\"} |~ `\" 2\\d{2} ` [5m]))",
+          "legendFormat": "2xx",
+          "queryType": "range",
           "refId": "A"
         },
         {
-          "expr": "sum(nginx_connections_active{job=\"ngf\", env=\"$env\"})",
-          "legendFormat": "active",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({job=\"nginx-access\"} |~ `\" 3\\d{2} ` [5m]))",
+          "legendFormat": "3xx",
+          "queryType": "range",
           "refId": "B"
         },
         {
-          "expr": "sum(nginx_connections_reading{job=\"ngf\", env=\"$env\"})",
-          "legendFormat": "reading",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({job=\"nginx-access\"} |~ `\" 4\\d{2} ` [5m]))",
+          "legendFormat": "4xx",
+          "queryType": "range",
           "refId": "C"
         },
         {
-          "expr": "sum(nginx_connections_writing{job=\"ngf\", env=\"$env\"})",
-          "legendFormat": "writing",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({job=\"nginx-access\"} |~ `\" 5\\d{2} ` [5m]))",
+          "legendFormat": "5xx",
+          "queryType": "range",
           "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "2xx" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "3xx" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "4xx" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 }
+    },
+    {
+      "type": "row",
+      "id": 20,
+      "title": "Latency",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 21,
+      "title": "Request Time p50 / p95 / p99",
+      "description": "Nginx request_time 기반 전체 레이턴시. rt - urt 차이가 크면 Nginx 구간 지연",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "30s",
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.50, {job=\"nginx-access\"} | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m]) by ()",
+          "legendFormat": "p50",
+          "queryType": "range",
+          "refId": "A"
         },
         {
-          "expr": "sum(nginx_connections_waiting{job=\"ngf\", env=\"$env\"})",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.95, {job=\"nginx-access\"} | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m]) by ()",
+          "legendFormat": "p95",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.99, {job=\"nginx-access\"} | regexp `rt=(?P<request_time>[\\d.]+)` | unwrap request_time [5m]) by ()",
+          "legendFormat": "p99",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "id": 22,
+      "title": "Upstream Response Time p50 / p95 / p99",
+      "description": "upstream_response_time 기반 — Spring/Next/FastAPI 실제 처리 시간",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "30s",
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.50, {job=\"nginx-access\"} | regexp `urt=(?P<upstream_response_time>[\\d.]+)` | unwrap upstream_response_time [5m]) by ()",
+          "legendFormat": "p50",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.95, {job=\"nginx-access\"} | regexp `urt=(?P<upstream_response_time>[\\d.]+)` | unwrap upstream_response_time [5m]) by ()",
+          "legendFormat": "p95",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.99, {job=\"nginx-access\"} | regexp `urt=(?P<upstream_response_time>[\\d.]+)` | unwrap upstream_response_time [5m]) by ()",
+          "legendFormat": "p99",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "id": 23,
+      "title": "경로별 p95 Request Time (API · AI)",
+      "description": "API 경로별 레이턴시. 정적 리소스 제외하고 /api/, /ai/ 경로만 표시",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "30s",
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.95, {job=\"nginx-access\"} |~ `uri=/api/` | regexp `rt=(?P<request_time>[\\d.]+) .* uri=(?P<uri>/api/[^/]+/[^/ ]+)` | unwrap request_time [5m]) by (uri)",
+          "legendFormat": "{{uri}}",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "quantile_over_time(0.95, {job=\"nginx-access\"} |~ `uri=/ai/` | regexp `rt=(?P<request_time>[\\d.]+) .* uri=(?P<uri>/ai/[^/ ]+)` | unwrap request_time [5m]) by (uri)",
+          "legendFormat": "{{uri}}",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 8 }
+    },
+    {
+      "type": "row",
+      "id": 30,
+      "title": "에러",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 31,
+      "title": "5xx Error Rate (%)",
+      "description": "SLO 기준선: 0.1% (튜닝 타깃), 1% (운영 SLO)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "30s",
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "100 * (\n  sum(count_over_time({job=\"nginx-access\"} |~ `\" 5\\d{2} ` [5m]))\n  /\n  sum(count_over_time({job=\"nginx-access\"} [5m]))\n)",
+          "legendFormat": "5xx rate",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 }
+    },
+    {
+      "type": "logs",
+      "id": 32,
+      "title": "5xx 에러 로그",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=\"nginx-access\"} |~ ` 5\\d{2} `",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "showControls": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 }
+    },
+    {
+      "type": "row",
+      "id": 40,
+      "title": "커넥션",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 41,
+      "title": "커넥션 상태",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "nginx_connections_active{job=\"nginx\", env=\"$env\"}",
+          "legendFormat": "active",
+          "refId": "A"
+        },
+        {
+          "expr": "nginx_connections_reading{job=\"nginx\", env=\"$env\"}",
+          "legendFormat": "reading",
+          "refId": "B"
+        },
+        {
+          "expr": "nginx_connections_writing{job=\"nginx\", env=\"$env\"}",
+          "legendFormat": "writing",
+          "refId": "C"
+        },
+        {
+          "expr": "nginx_connections_waiting{job=\"nginx\", env=\"$env\"}",
           "legendFormat": "waiting",
-          "refId": "E"
+          "refId": "D"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 10
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
           }
-        }
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "x": 12,
-        "y": 9,
-        "w": 12,
-        "h": 8
-      }
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 41, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "id": 42,
+      "title": "Accepted / Handled Rate",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "irate(nginx_connections_accepted{job=\"nginx\", env=\"$env\"}[5m])",
+          "legendFormat": "accepted",
+          "refId": "A"
+        },
+        {
+          "expr": "irate(nginx_connections_handled{job=\"nginx\", env=\"$env\"}[5m])",
+          "legendFormat": "handled",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 41, "w": 12, "h": 8 }
     },
     {
       "type": "row",
-      "title": "Config & Controller",
+      "id": 50,
+      "title": "Raw Logs",
       "collapsed": false,
+      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 1 },
       "panels": []
     },
     {
-      "type": "timeseries",
-      "title": "Config Reload Rate",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "type": "logs",
+      "id": 51,
+      "title": "Nginx Access Log",
+      "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(rate(nginx_config_reloads_total{job=\"ngf\", env=\"$env\"}[5m])) or sum(rate(nginx_gateway_fabric_nginx_reloads_total{job=\"ngf\", env=\"$env\"}[5m]))",
-          "legendFormat": "reloads/s",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=\"nginx-access\"}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "showControls": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
       },
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 12,
-        "h": 8
-      }
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 0, "y": 50, "w": 12, "h": 8 }
     },
     {
-      "type": "timeseries",
-      "title": "Event Batch Processing",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "type": "logs",
+      "id": 52,
+      "title": "Nginx Error Log",
+      "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(rate(nginx_gateway_fabric_event_batch_processing_milliseconds_sum{job=\"ngf\", env=\"$env\"}[5m])) / sum(rate(nginx_gateway_fabric_event_batch_processing_milliseconds_count{job=\"ngf\", env=\"$env\"}[5m]))",
-          "legendFormat": "avg",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=\"nginx-error\"}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "showControls": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
       },
-      "gridPos": {
-        "x": 12,
-        "y": 18,
-        "w": 12,
-        "h": 8
-      }
-    },
-    {
-      "type": "row",
-      "title": "Kubernetes Resources",
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "NGF CPU Usage",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{env=\"$env\", namespace=\"$namespace\", container!=\"\"}[5m])) by (pod)",
-          "legendFormat": "{{pod}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "cores",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 27,
-        "w": 12,
-        "h": 8
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "NGF Memory Usage",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(container_memory_working_set_bytes{env=\"$env\", namespace=\"$namespace\", container!=\"\"}) by (pod)",
-          "legendFormat": "{{pod}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 27,
-        "w": 12,
-        "h": 8
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Pod Restarts",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{env=\"$env\", namespace=\"$namespace\"}[5m])) by (pod, container)",
-          "legendFormat": "{{pod}} / {{container}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 35,
-        "w": 12,
-        "h": 8
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Pod Ready",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "kube_pod_status_ready{env=\"$env\", namespace=\"$namespace\", condition=\"true\"}",
-          "legendFormat": "{{pod}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10
-          }
-        }
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 35,
-        "w": 12,
-        "h": 8
-      }
+      "pluginVersion": "12.3.2",
+      "gridPos": { "x": 12, "y": 50, "w": 12, "h": 8 }
     }
   ]
 }
