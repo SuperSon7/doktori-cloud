@@ -1249,7 +1249,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "1 - avg(rate(windows_cpu_time_total{,mode=\"idle\"}[$__rate_interval]))",
+          "expr": "1 - avg(rate(windows_cpu_time_total{mode=\"idle\"}[$__rate_interval]))",
           "hide": false,
           "interval": "$resolution",
           "legendFormat": "Windows",
