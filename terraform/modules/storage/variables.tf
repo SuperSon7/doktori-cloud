@@ -15,7 +15,7 @@ variable "s3_buckets" {
   type = map(object({
     bucket_name        = string
     public_read        = optional(bool, false)
-    public_read_prefix = optional(string, "/*")   # e.g. "/images/*" for partial public read
+    public_read_prefix = optional(string, "/*") # e.g. "/images/*" for partial public read
     versioning         = optional(bool, false)
     enable_cors        = optional(bool, false)
     encryption         = optional(bool, false)

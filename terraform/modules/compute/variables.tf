@@ -10,6 +10,12 @@ variable "aws_region" {
   type = string
 }
 
+variable "name_suffix" {
+  description = "Optional suffix for module-scoped resources such as IAM roles when the module is instantiated more than once per environment"
+  type        = string
+  default     = ""
+}
+
 variable "vpc_id" {
   type = string
 }
@@ -65,6 +71,7 @@ variable "sg_cross_rules" {
     from_port   = number
     to_port     = number
     protocol    = string
+    description = optional(string, null)
   }))
   default = []
 }

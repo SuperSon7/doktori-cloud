@@ -45,9 +45,13 @@ variable "nat_instance_type" {
 }
 
 variable "nat_ami_id" {
-  description = "Override NAT instance AMI. If empty, uses Amazon Linux 2 ARM64."
+  description = "AMI ID for NAT instances. Callers must pass an explicit AMI ID."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{8,17}$", var.nat_ami_id))
+    error_message = "nat_ami_id must be an explicit AMI ID."
+  }
 }
 
 variable "nat_key_name" {
@@ -56,7 +60,7 @@ variable "nat_key_name" {
 }
 
 variable "nat_user_data" {
-  description = "Custom user_data for NAT instance. If empty, uses default iptables MASQUERADE."
+  description = "Optional runtime user_data override for NAT instances."
   type        = string
   default     = ""
 }
@@ -73,6 +77,12 @@ variable "nat_instances" {
     subnet_key = string
   }))
   default = null
+}
+
+variable "nat_eip_keys" {
+  description = "NAT instance keys that need static Elastic IPs. Use only for stable entrypoints or outbound IP allowlists."
+  type        = list(string)
+  default     = []
 }
 
 variable "nat_volume_size" {

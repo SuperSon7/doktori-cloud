@@ -53,6 +53,7 @@ variable "common_parameters" {
     "SPRING_RABBITMQ_HOST"     = { type = "String" }
     "SPRING_RABBITMQ_PASSWORD" = { type = "SecureString" }
     "SPRING_RABBITMQ_USERNAME" = { type = "SecureString" }
+    "RABBITMQ_ERLANG_COOKIE"   = { type = "SecureString" }
 
     # --- Recommendation Scheduler ---
     "ENABLE_RECO_SCHEDULER"   = { type = "String" }

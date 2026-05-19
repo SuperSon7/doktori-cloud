@@ -25,7 +25,13 @@ variable "db_subnet_ids" {
 
 variable "db_engine_version" {
   type    = string
-  default = "8.0.45"
+  default = "8.4.8"
+}
+
+variable "db_parameter_group_family" {
+  description = "RDS MySQL parameter group family. Must match db_engine_version major version, for example mysql8.4."
+  type        = string
+  default     = "mysql8.4"
 }
 
 variable "db_instance_class" {

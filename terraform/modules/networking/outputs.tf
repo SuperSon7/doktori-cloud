@@ -13,14 +13,19 @@ output "subnet_ids" {
   value       = { for k, v in aws_subnet.this : k => v.id }
 }
 
+output "subnet_cidrs" {
+  description = "Map of subnet key to subnet CIDR block"
+  value       = { for k, v in aws_subnet.this : k => v.cidr_block }
+}
+
 output "nat_instance_id" {
   description = "Primary NAT instance ID (backwards compat)"
   value       = aws_instance.nat["primary"].id
 }
 
 output "nat_eip" {
-  description = "Primary NAT instance public IP (backwards compat)"
-  value       = aws_eip.nat["primary"].public_ip
+  description = "Primary NAT Elastic IP if allocated (backwards compat)"
+  value       = try(aws_eip.nat["primary"].public_ip, null)
 }
 
 output "nat_instance_ids" {
@@ -29,7 +34,7 @@ output "nat_instance_ids" {
 }
 
 output "nat_eips" {
-  description = "Map of NAT EIPs per AZ key"
+  description = "Map of allocated NAT Elastic IPs per NAT key"
   value       = { for k, v in aws_eip.nat : k => v.public_ip }
 }
 

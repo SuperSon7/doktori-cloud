@@ -28,6 +28,11 @@ output "db_password_ssm_path" {
   value       = aws_ssm_parameter.db_password.name
 }
 
+output "db_password_ssm_arn" {
+  description = "SSM Parameter Store ARN for DB password"
+  value       = aws_ssm_parameter.db_password.arn
+}
+
 output "db_instance_id" {
   description = "RDS instance identifier"
   value       = aws_db_instance.main.identifier
