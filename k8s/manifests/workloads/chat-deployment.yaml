@@ -42,7 +42,7 @@ spec:
               component: chat
       containers:
         - name: chat
-          image: 246477585940.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/backend-chat:prod-portfolio-20260423-2200
+          image: 246477585940.dkr.ecr.ap-northeast-2.amazonaws.com/doktori/backend-chat:prod-local-20260519-151619-45393d6
           ports:
             - containerPort: 8081
               name: http
