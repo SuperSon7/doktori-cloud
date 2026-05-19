@@ -18,6 +18,11 @@ variable "db_engine_version" {
   default = "8.0.45"
 }
 
+variable "db_parameter_group_family" {
+  type    = string
+  default = "mysql8.0"
+}
+
 variable "db_instance_class" {
   type    = string
   default = "db.t4g.small"

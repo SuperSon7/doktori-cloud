@@ -16,7 +16,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type for k6 runners"
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.medium"
 }
 
 variable "root_volume_size" {

@@ -7,6 +7,7 @@ output "database" {
     db_name              = module.database.db_name
     db_username          = module.database.db_username
     db_password_ssm_path = module.database.db_password_ssm_path
+    db_password_ssm_arn  = module.database.db_password_ssm_arn
     db_instance_id       = module.database.db_instance_id
     rds_sg_id            = module.database.rds_sg_id
   }
