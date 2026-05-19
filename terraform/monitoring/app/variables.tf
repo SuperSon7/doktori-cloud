@@ -58,12 +58,13 @@ variable "allowed_admin_cidrs" {
   # EC2가 private 서브넷이므로 인터넷 직접 노출 없음
   # VPN 연결 후 mgmt private CIDR(172.16.1.0/24) 경유로 접근
   # 미설정 시 mgmt VPC 내부(172.16.0.0/16)에서만 접근 가능
-  default     = ["172.16.0.0/16"]
+  default = ["172.16.0.0/16"]
 }
 
 variable "peered_vpc_cidrs" {
-  description = "Prometheus/Loki 접근 허용 피어링 VPC CIDR 목록 (dev, prod 등)"
+  description = "Environment VPC CIDRs allowed to push/query monitoring endpoints over VPC peering"
   type        = list(string)
-  # 환경 VPC가 추가될 때마다 여기에 추가. K8s Pod CIDR(192.168.0.0/16) 필요 시 포함.
-  default     = []
+  # dev/prod are peered with mgmt. Add staging only after staging↔mgmt peering exists.
+  # Do not add K8s Pod/Service CIDRs here; traffic leaves nodes with VPC source IPs.
+  default = ["10.0.0.0/16", "10.1.0.0/16"]
 }
