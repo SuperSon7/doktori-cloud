@@ -141,6 +141,9 @@ spec:
           protocol: TCP
 ---
 # 6-1. kube-apiserver → Prometheus Adapter APIService 허용
+# APIService discovery is served through an internal ClusterIP and may arrive
+# with node/overlay source addresses depending on kube-proxy/Calico handling.
+# NetworkPolicy evaluates the final Pod target port, not the Service port.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -153,10 +156,7 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    - from:
-        - ipBlock:
-            cidr: 10.1.0.0/16
-      ports:
+    - ports:
         - port: 6443
           protocol: TCP
 ---
