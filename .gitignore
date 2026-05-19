@@ -141,6 +141,8 @@ mvp_backup/
 # =============================================================================
 ssm_params_export.txt
 *.params_export.txt
+scripts/ssm_inject_dev.sh
+scripts/ssm_inject_prod.sh
 
 # =============================================================================
 # Lambda build artifacts (archive_file data source가 plan 시 자동 생성)
