@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0.44
+    image: mysql:8.4.8
     environment:
       TZ: Asia/Seoul
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
@@ -30,7 +30,7 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     ports:
       - "6379:6379"
     volumes:
@@ -86,14 +86,21 @@ services:
         max-file: "3"
 
   backend:
-    image: ${ECR_REGISTRY}/doktori/backend-api:develop
+    image: ${ECR_REGISTRY}/doktori/backend-api:dev-develop
     init: true
     environment:
       SPRING_PROFILES_ACTIVE: dev
       FIREBASE_CREDENTIALS_PATH: file:/app/secrets/firebase-service-account.json
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -Duser.timezone=Asia/Seoul"
       TZ: Asia/Seoul
+      DB_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+      MONGO_URI: "mongodb://${MONGO_USERNAME:-doktori}:${MONGO_PASSWORD:-doktori1234}@mongodb:27017/doktoridb?authSource=admin"
+      AI_BASE_URL: "http://ai.dev.doktori.internal:8000/ai"
+      SPRING_REDIS_HOST: redis
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
     volumes:
       - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     ports:
@@ -127,12 +134,19 @@ services:
         max-file: "3"
 
   chat:
-    image: ${ECR_REGISTRY}/doktori/backend-chat:develop
+    image: ${ECR_REGISTRY}/doktori/backend-chat:dev-develop
     init: true
     environment:
       SPRING_PROFILES_ACTIVE: dev
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC"
+      DB_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+      MONGO_URI: "mongodb://${MONGO_USERNAME:-doktori}:${MONGO_PASSWORD:-doktori1234}@mongodb:27017/doktoridb?authSource=admin"
+      AI_BASE_URL: "http://ai.dev.doktori.internal:8000/ai"
+      SPRING_REDIS_HOST: redis
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
     ports:
       - "8081:8081"
     networks:
@@ -157,33 +171,6 @@ services:
           memory: 1.5G
           cpus: '0.5'
     stop_grace_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  frontend:
-    image: ${ECR_REGISTRY}/doktori/frontend:develop
-    environment:
-      HOSTNAME: "0.0.0.0"
-    ports:
-      - "3000:3000"
-    networks:
-      - app-net
-    healthcheck:
-      test: ["CMD", "/nodejs/bin/node", "-e", "const h=require('http');h.get('http://localhost:3000',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.75'
-    stop_grace_period: 10s
     logging:
       driver: "json-file"
       options:
@@ -242,7 +229,7 @@ services:
         max-file: "2"
 
   mongodb:
-    image: mongo:8.0
+    image: mongo:7.0
     container_name: mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-doktori}

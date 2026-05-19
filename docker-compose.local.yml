@@ -1,0 +1,327 @@
+services:
+  mysql:
+    image: mysql:8.0.44
+    environment:
+      TZ: Asia/Seoul
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: doktoridb
+    ports:
+      - "3307:3306"
+    volumes:
+      - local-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P 3306 --protocol=tcp -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - >
+        if [ -n "${SPRING_REDIS_PASSWORD}" ]; then
+          exec redis-server --requirepass "${SPRING_REDIS_PASSWORD}" --maxmemory 128mb --maxmemory-policy allkeys-lru;
+        else
+          exec redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru;
+        fi
+    ports:
+      - "6379:6379"
+    volumes:
+      - local-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"${SPRING_REDIS_PASSWORD}\" ]; then redis-cli -a \"${SPRING_REDIS_PASSWORD}\" ping; else redis-cli ping; fi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-doktori}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-zsed1234}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - local-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:8.0
+    container_name: doktori-local-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-doktori}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-doktori1234}
+      MONGO_INITDB_DATABASE: doktoridb
+    ports:
+      - "27017:27017"
+    volumes:
+      - local-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh -u \"$${MONGO_INITDB_ROOT_USERNAME}\" -p \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand('ping')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: 5-team-service-cloud/docker/local/backend-api.Dockerfile
+    environment:
+      TZ: Asia/Seoul
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: ${SPRING_REDIS_HOST}
+      SPRING_REDIS_PORT: ${SPRING_REDIS_PORT}
+      SPRING_REDIS_PASSWORD: ${SPRING_REDIS_PASSWORD:-}
+      SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${SPRING_RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME:-${RABBITMQ_USER}}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD:-${RABBITMQ_PASS}}
+      MONGO_URI: ${API_MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
+      KAKAO_FRONTEND_REDIRECT: ${KAKAO_FRONTEND_REDIRECT}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
+      ZOOM_ACCOUNT_ID: ${ZOOM_ACCOUNT_ID}
+      ZOOM_CLIENT_ID: ${ZOOM_CLIENT_ID}
+      ZOOM_CLIENT_SECRET: ${ZOOM_CLIENT_SECRET}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8000/ai}
+      AI_API_KEY: ${AI_API_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-doktori-dev-images}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-file:/app/secrets/firebase-service-account.json}
+      SPRING_CLOUD_AWS_PARAMETERSTORE_ENABLED: "false"
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}:/app/secrets/firebase-service-account.json:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  chat:
+    build:
+      context: ..
+      dockerfile: 5-team-service-cloud/docker/local/backend-chat.Dockerfile
+    environment:
+      TZ: Asia/Seoul
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: ${SPRING_REDIS_HOST}
+      SPRING_REDIS_PORT: ${SPRING_REDIS_PORT}
+      SPRING_REDIS_PASSWORD: ${SPRING_REDIS_PASSWORD:-}
+      MONGO_URI: ${CHAT_MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8000/ai}
+      AI_API_KEY: ${AI_API_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-doktori-dev-images}
+      SPRING_CLOUD_AWS_PARAMETERSTORE_ENABLED: "false"
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ../5-team-service-ai
+      args:
+        PYTHON_VERSION: "3.10"
+    env_file: ../5-team-service-ai/.env.local
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+    stop_grace_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ../5-team-service-fe
+      secrets:
+        - frontend_env
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/local.nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      api:
+        condition: service_healthy
+      chat:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Observability Agent (replaces node_exporter + mysqld_exporter + promtail)
+  # ---------------------------------------------------------------------------
+  alloy:
+    image: grafana/alloy:v1.9.0
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+      - ./monitoring/alloy/config.alloy.local:/etc/alloy/config.alloy:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - MYSQL_DSN=root:${DB_PASSWORD}@(mysql:3306)/
+      - MONITORING_IP=${MONITORING_IP}
+      - ALLOY_ENV=dev
+    pid: host
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.15'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+      - doktori-local
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor — 컨테이너별 리소스 메트릭 (CPU, Memory, Network, Disk I/O)
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    image: ghcr.io/google/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # nginx stub_status → Prometheus 메트릭 변환 (Alloy 내장 없어 사이드카 유지)
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4
+    command:
+      - --nginx.scrape-uri=http://nginx:8888/nginx_status
+    depends_on:
+      - nginx
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: '0.05'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+networks:
+  doktori-local:
+    external: true
+
+volumes:
+  local-mysql-data:
+  local-redis-data:
+  local-rabbitmq-data:
+  local-mongodb-data:
+  alloy-data:
+
+secrets:
+  frontend_env:
+    file: ../5-team-service-fe/.env.local
