@@ -40,7 +40,8 @@ const SESSION_MAX_SEC = Number(__ENV.WS_SESSION_MAX || 30);
 const TOKEN_COUNT = Number(__ENV.TOKEN_COUNT || 500);
 
 function parseStages() {
-  if (!__ENV.WS_STAGES) {
+  const raw = __ENV.WS_STAGES || __ENV.K6_STAGES;
+  if (!raw) {
     return [
       { duration: '1m', target: 20 },
       { duration: '3m', target: 50 },
@@ -50,7 +51,7 @@ function parseStages() {
     ];
   }
 
-  return __ENV.WS_STAGES
+  return raw
     .split(',')
     .map((stage) => {
       const [duration, target] = stage.split(':');

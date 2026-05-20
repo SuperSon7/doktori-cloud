@@ -10,8 +10,14 @@
  */
 import { group, check } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
-import { config, thresholds } from '../config.js';
-import { apiGet, checkResponse, extractData, thinkTime, initAuth } from '../helpers.js';
+import { thresholds } from '../config.js';
+import {
+  apiGetWithToken,
+  extractData,
+  thinkTime,
+  fetchMultiTokens,
+  pickToken,
+} from '../helpers.js';
 
 // 커스텀 메트릭
 const myMeetingsDuration = new Trend('my_meetings_duration', true);
@@ -39,15 +45,16 @@ export const options = {
 };
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.error('JWT_TOKEN 또는 REFRESH_TOKEN 환경변수가 필요합니다.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (!token) {
     return;
   }
 
@@ -56,7 +63,7 @@ export default function (data) {
     const start = Date.now();
 
     // size=10으로 요청 시 21개 쿼리 예상
-    const res = apiGet('/users/me/meetings?status=ACTIVE&size=10', {}, true);
+    const res = apiGetWithToken('/users/me/meetings?status=ACTIVE&size=10', token);
 
     const duration = Date.now() - start;
     myMeetingsDuration.add(duration);
@@ -79,14 +86,14 @@ export default function (data) {
   // 2. 내 모임 상세 조회 (회차별 독후감 N+1)
   group('내 모임 상세 (회차별 N+1)', function () {
     // 먼저 목록에서 모임 ID 가져오기
-    const listRes = apiGet('/users/me/meetings?status=ACTIVE&size=5', {}, true);
+    const listRes = apiGetWithToken('/users/me/meetings?status=ACTIVE&size=5', token);
     const listData = extractData(listRes);
 
     if (listData && listData.items && listData.items.length > 0) {
       const meetingId = listData.items[0].meetingId;
 
       const start = Date.now();
-      const detailRes = apiGet(`/users/me/meetings/${meetingId}`, {}, true);
+      const detailRes = apiGetWithToken(`/users/me/meetings/${meetingId}`, token);
 
       const duration = Date.now() - start;
       myMeetingDetailDuration.add(duration);

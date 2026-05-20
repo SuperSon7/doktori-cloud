@@ -4,7 +4,6 @@
 #
 # 사용법:
 #   export BASE_URL="https://api.doktori.kr/api"
-#   export JWT_TOKEN="your-token"
 #   ./run-single.sh <시나리오> [--prom]
 #
 # 옵션:
@@ -32,14 +31,6 @@
 #   my-meetings-n1  N+1 쿼리 — 목록 10건 시 추가 쿼리 20건
 #   join-meeting    정원 레이스 컨디션 — SELECT/UPDATE 간 타이밍 이슈
 #
-# ─── 카오스 엔지니어링 타겟 ────────────────────────────────────
-#   redis-chaos   Redis 집중 — 캐시/SSE pub-sub/Refresh Token
-#                 관찰: Redis 종료 시 캐시 미스 → RDS 폭격 여부
-#   mongodb-chaos MongoDB 집중 — 채팅 메시지 조회 + 행동 로그 쓰기
-#                 관찰: MongoDB 종료 시 채팅 히스토리/로그 저장 실패 여부
-#   rabbitmq-chaos RabbitMQ 집중 — 참여 신청 → 알림 enqueue/consumer
-#                 관찰: RabbitMQ 종료 시 알림 API 500 or graceful 처리 여부
-#
 # ─── 서비스별 ────────────────────────────────────────────────
 #   chat-api      Chat 서버 REST — 방생성/입장/메시지/투표/요약
 #   chat-websocket STOMP WebSocket 동시 연결 (WS_URL 필요)
@@ -49,8 +40,8 @@
 #
 # 예시:
 #   ./run-single.sh smoke
-#   ./run-single.sh redis-chaos --prom
-#   PROM_URL=http://13.124.202.148:9090 ./run-single.sh mongodb-chaos --prom
+#   ./run-single.sh chat-api --prom
+#   PROM_URL=http://13.124.202.148:9090 ./run-single.sh chat-api --prom
 
 set -e
 
@@ -98,7 +89,7 @@ echo "=========================================="
 echo " 시나리오: $SCENARIO"
 echo "=========================================="
 echo "BASE_URL:   $BASE_URL"
-echo "JWT_TOKEN:  ${JWT_TOKEN:+설정됨}${JWT_TOKEN:-미설정}"
+echo "TOKEN_COUNT:${TOKEN_COUNT:-기본값}"
 echo "Prometheus: ${USE_PROM} (${PROM_URL})"
 echo "결과 파일:  $OUTPUT_FILE"
 echo ""

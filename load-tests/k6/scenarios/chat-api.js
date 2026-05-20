@@ -36,18 +36,33 @@ const chatRoomCreateSuccess = new Counter('chat_room_create_success');
 const chatRoomJoinSuccess = new Counter('chat_room_join_success');
 const chatRoomJoinConflict = new Counter('chat_room_join_conflict');
 
+function parseStages() {
+  const raw = __ENV.CHAT_API_STAGES || __ENV.K6_STAGES;
+  if (!raw) {
+    return [
+      { duration: '1m', target: 20 },
+      { duration: '3m', target: 50 },
+      { duration: '3m', target: 100 },
+      { duration: '2m', target: 50 },
+      { duration: '1m', target: 0 },
+    ];
+  }
+
+  return raw
+    .split(',')
+    .map((stage) => {
+      const [duration, target] = stage.split(':');
+      return { duration: duration.trim(), target: Number(target) };
+    })
+    .filter((stage) => stage.duration && Number.isFinite(stage.target));
+}
+
 export const options = {
   scenarios: {
     chat_api: {
       executor: 'ramping-vus',
-      startVUs: 5,
-      stages: [
-        { duration: '1m', target: 20 },
-        { duration: '3m', target: 50 },
-        { duration: '3m', target: 100 },
-        { duration: '2m', target: 50 },
-        { duration: '1m', target: 0 },
-      ],
+      startVUs: Number(__ENV.CHAT_API_START_VUS || 5),
+      stages: parseStages(),
     },
   },
   thresholds: {

@@ -17,8 +17,8 @@ import { group, check, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 import { config } from '../config.js';
 import {
-  apiGet, apiPost, checkResponse, extractData,
-  initAuth, randomItem, randomInt, thinkTime
+  apiGetWithToken, apiPostWithToken, extractData,
+  fetchMultiTokens, pickToken, randomItem, randomInt, thinkTime
 } from '../helpers.js';
 
 // 커스텀 메트릭
@@ -57,15 +57,16 @@ const genreIds = [1, 2, 3, 4, 5];
 const daysOfWeek = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.error('모임 생성은 인증이 필요합니다.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (!token) {
     sleep(1);
     return;
   }
@@ -80,7 +81,7 @@ export default function (data) {
       const keyword = randomItem(bookKeywords);
       const start = Date.now();
 
-      const res = apiGet(`/books?query=${encodeURIComponent(keyword)}&page=1&size=5`, {}, true);
+      const res = apiGetWithToken(`/books?query=${encodeURIComponent(keyword)}&page=1&size=5`, token);
 
       bookSearchDuration.add(Date.now() - start);
 
@@ -102,12 +103,12 @@ export default function (data) {
 
     // 2. 이미지 Presigned URL 발급
     group('이미지 URL 발급', function () {
-      const res = apiPost('/uploads/presigned-url', {
+      const res = apiPostWithToken('/uploads/presigned-url', {
         directory: 'MEETING',
         fileName: `loadtest_meeting_${Date.now()}.jpg`,
         contentType: 'image/jpeg',
         fileSize: 100 * 1024,
-      }, true);
+      }, token);
 
       if (res.status === 200) {
         const resData = extractData(res);
@@ -173,7 +174,7 @@ export default function (data) {
       };
 
       const start = Date.now();
-      const res = apiPost('/meetings', meetingData, true);
+      const res = apiPostWithToken('/meetings', meetingData, token);
       meetingCreateDuration.add(Date.now() - start);
 
       const success = check(res, {

@@ -7,7 +7,7 @@
  * 3. 전체 독후감 목록 조회 (GET /meeting-rounds/{roundId}/book-reports)
  *
  * 사전 조건:
- * - JWT_TOKEN 또는 REFRESH_TOKEN 환경변수 필요
+ * - /api/dev/tokens 에서 발급되는 테스트 사용자 토큰 사용
  * - TEST_ROUND_ID 환경변수: 테스트할 모임 회차 ID (기본값: config.testData.roundId)
  *
  * 제약사항:
@@ -18,8 +18,8 @@ import { group, check, sleep } from 'k6';
 import { Trend, Counter, Rate } from 'k6/metrics';
 import { config, thresholds } from '../config.js';
 import {
-  apiGet, apiPost, checkResponse,
-  thinkTime, initAuth, getAccessToken,
+  apiGetWithToken, apiPostWithToken, checkResponse,
+  thinkTime, fetchMultiTokens, pickToken,
 } from '../helpers.js';
 
 const bookReportCreateDuration = new Trend('book_report_create_duration', true);
@@ -57,15 +57,16 @@ const BOOK_REPORT_CONTENTS = [
 ];
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.warn('인증 토큰이 없습니다. JWT_TOKEN 또는 REFRESH_TOKEN 환경변수를 설정하세요.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) return;
+  const token = pickToken(data.tokens);
+  if (!token) return;
 
   const scenario = Math.floor(Math.random() * 100);
 
@@ -74,10 +75,10 @@ export default function (data) {
     group('독후감 작성', function () {
       const content = BOOK_REPORT_CONTENTS[__VU % BOOK_REPORT_CONTENTS.length];
       const start = Date.now();
-      const res = apiPost(
+      const res = apiPostWithToken(
         `/meeting-rounds/${ROUND_ID}/book-reports`,
         { content },
-        true
+        token
       );
       bookReportCreateDuration.add(Date.now() - start);
 
@@ -98,7 +99,7 @@ export default function (data) {
     // 30%: 내 독후감 조회
     group('내 독후감 조회', function () {
       const start = Date.now();
-      const res = apiGet(`/meeting-rounds/${ROUND_ID}/book-reports/me`, {}, true);
+      const res = apiGetWithToken(`/meeting-rounds/${ROUND_ID}/book-reports/me`, token);
       bookReportReadDuration.add(Date.now() - start);
       check(res, {
         'My book report 200/404': (r) => r.status === 200 || r.status === 404,
@@ -109,7 +110,7 @@ export default function (data) {
     // 30%: 전체 독후감 목록 조회
     group('독후감 목록 조회', function () {
       const start = Date.now();
-      const res = apiGet(`/meeting-rounds/${ROUND_ID}/book-reports`, {}, true);
+      const res = apiGetWithToken(`/meeting-rounds/${ROUND_ID}/book-reports`, token);
       bookReportReadDuration.add(Date.now() - start);
       checkResponse(res, 200, 'Book reports list');
     });

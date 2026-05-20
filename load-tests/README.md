@@ -81,15 +81,7 @@ load-tests/
 │       ├── chat-api.js         # 채팅방 REST API (목록/생성/입장/상세)
 │       ├── chat-websocket.js   # STOMP WebSocket (연결/구독/메시지)
 │       │
-│       └── migration/          # 마이그레이션 전용 시나리오 (11개)
-│
-├── chat-script/                # 팀원 작성 — 채팅방 멀티유저 smoke
-│   └── script_chatroom_multiuser_smoke.js
-│
-├── doktori-smoke/              # 통합 프로브 (전체 API 순회 + HTML 리포트)
-│   ├── script_scenario2_probe.js
-│   ├── run_k6_with_report.sh
-│   └── generate_k6_table_report.mjs
+│       └── migration/          # 마이그레이션 전용 시나리오
 │
 ├── run-all.sh                  # 전체 시나리오 순차 실행
 ├── run-single.sh               # 단일 시나리오 실행
@@ -121,7 +113,7 @@ export BASE_URL="https://api.doktori.kr/api"    # 프로덕션 API (ALB 직접, 
 export WS_URL="wss://api.doktori.kr/ws/chat"    # WebSocket (ALB 직접)
 ```
 
-> JWT_TOKEN 수동 설정은 불필요 — 멀티 토큰 시나리오가 `/api/dev/tokens`에서 자동 발급
+> 수동 토큰 설정은 불필요 — 멀티 토큰 시나리오가 `/api/dev/tokens`에서 자동 발급
 
 ### Smoke (기능 검증)
 
@@ -162,8 +154,7 @@ k6 run k6/scenarios/my-meetings-n1.js
 # 검색 중복 서브쿼리
 k6 run k6/scenarios/meeting-search.js
 
-# 동시 참여 레이스컨디션 (멀티 토큰 필요)
-export JWT_TOKENS="token1,token2,token3,..."
+# 동시 참여 레이스컨디션 (/api/dev/tokens 자동 사용)
 k6 run k6/scenarios/join-meeting.js
 ```
 
@@ -172,10 +163,6 @@ k6 run k6/scenarios/join-meeting.js
 ```bash
 # JSON (Grafana 분석용)
 k6 run --out json=result/load.json k6/scenarios/load.js
-
-# HTML 리포트 (doktori-smoke)
-cd doktori-smoke
-ACCESS_TOKEN="..." VUS=30 DURATION=10m ./run_k6_with_report.sh
 ```
 
 ## 시나리오별 상세
@@ -184,11 +171,11 @@ ACCESS_TOKEN="..." VUS=30 DURATION=10m ./run_k6_with_report.sh
 
 | 시나리오 | VU | 시간 | 인증 | 목적 |
 |---------|-----|------|------|------|
-| smoke | 5 | 1분 | 선택 | API 정상 동작 확인 |
+| smoke | 5 | 1분 | dev token | API 정상 동작 확인 |
 | **load** | 50→100 | 16분 | **멀티 토큰 (500명)** | SLO 충족 검증 |
 | **stress** | 100→500 | 13분 | **멀티 토큰 (500명)** | K8s 한계점 탐색 |
-| spike | 100→500→100 | 5분 | 혼합 | HPA 반응 속도 |
-| soak | 50 | 1시간 | 혼합 | 메모리 누수, 커넥션 풀 고갈 |
+| spike | 100→500→100 | 5분 | dev token | HPA 반응 속도 |
+| soak | 50 | 1시간 | dev token | 메모리 누수, 커넥션 풀 고갈 |
 
 ### 코드 병목 타겟
 
@@ -205,7 +192,6 @@ ACCESS_TOKEN="..." VUS=30 DURATION=10m ./run_k6_with_report.sh
 |---------|---------|-----|------|
 | **chat-websocket** | WebSocket (STOMP) | 5→100 | 동시 연결 한계, 메시지 지연 |
 | **chat-api** | HTTP REST | 5→100 | 채팅방 CRUD 성능 |
-| chat-script (팀원) | HTTP REST | 설정 가능 | 멀티유저 채팅방 생성/입장 |
 
 ### load.js 트래픽 배분
 

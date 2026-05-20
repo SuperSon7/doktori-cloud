@@ -54,6 +54,26 @@ cd load-tests
 | `--prom` | Prometheus remote write 활성화 → Grafana에서 실시간 확인 |
 | `--pull` | 실행 전 각 러너에서 `git pull` (코드 변경 후 첫 실행 시) |
 
+### 50 VU 예시
+
+러너 2대 기준 총 50 VU를 넣으려면 각 러너가 25 VU를 만들도록 k6 옵션을 넘긴다.
+
+```bash
+TOKEN_COUNT=50 \
+K6_EXTRA_ARGS="--stage 1m:25 --stage 5m:25 --stage 1m:0" \
+./run-distributed.sh guest-flow --prom
+
+TOKEN_COUNT=50 \
+K6_STAGES="1m:25,5m:25,1m:0" \
+WS_START_VUS=0 \
+./run-distributed.sh chat-ws --prom
+
+TOKEN_COUNT=50 \
+K6_STAGES="1m:25,5m:25,1m:0" \
+CHAT_API_START_VUS=0 \
+./run-distributed.sh chat-api --prom
+```
+
 ### 시나리오 목록
 
 #### 표준 부하 패턴

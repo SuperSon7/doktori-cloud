@@ -1,11 +1,8 @@
 /**
  * 시나리오 11: 모임 참여 신청 - 정원 레이스 컨디션 테스트
  *
- * ⚠️ 제약사항:
- *   - 카카오 로그인 기반이라 다중 사용자 토큰 확보 어려움
- *   - 단일 토큰으로는 모든 VU가 같은 유저 → 첫 요청 후 409(중복) 반복
- *   - 실행하려면 JWT_TOKENS 환경변수에 쉼표 구분 토큰 목록 필요
- *   - 카카오 개발자 콘솔에서 테스트 계정(최대 5개) 발급 가능하나 50VU에는 부족
+ * 인증:
+ *   - /api/dev/tokens 에서 발급되는 테스트 사용자 토큰을 VU별로 사용
  *
  * 병목 타겟: MeetingService.joinMeeting()
  * - Check-then-Act 패턴: 정원 체크 후 증가 사이에 다른 트랜잭션 끼어들 가능
@@ -16,9 +13,14 @@
  */
 import { group, check, sleep } from 'k6';
 import { Trend, Counter, Rate } from 'k6/metrics';
-import { SharedArray } from 'k6/data';
 import { config, thresholds } from '../config.js';
-import { apiGet, apiPostWithToken, checkResponse, extractData } from '../helpers.js';
+import {
+  apiGet,
+  apiPostWithToken,
+  extractData,
+  fetchMultiTokens,
+  pickToken,
+} from '../helpers.js';
 
 // 커스텀 메트릭
 const joinDuration = new Trend('join_meeting_duration', true);
@@ -26,18 +28,6 @@ const joinSuccess = new Counter('join_meeting_success');
 const joinFailed = new Counter('join_meeting_failed');
 const joinConflict = new Counter('join_meeting_conflict');
 const capacityExceeded = new Rate('capacity_exceeded');
-
-// 테스트용 JWT 토큰 배열 (실제 테스트 시 환경변수로 설정)
-// 여러 사용자가 동시에 참여 신청하는 시나리오
-const testTokens = new SharedArray('tokens', function () {
-  // 환경변수에서 쉼표로 구분된 토큰 목록 로드
-  const tokens = __ENV.JWT_TOKENS ? __ENV.JWT_TOKENS.split(',') : [];
-  if (tokens.length === 0 && __ENV.JWT_TOKEN) {
-    // 단일 토큰만 있으면 그것 사용 (실제 동시성 테스트 제한됨)
-    tokens.push(__ENV.JWT_TOKEN);
-  }
-  return tokens;
-});
 
 export const options = {
   scenarios: {
@@ -58,13 +48,14 @@ export const options = {
 export function setup() {
   // 테스트 대상 모임 확인
   const meetingId = __ENV.TEST_MEETING_ID || config.testData.meetingId;
+  const tokens = fetchMultiTokens(Number(__ENV.TOKEN_COUNT || 50));
 
   console.log(`=== 모임 참여 동시성 테스트 ===`);
   console.log(`대상 모임 ID: ${meetingId}`);
-  console.log(`테스트 토큰 수: ${testTokens.length}`);
+  console.log(`테스트 토큰 수: ${tokens.length}`);
 
-  if (testTokens.length === 0) {
-    console.error('JWT_TOKENS 또는 JWT_TOKEN 환경변수가 필요합니다.');
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
     return { meetingId: null };
   }
 
@@ -87,6 +78,7 @@ export function setup() {
       meetingId: meetingId,
       initialCapacity: data.meeting.capacity,
       initialCount: data.meeting.currentCount,
+      tokens,
     };
   }
 
@@ -99,9 +91,11 @@ export default function (data) {
     return;
   }
 
-  // VU별로 다른 토큰 사용 (round-robin)
-  const tokenIndex = __VU % testTokens.length;
-  const token = testTokens[tokenIndex];
+  const token = pickToken(data.tokens);
+  if (!token) {
+    sleep(1);
+    return;
+  }
 
   group('모임 참여 신청', function () {
     const start = Date.now();

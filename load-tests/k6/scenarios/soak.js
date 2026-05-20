@@ -7,12 +7,18 @@ import { group, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 import { config, thresholds, loadStages } from '../config.js';
 import {
-  apiGet, extractData, randomItem, randomInt, thinkTime, initAuth
+  apiGet,
+  apiGetWithToken,
+  extractData,
+  randomItem,
+  randomInt,
+  thinkTime,
+  fetchMultiTokens,
+  pickToken,
 } from '../helpers.js';
 
 export function setup() {
-  const hasAuth = initAuth();
-  return { hasAuth };
+  return { tokens: fetchMultiTokens() };
 }
 
 // 장기 모니터링용 커스텀 메트릭
@@ -68,15 +74,15 @@ export default function (setupData) {
 
     thinkTime(2, 5);
 
-    // 4. 인증 API (토큰 있을 경우)
-    if (setupData.hasAuth) {
-      apiGet('/users/me', {}, true);
+    const token = pickToken(setupData.tokens);
+    if (token) {
+      apiGetWithToken('/users/me', token);
       thinkTime(2, 5);
 
-      apiGet('/users/me/meetings?status=ACTIVE&size=10', {}, true);
+      apiGetWithToken('/users/me/meetings?status=ACTIVE&size=10', token);
       thinkTime(2, 5);
 
-      apiGet('/notifications/unread', {}, true);
+      apiGetWithToken('/notifications/unread', token);
     }
   });
 

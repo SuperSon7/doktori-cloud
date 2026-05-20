@@ -3,10 +3,10 @@ export const config = {
   // 기본 URL (환경변수로 오버라이드 가능)
   baseUrl: __ENV.BASE_URL || 'http://localhost:8080/api',
 
-  // Access Token (런타임에 자동 갱신됨)
+  // Legacy fallback. 일반 부하 시나리오는 /dev/tokens를 사용한다.
   accessToken: __ENV.JWT_TOKEN || null,
 
-  // Refresh Token (브라우저 개발자도구 → Application → Cookies → refreshToken 값)
+  // Legacy fallback. migration 시나리오 호환용.
   refreshToken: __ENV.REFRESH_TOKEN || '',
 
   // 테스트 데이터 ID (환경에 맞게 수정)

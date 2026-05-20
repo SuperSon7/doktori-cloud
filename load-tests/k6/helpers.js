@@ -172,16 +172,9 @@ export function apiDelete(path, auth = false) {
 // POST 요청 (토큰 직접 지정 — 다중 사용자 시나리오용)
 export function apiPostWithToken(path, body = {}, token = null) {
   const url = `${config.baseUrl}${path}`;
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const response = http.post(url, JSON.stringify(body), {
-    headers,
+    headers: authHeaders(token),
     tags: { name: path.split('?')[0] },
   });
 
@@ -266,8 +259,15 @@ export function paginateWithCursor(path, params = {}, maxPages = 3, auth = false
 
 // 테스트 시작 시 토큰 초기화 (setup에서 호출)
 export function initAuth() {
+  const tokens = fetchMultiTokens(1);
+  if (tokens.length > 0) {
+    _accessToken = tokens[0];
+    console.log('/dev/tokens에서 Access Token 로드');
+    return true;
+  }
+
   if (config.accessToken) {
-    _accessToken = config.accessToken;
+    _accessToken = config.accessToken; // migration 호환용 fallback
     console.log('JWT_TOKEN 환경변수에서 토큰 로드');
     return true;
   }
@@ -294,7 +294,7 @@ export function fetchMultiTokens(count = 500) {
   }
 
   const baseUrl = __ENV.BASE_URL || config.baseUrl;
-  const pageSize = Math.min(Number(__ENV.TOKEN_PAGE_SIZE || 1000), count);
+  const pageSize = Math.min(Number(__ENV.TOKEN_PAGE_SIZE || 100), count);
   const baseOffset = Number(__ENV.TOKEN_OFFSET || 0);
   const tokens = [];
 
@@ -338,11 +338,6 @@ export function fetchMultiTokens(count = 500) {
     return tokens;
   }
 
-  // fallback: 단일 JWT_TOKEN
-  if (config.accessToken) {
-    console.warn('멀티 토큰 실패 — 단일 토큰 fallback');
-    return [config.accessToken];
-  }
   return [];
 }
 
@@ -352,17 +347,24 @@ export function pickToken(tokens) {
   return tokens[__VU % tokens.length];
 }
 
-// 특정 토큰으로 GET
-export function apiGetWithToken(path, token, params = {}) {
-  const url = `${config.baseUrl}${path}`;
+export function authHeaders(token, extra = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    ...extra,
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// 특정 토큰으로 GET
+export function apiGetWithToken(path, token, params = {}) {
+  const url = `${config.baseUrl}${path}`;
 
   const response = http.get(url, {
-    headers,
+    headers: authHeaders(token),
     tags: { name: path.split('?')[0] },
     ...params,
   });
@@ -376,14 +378,23 @@ export function apiGetWithToken(path, token, params = {}) {
 // 특정 토큰으로 PUT
 export function apiPutWithToken(path, body = {}, token = null) {
   const url = `${config.baseUrl}${path}`;
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const response = http.put(url, JSON.stringify(body), {
-    headers,
+    headers: authHeaders(token),
+    tags: { name: path.split('?')[0] },
+  });
+
+  apiDuration.add(response.timings.duration);
+  errorRate.add(response.status >= 500);
+  clientErrorRate.add(response.status >= 400 && response.status < 500);
+  return response;
+}
+
+export function apiDeleteWithToken(path, token = null) {
+  const url = `${config.baseUrl}${path}`;
+
+  const response = http.del(url, null, {
+    headers: authHeaders(token),
     tags: { name: path.split('?')[0] },
   });
 

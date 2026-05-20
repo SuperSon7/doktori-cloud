@@ -55,10 +55,12 @@ echo ""
 
 K6_CMD=(k6 run --summary-export "${SUMMARY_FILE}" --summary-trend-stats "${K6_SUMMARY_TREND_STATS}")
 if [ -n "${K6_OUT_ARG}" ]; then
-  K6_CMD+=(${=K6_OUT_ARG})
+  read -r -a K6_OUT_PARTS <<< "${K6_OUT_ARG}"
+  K6_CMD+=("${K6_OUT_PARTS[@]}")
 fi
 if [ -n "${K6_EXTRA_ARGS}" ]; then
-  K6_CMD+=(${=K6_EXTRA_ARGS})
+  read -r -a K6_EXTRA_PARTS <<< "${K6_EXTRA_ARGS}"
+  K6_CMD+=("${K6_EXTRA_PARTS[@]}")
 fi
 K6_CMD+=("${SCENARIO}")
 

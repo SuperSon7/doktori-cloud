@@ -18,8 +18,15 @@ import { group, check, sleep } from 'k6';
 import { Trend, Counter, Gauge } from 'k6/metrics';
 import { config } from '../config.js';
 import {
-  apiGet, apiPut, apiPost, checkResponse, extractData,
-  initAuth, getAccessToken, randomInt, thinkTime
+  apiGetWithToken,
+  apiPutWithToken,
+  checkResponse,
+  extractData,
+  authHeaders,
+  fetchMultiTokens,
+  pickToken,
+  randomInt,
+  thinkTime,
 } from '../helpers.js';
 
 // 커스텀 메트릭
@@ -65,21 +72,16 @@ export const options = {
 };
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.error('알림 테스트는 인증이 필요합니다.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 // SSE 연결 테스트
 export function sseTest(data) {
-  if (!data.hasAuth) {
-    sleep(1);
-    return;
-  }
-
-  const token = getAccessToken();
+  const token = pickToken(data.tokens);
   if (!token) {
     sleep(1);
     return;
@@ -90,11 +92,10 @@ export function sseTest(data) {
 
     // SSE 연결 시도
     const res = http.get(`${config.baseUrl}/notifications/subscribe`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
+      headers: authHeaders(token, {
         'Accept': 'text/event-stream',
         'Cache-Control': 'no-cache',
-      },
+      }),
       tags: { name: '/notifications/subscribe' },
       timeout: '30s',  // SSE는 장시간 연결
     });
@@ -123,7 +124,8 @@ export function sseTest(data) {
 
 // 알림 API 테스트
 export function notificationApiTest(data) {
-  if (!data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (!token) {
     sleep(1);
     return;
   }
@@ -131,7 +133,7 @@ export function notificationApiTest(data) {
   group('알림 API', function () {
     // 1. 읽지 않은 알림 확인
     group('읽지 않은 알림 확인', function () {
-      const res = apiGet('/notifications/unread', {}, true);
+      const res = apiGetWithToken('/notifications/unread', token);
       checkResponse(res, 200, 'Unread check');
     });
 
@@ -141,7 +143,7 @@ export function notificationApiTest(data) {
     let notificationIds = [];
     group('알림 목록 조회', function () {
       const start = Date.now();
-      const res = apiGet('/notifications', {}, true);
+      const res = apiGetWithToken('/notifications', token);
       notificationListDuration.add(Date.now() - start);
 
       if (res.status === 200) {
@@ -161,7 +163,7 @@ export function notificationApiTest(data) {
     if (notificationIds.length > 0) {
       group('알림 읽음 처리', function () {
         const notificationId = notificationIds[0];
-        const res = apiPut(`/notifications/${notificationId}`, {}, true);
+        const res = apiPutWithToken(`/notifications/${notificationId}`, {}, token);
         check(res, {
           'Mark as read - status 204': (r) => r.status === 204,
         });
@@ -173,7 +175,7 @@ export function notificationApiTest(data) {
     // 4. 전체 읽음 처리 (10% 확률)
     if (Math.random() < 0.1) {
       group('전체 알림 읽음', function () {
-        const res = apiPut('/notifications', {}, true);
+        const res = apiPutWithToken('/notifications', {}, token);
         check(res, {
           'Mark all as read - status 204': (r) => r.status === 204,
         });

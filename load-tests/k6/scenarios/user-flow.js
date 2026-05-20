@@ -6,9 +6,9 @@
 import { group, check } from 'k6';
 import { config, thresholds, loadStages } from '../config.js';
 import {
-  apiGet, apiPut, apiPost,
+  apiGetWithToken, apiPutWithToken,
   checkResponse, extractData, thinkTime, randomItem,
-  initAuth
+  fetchMultiTokens, pickToken,
 } from '../helpers.js';
 
 export const options = {
@@ -24,25 +24,24 @@ export const options = {
   },
 };
 
-// 사전 조건: JWT 토큰 또는 Refresh 토큰 필수
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.warn('인증 토큰이 없습니다. JWT_TOKEN 또는 REFRESH_TOKEN 환경변수를 설정하세요.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) {
-    console.log('토큰 없음 - 테스트 건너뜀');
+  const token = pickToken(data.tokens);
+  if (!token) {
     return;
   }
 
   group('로그인 사용자 일상 흐름', function () {
     // 1. 내 프로필 조회
     group('내 프로필', function () {
-      const res = apiGet('/users/me', {}, true);
+      const res = apiGetWithToken('/users/me', token);
       checkResponse(res, 200, 'My Profile');
 
       // 프로필 조회 완료
@@ -52,7 +51,7 @@ export default function (data) {
 
     // 2. 개인화 추천 모임 조회
     group('개인화 추천', function () {
-      const res = apiGet('/recommendations/meetings', {}, true);
+      const res = apiGetWithToken('/recommendations/meetings', token);
       checkResponse(res, 200, 'Personalized Recommendations');
 
       // 개인화 추천 조회 완료
@@ -63,7 +62,7 @@ export default function (data) {
     // 3. 내 활성 모임 목록
     let myMeetingIds = [];
     group('내 모임 목록', function () {
-      const res = apiGet('/users/me/meetings?status=ACTIVE&size=10', {}, true);
+      const res = apiGetWithToken('/users/me/meetings?status=ACTIVE&size=10', token);
       checkResponse(res, 200, 'My Meetings');
 
       const data = extractData(res);
@@ -76,7 +75,7 @@ export default function (data) {
 
     // 4. 오늘의 모임 확인
     group('오늘의 모임', function () {
-      const res = apiGet('/users/me/meetings/today', {}, true);
+      const res = apiGetWithToken('/users/me/meetings/today', token);
       checkResponse(res, 200, 'Today Meetings');
 
       // 오늘의 모임 조회 완료
@@ -88,7 +87,7 @@ export default function (data) {
     if (myMeetingIds.length > 0) {
       group('내 모임 상세', function () {
         const meetingId = randomItem(myMeetingIds);
-        const res = apiGet(`/users/me/meetings/${meetingId}`, {}, true);
+        const res = apiGetWithToken(`/users/me/meetings/${meetingId}`, token);
         checkResponse(res, 200, 'My Meeting Detail');
 
         // 내 모임 상세 조회 완료
@@ -99,7 +98,7 @@ export default function (data) {
 
     // 6. 읽지 않은 알림 확인
     group('알림 확인', function () {
-      const res = apiGet('/notifications/unread', {}, true);
+      const res = apiGetWithToken('/notifications/unread', token);
       checkResponse(res, 200, 'Unread Check');
 
       // 읽지 않은 알림 확인 완료
@@ -110,7 +109,7 @@ export default function (data) {
     // 7. 알림 목록 조회
     let notificationIds = [];
     group('알림 목록', function () {
-      const res = apiGet('/notifications', {}, true);
+      const res = apiGetWithToken('/notifications', token);
       checkResponse(res, 200, 'Notifications');
 
       const data = extractData(res);
@@ -127,7 +126,7 @@ export default function (data) {
     if (notificationIds.length > 0) {
       group('알림 읽음 처리', function () {
         const notificationId = notificationIds[0];
-        const res = apiPut(`/notifications/${notificationId}`, {}, true);
+        const res = apiPutWithToken(`/notifications/${notificationId}`, {}, token);
         check(res, {
           'Mark as read - status 204': (r) => r.status === 204,
         });
@@ -140,7 +139,7 @@ export default function (data) {
     if (myMeetingIds.length > 0) {
       group('모임 리뷰 조회', function () {
         const meetingId = randomItem(myMeetingIds);
-        const res = apiGet(`/reviews/meetings/${meetingId}`, {}, true);
+        const res = apiGetWithToken(`/reviews/meetings/${meetingId}`, token);
         checkResponse(res, 200, 'Meeting Reviews');
       });
     }

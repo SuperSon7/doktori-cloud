@@ -4,11 +4,17 @@
  */
 import { sleep } from 'k6';
 import { config, loadStages } from '../config.js';
-import { apiGet, randomItem, randomInt, initAuth, getAccessToken } from '../helpers.js';
+import {
+  apiGet,
+  apiGetWithToken,
+  randomItem,
+  randomInt,
+  fetchMultiTokens,
+  pickToken,
+} from '../helpers.js';
 
 export function setup() {
-  const hasAuth = initAuth();
-  return { hasAuth };
+  return { tokens: fetchMultiTokens() };
 }
 
 export const options = {
@@ -33,14 +39,14 @@ export default function (data) {
   const api = randomItem(apis);
   apiGet(api);
 
-  // 인증 API (토큰 있을 경우)
-  if (data.hasAuth && Math.random() > 0.5) {
+  const token = pickToken(data.tokens);
+  if (token && Math.random() > 0.5) {
     const authApis = [
       '/users/me',
       '/users/me/meetings?status=ACTIVE&size=5',
       '/notifications/unread',
     ];
-    apiGet(randomItem(authApis), {}, true);
+    apiGetWithToken(randomItem(authApis), token);
   }
 
   sleep(randomInt(0, 1) * 0.5);  // 0~0.5초 랜덤 대기

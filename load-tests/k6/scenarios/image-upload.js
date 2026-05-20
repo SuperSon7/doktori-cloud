@@ -8,8 +8,14 @@
 import http from 'k6/http';
 import { group, check, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
-import { config } from '../config.js';
-import { apiPost, checkResponse, extractData, initAuth, randomItem, randomInt } from '../helpers.js';
+import {
+  apiPostWithToken,
+  extractData,
+  fetchMultiTokens,
+  pickToken,
+  randomItem,
+  randomInt,
+} from '../helpers.js';
 
 // 커스텀 메트릭
 const presignDuration = new Trend('presign_url_duration', true);
@@ -62,15 +68,16 @@ const directories = ['PROFILE', 'MEETING'];
 const contentTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.error('이미지 업로드는 인증이 필요합니다. JWT_TOKEN 또는 REFRESH_TOKEN을 설정하세요.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (!token) {
     sleep(1);
     return;
   }
@@ -88,12 +95,12 @@ export default function (data) {
     group('Presigned URL 발급', function () {
       const start = Date.now();
 
-      const res = apiPost('/uploads/presigned-url', {
+      const res = apiPostWithToken('/uploads/presigned-url', {
         directory: directory,
         fileName: fileName,
         contentType: contentType,
         fileSize: fileSize,
-      }, true);
+      }, token);
 
       const duration = Date.now() - start;
       presignDuration.add(duration);

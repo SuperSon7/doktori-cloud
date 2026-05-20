@@ -5,9 +5,10 @@
 import { sleep } from 'k6';
 import { config, thresholds, loadStages } from '../config.js';
 import {
-  apiGet, apiPost, apiPut,
+  apiGet,
+  apiGetWithToken,
   checkResponse, extractData, thinkTime, randomItem,
-  initAuth, getAccessToken
+  fetchMultiTokens, pickToken,
 } from '../helpers.js';
 
 export const options = {
@@ -18,10 +19,8 @@ export const options = {
   },
 };
 
-// 테스트 시작 시 토큰 초기화
 export function setup() {
-  const hasAuth = initAuth();
-  return { hasAuth };
+  return { tokens: fetchMultiTokens(Number(__ENV.TOKEN_COUNT || 10)) };
 }
 
 export default function (data) {
@@ -64,24 +63,24 @@ export default function (data) {
   const genresRes = apiGet('/policies/reading-genres');
   checkResponse(genresRes, 200, 'Reading Genres');
 
-  // === 인증 필요 API (토큰이 있을 경우만) ===
-  if (data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (token) {
     thinkTime(1, 2);
 
     // 7. 내 프로필 조회
-    const profileRes = apiGet('/users/me', {}, true);
+    const profileRes = apiGetWithToken('/users/me', token);
     checkResponse(profileRes, 200, 'My Profile');
 
     thinkTime(1, 2);
 
     // 8. 내 모임 목록
-    const myMeetingsRes = apiGet('/users/me/meetings?status=ACTIVE&size=10', {}, true);
+    const myMeetingsRes = apiGetWithToken('/users/me/meetings?status=ACTIVE&size=10', token);
     checkResponse(myMeetingsRes, 200, 'My Meetings');
 
     thinkTime(1, 2);
 
     // 9. 알림 확인
-    const unreadRes = apiGet('/notifications/unread', {}, true);
+    const unreadRes = apiGetWithToken('/notifications/unread', token);
     checkResponse(unreadRes, 200, 'Unread Notifications');
   }
 

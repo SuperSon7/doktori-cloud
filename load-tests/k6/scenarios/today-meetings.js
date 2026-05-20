@@ -10,8 +10,13 @@
  */
 import { group, check } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
-import { config, thresholds } from '../config.js';
-import { apiGet, checkResponse, thinkTime, initAuth } from '../helpers.js';
+import { thresholds } from '../config.js';
+import {
+  apiGetWithToken,
+  thinkTime,
+  fetchMultiTokens,
+  pickToken,
+} from '../helpers.js';
 
 // 커스텀 메트릭
 const todayMeetingsDuration = new Trend('today_meetings_duration', true);
@@ -39,22 +44,23 @@ export const options = {
 };
 
 export function setup() {
-  const hasAuth = initAuth();
-  if (!hasAuth) {
-    console.error('JWT_TOKEN 또는 REFRESH_TOKEN 환경변수가 필요합니다.');
+  const tokens = fetchMultiTokens();
+  if (tokens.length === 0) {
+    console.error('Dev token 발급에 실패했습니다.');
   }
-  return { hasAuth };
+  return { tokens };
 }
 
 export default function (data) {
-  if (!data.hasAuth) {
+  const token = pickToken(data.tokens);
+  if (!token) {
     return;
   }
 
   group('오늘의 모임 조회', function () {
     const start = Date.now();
 
-    const res = apiGet('/users/me/meetings/today', {}, true);
+    const res = apiGetWithToken('/users/me/meetings/today', token);
 
     const duration = Date.now() - start;
     todayMeetingsDuration.add(duration);

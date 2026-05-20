@@ -4,7 +4,7 @@
 #
 # 사용법:
 #   export BASE_URL="https://your-api.com/api"
-#   export JWT_TOKEN="your-token"
+#   export WS_URL="wss://your-api.com/ws/chat"
 #   ./run-all.sh
 #
 
@@ -25,7 +25,8 @@ echo " Doktori 부하테스트 실행"
 echo -e "==========================================${NC}"
 echo ""
 echo "BASE_URL: ${BASE_URL:-미설정}"
-echo "JWT_TOKEN: ${JWT_TOKEN:+설정됨}${JWT_TOKEN:-미설정}"
+echo "WS_URL: ${WS_URL:-미설정}"
+echo "TOKEN_COUNT: ${TOKEN_COUNT:-기본값}"
 echo "결과 저장: $RESULTS_DIR"
 echo ""
 
@@ -62,38 +63,40 @@ run_test "01_smoke" "k6/scenarios/smoke.js"
 echo -e "${GREEN}=== 2. 비회원 탐색 흐름 ===${NC}"
 run_test "02_guest_flow" "k6/scenarios/guest-flow.js"
 
-# 3. 로그인 사용자 흐름 (토큰 필요)
-if [ -n "$JWT_TOKEN" ]; then
-    echo -e "${GREEN}=== 3. 로그인 사용자 흐름 ===${NC}"
-    run_test "03_user_flow" "k6/scenarios/user-flow.js"
-else
-    echo -e "${YELLOW}=== 3. 로그인 사용자 흐름 (건너뜀 - 토큰 없음) ===${NC}"
-fi
+# 3. 로그인 사용자 흐름
+echo -e "${GREEN}=== 3. 로그인 사용자 흐름 ===${NC}"
+run_test "03_user_flow" "k6/scenarios/user-flow.js"
 
 # 4. 모임 검색 병목 테스트
 echo -e "${GREEN}=== 4. 모임 검색 병목 테스트 ===${NC}"
 run_test "04_meeting_search" "k6/scenarios/meeting-search.js"
 
-# 5. N+1 문제 테스트 (토큰 필요)
-if [ -n "$JWT_TOKEN" ]; then
-    echo -e "${GREEN}=== 5. N+1 문제 테스트 ===${NC}"
-    run_test "05_my_meetings_n1" "k6/scenarios/my-meetings-n1.js"
+# 5. N+1 문제 테스트
+echo -e "${GREEN}=== 5. N+1 문제 테스트 ===${NC}"
+run_test "05_my_meetings_n1" "k6/scenarios/my-meetings-n1.js"
 
-    echo -e "${GREEN}=== 6. 오늘의 모임 (DATE 인덱스) 테스트 ===${NC}"
-    run_test "06_today_meetings" "k6/scenarios/today-meetings.js"
-fi
+echo -e "${GREEN}=== 6. 오늘의 모임 (DATE 인덱스) 테스트 ===${NC}"
+run_test "06_today_meetings" "k6/scenarios/today-meetings.js"
 
 # 7. 종합 Load 테스트
 echo -e "${GREEN}=== 7. 종합 Load 테스트 ===${NC}"
 run_test "07_load" "k6/scenarios/load.js"
 
-# 8. Stress 테스트
-echo -e "${GREEN}=== 8. Stress 테스트 ===${NC}"
-run_test "08_stress" "k6/scenarios/stress.js"
+# 8. Chat REST API 테스트
+echo -e "${GREEN}=== 8. Chat REST API 테스트 ===${NC}"
+run_test "08_chat_api" "k6/scenarios/chat-api.js"
 
-# 9. Spike 테스트
-echo -e "${GREEN}=== 9. Spike 테스트 ===${NC}"
-run_test "09_spike" "k6/scenarios/spike.js"
+# 9. Chat WebSocket 테스트
+echo -e "${GREEN}=== 9. Chat WebSocket 테스트 ===${NC}"
+run_test "09_chat_websocket" "k6/scenarios/chat-websocket.js"
+
+# 10. Stress 테스트
+echo -e "${GREEN}=== 10. Stress 테스트 ===${NC}"
+run_test "10_stress" "k6/scenarios/stress.js"
+
+# 11. Spike 테스트
+echo -e "${GREEN}=== 11. Spike 테스트 ===${NC}"
+run_test "11_spike" "k6/scenarios/spike.js"
 
 echo -e "${GREEN}=========================================="
 echo " 테스트 완료!"

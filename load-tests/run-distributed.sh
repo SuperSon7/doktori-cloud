@@ -10,7 +10,6 @@
 #   표준 프로파일: smoke, load, stress, spike, soak
 #   비즈니스:     guest-flow, user-flow, create-meeting, book-report, meeting-spike, meeting-lifecycle
 #   RDS 타겟:     meeting-search, today-meetings, my-meetings-n1, join-meeting
-#   카오스:       redis-chaos, mongodb-chaos, rabbitmq-chaos
 #   서비스별:     chat-api, chat-ws, notification, cache-test, image-upload
 #   기타:         custom <path>
 #
@@ -23,9 +22,14 @@
 #   --kill                 실행 중인 k6 프로세스 종료
 #   --result               최신 결과 확인
 #
+# 환경변수:
+#   TOKEN_COUNT=50         /dev/tokens 발급 개수
+#   K6_STAGES="1m:25,5m:25,1m:0"
+#   K6_EXTRA_ARGS="--stage 1m:25 --stage 5m:25 --stage 1m:0"
+#   WS_STAGES="1m:25,5m:25,1m:0"
+#
 # 예시:
 #   ./run-distributed.sh smoke --pull --prom
-#   ./run-distributed.sh redis-chaos --prom
 #   ./run-distributed.sh load --prom
 #   ./run-distributed.sh --stop
 
@@ -51,6 +55,46 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+REMOTE_ENV_VARS=(
+  TOKEN_COUNT
+  TOKEN_PAGE_SIZE
+  TOKEN_OFFSET
+  TOKEN_FETCH_TIMEOUT
+  TEST_MEETING_ID
+  TEST_MEETING_IDS
+  TEST_ROUND_ID
+  TEST_ROOM_IDS
+  CACHE_MEETING_IDS
+  CHAT_ROOM_IDS
+  K6_STAGES
+  CHAT_API_STAGES
+  CHAT_API_START_VUS
+  WS_STAGES
+  WS_START_VUS
+  MSG_INTERVAL
+  MSG_MIN
+  MSG_MAX
+  WS_SESSION_MIN
+  WS_SESSION_MAX
+  SESSION_DURATION
+  K6_EXTRA_ARGS
+)
+
+append_remote_env() {
+  local cmd="$1"
+  local var value quoted
+
+  for var in "${REMOTE_ENV_VARS[@]}"; do
+    value="${!var:-}"
+    if [ -n "$value" ]; then
+      printf -v quoted '%q' "$value"
+      cmd="${cmd} && export ${var}=${quoted}"
+    fi
+  done
+
+  echo "$cmd"
+}
+
 # ── 시나리오 매핑 ──
 resolve_scenario() {
   case "$1" in
@@ -72,10 +116,6 @@ resolve_scenario() {
     today-meetings)    echo "k6/scenarios/today-meetings.js" ;;
     my-meetings-n1)    echo "k6/scenarios/my-meetings-n1.js" ;;
     join-meeting)      echo "k6/scenarios/join-meeting.js" ;;
-    # 카오스 엔지니어링 타겟
-    redis-chaos)       echo "k6/scenarios/redis-chaos.js" ;;
-    mongodb-chaos)     echo "k6/scenarios/mongodb-chaos.js" ;;
-    rabbitmq-chaos)    echo "k6/scenarios/rabbitmq-chaos.js" ;;
     # 서비스별
     chat-api)          echo "k6/scenarios/chat-api.js" ;;
     chat-ws)           echo "k6/scenarios/chat-websocket.js" ;;
@@ -122,6 +162,7 @@ run_on_runner() {
 
   cmd="${cmd} && export BASE_URL=${BASE_URL}"
   cmd="${cmd} && export WS_URL=${WS_URL}"
+  cmd=$(append_remote_env "$cmd")
 
   local k6_args=""
   if [ "$use_prom" = "true" ] && [ -n "$PROM_URL" ]; then
@@ -130,7 +171,7 @@ run_on_runner() {
     k6_args="--out experimental-prometheus-rw"
   fi
 
-  cmd="${cmd} && k6 run ${k6_args} ${scenario_file} 2>&1 | tee /tmp/k6-${timestamp}.log"
+  cmd="${cmd} && k6 run ${k6_args} \${K6_EXTRA_ARGS:-} ${scenario_file} 2>&1 | tee /tmp/k6-${timestamp}.log"
 
   echo -e "${CYAN}[${ip}]${NC} 시작: ${scenario_file}"
   # shellcheck disable=SC2029  # cmd is intentionally built locally and expanded before SSH
@@ -281,7 +322,7 @@ manage_runners() {
 
 # ── 도움말 ──
 show_help() {
-  head -32 "$0" | tail -31
+  head -38 "$0" | tail -37
 }
 
 # ── 파싱 ──
