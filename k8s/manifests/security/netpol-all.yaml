@@ -567,10 +567,22 @@ spec:
       ports:
         - port: 80
           protocol: TCP
-    # AWS VPC Endpoints (SSM Parameter Store)
+    # AWS VPC Endpoints (SSM Parameter Store) — Interface Endpoint 사용 시 private IP 경로
     - to:
         - ipBlock:
             cidr: 10.1.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    # TODO(cost): Interface VPC Endpoint를 다시 켜면 이 NAT 경유 public HTTPS 허용을 제거한다.
+    # 현재 prod base는 비용 절약을 위해 vpc_interface_endpoints=[] 이므로
+    # ssm.ap-northeast-2.amazonaws.com 이 public IP(43.x)로 resolve되고 NAT 경유 egress가 필요하다.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 169.254.0.0/16
       ports:
         - port: 443
           protocol: TCP
