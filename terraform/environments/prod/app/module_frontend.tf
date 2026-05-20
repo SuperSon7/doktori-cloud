@@ -13,6 +13,7 @@ module "frontend" {
   public_subnet_ids = [
     local.net.subnet_ids["public"],
     local.net.subnet_ids["public_c"],
+    local.net.subnet_ids["public_b"],
   ]
   private_subnet_ids = local.frontend_private_subnet_ids
 

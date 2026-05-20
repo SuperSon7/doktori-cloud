@@ -74,6 +74,7 @@ spec:
       backendRefs:
         - name: chat-svc
           port: 8081
+---
 # api REST API (catch-all /api/)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
