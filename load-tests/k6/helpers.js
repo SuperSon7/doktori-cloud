@@ -284,7 +284,7 @@ export function initAuth() {
 // ── 멀티 토큰 (다수 유저 시뮬레이션) ──────────────────────────────────────
 
 // /api/dev/tokens 에서 테스트 유저 토큰 목록을 발급받아 반환 (setup에서 1회 호출)
-export function fetchMultiTokens(count = 500) {
+export function fetchMultiTokens(count = Number(__ENV.TOKEN_COUNT || 500)) {
   if (Array.isArray(tokenFileData) && tokenFileData.length > 0) {
     const tokens = tokenFileData
       .slice(0, count)
