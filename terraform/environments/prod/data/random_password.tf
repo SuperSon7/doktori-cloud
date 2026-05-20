@@ -10,3 +10,8 @@ resource "random_password" "mongo" {
   length  = 24
   special = false
 }
+
+ephemeral "random_password" "redis" {
+  length  = 24
+  special = false
+}

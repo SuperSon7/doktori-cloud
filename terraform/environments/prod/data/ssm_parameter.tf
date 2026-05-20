@@ -27,6 +27,14 @@ resource "aws_ssm_parameter" "aws_s3_endpoint" {
   tags  = { Name = "${var.project_name}-${var.environment}-AWS_S3_ENDPOINT" }
 }
 
+resource "aws_ssm_parameter" "spring_redis_password" {
+  name             = "/${var.project_name}/${var.environment}/SPRING_REDIS_PASSWORD"
+  type             = "SecureString"
+  value_wo         = ephemeral.random_password.redis.result
+  value_wo_version = 1
+  tags             = { Name = "${var.project_name}-${var.environment}-SPRING_REDIS_PASSWORD" }
+}
+
 resource "aws_ssm_parameter" "spring_redis_sentinel_master" {
   count = var.enable_data_ha ? 1 : 0
 

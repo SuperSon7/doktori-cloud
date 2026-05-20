@@ -7,6 +7,10 @@ module "data_compute" {
 
   name_suffix = "data"
 
+  # Redis user_data reads SPRING_REDIS_PASSWORD from SSM at first boot.
+  # This ensures the parameter exists before any EC2 in this module starts.
+  depends_on = [aws_ssm_parameter.spring_redis_password]
+
   project_name = var.project_name
   environment  = var.environment
   aws_region   = var.aws_region
