@@ -17,6 +17,37 @@ JOIN_PARAM="$${SSM_PREFIX}/join-command"
 
 WORKER_IP=$(hostname -I | awk '{print $1}')
 
+mark_instance_unhealthy() {
+  local token instance_id
+
+  echo "  -> ASG에 bootstrap 실패 인스턴스 Unhealthy 신고 시도..."
+
+  token=$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || true)
+
+  if [ -n "$${token}" ]; then
+    instance_id=$(curl -fsS \
+      -H "X-aws-ec2-metadata-token: $${token}" \
+      "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || true)
+  else
+    instance_id=$(curl -fsS \
+      "http://169.254.169.254/latest/meta-data/instance-id" 2>/dev/null || true)
+  fi
+
+  if [ -z "$${instance_id}" ]; then
+    echo "  WARN: IMDS에서 instance-id를 가져오지 못해 ASG health 신고를 건너뜀"
+    return 0
+  fi
+
+  if ! aws autoscaling set-instance-health \
+    --instance-id "$${instance_id}" \
+    --health-status Unhealthy \
+    --no-should-respect-grace-period \
+    --region "$${REGION}"; then
+    echo "  WARN: ASG SetInstanceHealth 호출 실패"
+  fi
+}
+
 echo "============================================="
 echo " K8s Worker Bootstrap Only"
 echo " IP: $${WORKER_IP}"
@@ -73,13 +104,50 @@ done
 
 if [ -z "$${JOIN_CMD}" ]; then
   echo "ERROR: 15분 초과 - worker join 명령을 찾을 수 없음"
+  mark_instance_unhealthy
   exit 1
 fi
 
 echo "[2/2] kubeadm join..."
 
-eval "$${JOIN_CMD}" \
-  --cri-socket=unix:///run/containerd/containerd.sock
+JOIN_SUCCESS=false
+
+for attempt in $(seq 1 5); do
+  echo "  -> worker join 시도 $${attempt}/5..."
+
+  if [ "$${attempt}" -gt 1 ]; then
+    kubeadm reset -f --cri-socket=unix:///run/containerd/containerd.sock 2>/dev/null || true
+
+    JOIN_CMD=$(aws ssm get-parameter \
+      --name "$${JOIN_PARAM}" \
+      --with-decryption \
+      --query "Parameter.Value" \
+      --output text \
+      --region "$${REGION}" 2>/dev/null || true)
+
+    if [ -z "$${JOIN_CMD}" ]; then
+      echo "  WARN: SSM에서 worker join 명령 재조회 실패"
+    fi
+  fi
+
+  if [ -n "$${JOIN_CMD}" ] && eval "$${JOIN_CMD}" \
+    --cri-socket=unix:///run/containerd/containerd.sock; then
+    JOIN_SUCCESS=true
+    break
+  fi
+
+  if [ "$${attempt}" -lt 5 ]; then
+    SLEEP_SECONDS=$((10 * (2 ** (attempt - 1))))
+    echo "  WARN: worker join 실패 (시도 $${attempt}/5). $${SLEEP_SECONDS}초 후 재시도..."
+    sleep "$${SLEEP_SECONDS}"
+  fi
+done
+
+if [ "$${JOIN_SUCCESS}" = false ]; then
+  echo "ERROR: worker join 5회 시도 모두 실패"
+  mark_instance_unhealthy
+  exit 1
+fi
 
 echo ""
 echo "============================================="
