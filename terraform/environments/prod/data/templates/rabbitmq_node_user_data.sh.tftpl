@@ -109,7 +109,7 @@ prometheus.exporter.unix "host" {
 
 prometheus.scrape "host_metrics" {
   targets         = prometheus.exporter.unix.host.targets
-  forward_to      = [prometheus.relabel.data_common.receiver]
+  forward_to      = [prometheus.relabel.host_common.receiver]
   scrape_interval = "30s"
 }
 
@@ -117,11 +117,11 @@ prometheus.scrape "rabbitmq_metrics" {
   targets = [{
     __address__ = "127.0.0.1:15692",
   }]
-  forward_to      = [prometheus.relabel.data_common.receiver]
+  forward_to      = [prometheus.relabel.rabbitmq_common.receiver]
   scrape_interval = "15s"
 }
 
-prometheus.relabel "data_common" {
+prometheus.relabel "host_common" {
   forward_to = [prometheus.remote_write.monitoring.receiver]
   rule {
     replacement  = "${environment}"
@@ -130,6 +130,26 @@ prometheus.relabel "data_common" {
   rule {
     replacement  = "rabbitmq"
     target_label = "service"
+  }
+  rule {
+    replacement  = "$NODE_NAME"
+    target_label = "instance"
+  }
+}
+
+prometheus.relabel "rabbitmq_common" {
+  forward_to = [prometheus.remote_write.monitoring.receiver]
+  rule {
+    replacement  = "${environment}"
+    target_label = "env"
+  }
+  rule {
+    replacement  = "rabbitmq"
+    target_label = "service"
+  }
+  rule {
+    replacement  = "rabbitmq"
+    target_label = "app"
   }
   rule {
     replacement  = "$NODE_NAME"
