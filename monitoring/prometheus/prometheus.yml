@@ -16,9 +16,12 @@ rule_files:
 # 각 서버의 Alloy 에이전트가 로컬에서 수집 후 Prometheus로 push
 #   - 호스트 메트릭 (prometheus.exporter.unix)
 #   - Spring Boot actuator (prometheus.scrape)
-#   - MySQL (prometheus.exporter.mysql)
+#   - dev/local MySQL (prometheus.exporter.mysql)
 #   - Nginx (nginx-exporter 사이드카 → Alloy scrape)
 # Prometheus는 --web.enable-remote-write-receiver 플래그로 수신
+#
+# [Pull — RDS mysqld_exporter]
+# prod RDS는 별도 rds-monitoring EC2의 mysqld_exporter(:9104)를 scrape
 #
 # [Pull — Blackbox Exporter]
 # 모니터링 서버에서 외부 URL 프로빙 (엔드포인트 가용성)
@@ -38,6 +41,18 @@ scrape_configs:
       - targets: ["cadvisor:8080"]
         labels:
           env: monitoring
+
+  # ──────────────────────────────────────────────
+  # RDS MySQL — prod rds-monitoring EC2 mysqld_exporter
+  # ──────────────────────────────────────────────
+  - job_name: rds-mysql
+    static_configs:
+      - targets: ["10.1.26.239:9104"]
+        labels:
+          env: prod
+          instance: mysql
+          app: mysql
+          target: rds-prod
 
   # ──────────────────────────────────────────────
   # Blackbox Exporter — 외부 엔드포인트 가용성 프로빙

@@ -43,7 +43,7 @@
   - `node_exporter` 타깃 IP: `52.79.205.195:9100`, `3.37.180.158:9100`
   - `spring-boot-prod` 타깃 도메인: `doktori.kr`
   - `spring-boot-dev` 타깃 도메인: `dev.doktori.kr`
-  - `mysql-prod` 타깃 IP: `3.37.180.158:9104`
+  - `rds-mysql` 타깃 IP: `10.1.26.239:9104`
   - `blackbox` HTTP 체크 대상: `https://doktori.kr`
 
 - **의미**

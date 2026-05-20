@@ -3,7 +3,7 @@
 # RDS Monitoring — boot-time secret injection
 #
 # Golden Image(Packer AMI)에 mysqld_exporter, AWS CLI, SSM Agent, systemd unit이
-# 이미 설치되어 있다. 이 스크립트는 부팅 시점의 동적 값만 주입한다.
+# 이미 설치되어 있다. 이 스크립트는 부팅 시점의 DB 접속 설정만 주입한다.
 # =============================================================================
 set -euo pipefail
 exec > >(tee /var/log/rds-monitoring-init.log) 2>&1
@@ -20,21 +20,32 @@ echo " Host: $${DB_HOST}:$${DB_PORT}"
 echo " User: $${DB_USERNAME}"
 echo "============================================="
 
-DB_PASSWORD=$(aws ssm get-parameter \
-  --name "$${DB_PASSWORD_PARAM}" \
-  --with-decryption \
-  --query "Parameter.Value" \
-  --output text \
-  --region "$${REGION}")
+DB_PASSWORD=""
+for attempt in $(seq 1 30); do
+  DB_PASSWORD=$(aws ssm get-parameter \
+    --name "$${DB_PASSWORD_PARAM}" \
+    --with-decryption \
+    --query "Parameter.Value" \
+    --output text \
+    --region "$${REGION}" 2>/tmp/rds-monitoring-ssm-error.log) && break
+
+  echo "SSM password fetch failed (attempt $${attempt}/30); retrying in 10s"
+  cat /tmp/rds-monitoring-ssm-error.log
+  sleep 10
+done
 
 if [ -z "$${DB_PASSWORD}" ] || [ "$${DB_PASSWORD}" = "None" ]; then
   echo "ERROR: DB password parameter is empty: $${DB_PASSWORD_PARAM}"
   exit 1
 fi
 
-install -o root -g mysqld_exporter -m 0640 /dev/null /etc/mysqld_exporter.env
-cat > /etc/mysqld_exporter.env <<EOF
-DATA_SOURCE_NAME="$${DB_USERNAME}:$${DB_PASSWORD}@($${DB_HOST}:$${DB_PORT})/"
+install -o root -g mysqld_exporter -m 0640 /dev/null /etc/mysqld_exporter.cnf
+cat > /etc/mysqld_exporter.cnf <<EOF
+[client]
+user=$${DB_USERNAME}
+password=$${DB_PASSWORD}
+host=$${DB_HOST}
+port=$${DB_PORT}
 EOF
 
 systemctl daemon-reload
@@ -42,3 +53,5 @@ systemctl enable mysqld_exporter
 systemctl restart mysqld_exporter
 
 echo "mysqld_exporter: $(systemctl is-active mysqld_exporter)"
+curl -fsS --max-time 5 http://127.0.0.1:9104/metrics >/dev/null
+echo "mysqld_exporter metrics endpoint: ok"

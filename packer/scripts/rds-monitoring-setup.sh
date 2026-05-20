@@ -7,7 +7,7 @@
 #
 # 자격증명(DSN)은 AMI에 굽지 않음.
 # 인스턴스 부팅 시 user_data가 SSM Parameter Store에서 읽어
-# /etc/mysqld_exporter.env 파일에 DATA_SOURCE_NAME을 기록함.
+# /etc/mysqld_exporter.cnf 파일에 MySQL client 설정을 기록함.
 # =============================================================================
 set -euo pipefail
 
@@ -85,35 +85,36 @@ configure_service() {
     useradd --system --no-create-home --shell /bin/false "$SERVICE_USER"
   fi
 
-  # EnvironmentFile 플레이스홀더 생성
-  # 실제 DATA_SOURCE_NAME 값은 인스턴스 부팅 시 user_data가 SSM에서 읽어 기록
-  if [ ! -f /etc/mysqld_exporter.env ]; then
-    cat > /etc/mysqld_exporter.env <<'EOF'
+  # mysqld_exporter 0.15+ no longer supports DATA_SOURCE_NAME.
+  # 실제 접속 정보는 인스턴스 부팅 시 user_data가 SSM에서 읽어 기록한다.
+  if [ ! -f /etc/mysqld_exporter.cnf ]; then
+    cat > /etc/mysqld_exporter.cnf <<'EOF'
 # user_data 스크립트가 인스턴스 부팅 시 SSM Parameter Store에서 읽어 채움
-# 형식: "user:password@(host:3306)/"
-DATA_SOURCE_NAME=""
+[client]
+user =
 EOF
-    chmod 640 /etc/mysqld_exporter.env
-    chown root:"$SERVICE_USER" /etc/mysqld_exporter.env
+    chmod 640 /etc/mysqld_exporter.cnf
+    chown root:"$SERVICE_USER" /etc/mysqld_exporter.cnf
   fi
 
   # systemd unit 파일 생성 (멱등: 같은 내용이면 재생성해도 무해)
   cat > /etc/systemd/system/mysqld_exporter.service <<EOF
 [Unit]
 Description=Prometheus MySQL Exporter
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=${SERVICE_USER}
 Group=${SERVICE_USER}
-EnvironmentFile=/etc/mysqld_exporter.env
 ExecStart=${INSTALL_DIR}/mysqld_exporter \
+  --config.my-cnf=/etc/mysqld_exporter.cnf \
   --web.listen-address=:9104 \
   --collect.info_schema.innodb_metrics \
   --collect.info_schema.processlist \
   --collect.global_status \
   --collect.global_variables \
-  --collect.slave_status
+  --no-collect.slave_status
 
 Restart=always
 RestartSec=5
@@ -126,8 +127,8 @@ WantedBy=multi-user.target
 EOF
 
   systemctl daemon-reload
-  systemctl enable mysqld_exporter
-  # 서비스 자체는 DATA_SOURCE_NAME 없이 시작 불가 — enable만 하고 start는 user_data에서
+  systemctl disable mysqld_exporter >/dev/null 2>&1 || true
+  # 서비스는 DB 접속 설정 없이 시작 불가 — user_data가 설정 파일을 쓴 뒤 enable/start 한다.
 }
 
 install_awscli() {

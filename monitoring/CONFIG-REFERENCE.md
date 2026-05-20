@@ -82,6 +82,7 @@
 | job | 방식 | 설명 |
 |-----|------|------|
 | `prometheus` | Pull (self) | Prometheus 자체 메트릭 수집. `up`, `prometheus_tsdb_*` 등 |
+| `rds-mysql` | Pull → mysqld_exporter | prod RDS 모니터링 EC2(`10.1.26.239:9104`)에서 MySQL exporter 메트릭 수집 |
 | `blackbox-http` | Pull → Blackbox | 외부 URL 가용성 프로빙. 모니터링 서버에서 공개 URL로 HTTP 요청 |
 
 ### Blackbox relabel_configs 동작 원리
@@ -92,7 +93,7 @@ __param_target → instance 라벨 (어떤 URL인지 식별)
 __address__ → blackbox-exporter:9115 (실제 요청 대상을 Blackbox로 변경)
 ```
 
-> Alloy가 push하는 메트릭(host, mysql, spring boot, nginx)은 scrape_configs에 없음.
+> Alloy가 push하는 메트릭(host, dev/local mysql, spring boot, nginx)은 scrape_configs에 없음.
 > `--web.enable-remote-write-receiver`로 `/api/v1/write` 엔드포인트를 열어 수신.
 
 ---

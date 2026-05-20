@@ -39,7 +39,7 @@ locals {
 
   rds_monitoring_user_data = templatefile("${path.module}/templates/rds_monitoring_user_data.sh.tftpl", {
     region               = var.aws_region
-    db_host              = coalesce(data.terraform_remote_state.data.outputs.database.proxy_host, data.terraform_remote_state.data.outputs.database.db_host)
+    db_host              = data.terraform_remote_state.data.outputs.database.db_host
     db_port              = data.terraform_remote_state.data.outputs.database.db_port
     db_username          = data.terraform_remote_state.data.outputs.database.db_username
     db_password_ssm_path = data.terraform_remote_state.data.outputs.database.db_password_ssm_path
