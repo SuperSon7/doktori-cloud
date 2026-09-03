@@ -48,6 +48,7 @@ jobs:
   apply-base:
     if: inputs.action == 'apply'
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +59,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -74,20 +75,17 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-          else
-            COLOR=15158332; STATUS="FAILED"
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: base\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ job.status == 'success' && 'Staging Apply SUCCESS: base' || 'Staging Apply FAILED: base' }}"
 
   apply-app:
     if: inputs.action == 'apply'
     needs: apply-base
     runs-on: ubuntu-latest
+    environment: terraform-staging
     strategy:
       fail-fast: false
       matrix:
@@ -102,7 +100,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -118,15 +116,11 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-          else
-            COLOR=15158332; STATUS="FAILED"
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Apply ${STATUS}: ${{ matrix.layer }}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ format('Staging Apply {0}: {1}', job.status == 'success' && 'SUCCESS' || 'FAILED', matrix.layer) }}"
 
   # -------------------------------------------------------
   # Start — EC2 start + RDS start + health check
@@ -134,11 +128,14 @@ jobs:
   start:
     if: inputs.action == 'start'
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Get staging instance IDs
@@ -217,17 +214,12 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="STARTED"
-            DESC="All instances running. Health check passed."
-          else
-            COLOR=15158332; STATUS="START FAILED"
-            DESC="Some instances may have failed to start."
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: ${{ job.status == 'success' && 'Staging STARTED' || 'Staging START FAILED' }}
+          description: ${{ job.status == 'success' && 'All instances running. Health check passed.' || 'Some instances may have failed to start.' }}
 
   # -------------------------------------------------------
   # Stop — EC2 stop + RDS stop (keeps infra, saves ~$47/month)
@@ -235,11 +227,14 @@ jobs:
   stop:
     if: inputs.action == 'stop'
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Get staging instance IDs
@@ -279,17 +274,12 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="STOPPED"
-            DESC="All instances stopped. Fixed cost: ~\\$12/month (EIP + EBS)."
-          else
-            COLOR=15158332; STATUS="STOP FAILED"
-            DESC="Some instances may have failed to stop."
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging ${STATUS}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: ${{ job.status == 'success' && 'Staging STOPPED' || 'Staging STOP FAILED' }}
+          description: "${{ job.status == 'success' && 'All instances stopped. Fixed cost: ~$12/month (EIP + EBS).' || 'Some instances may have failed to stop.' }}"
 
   # -------------------------------------------------------
   # Deploy — reusable workflow per service (no code duplication)
@@ -302,9 +292,10 @@ jobs:
     with:
       service_name: api
       image_tag: ${{ inputs.image_tag }}
+      environment: staging
+      aws_deploy_role_arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ecr_registry: ${{ vars.ECR_REGISTRY }}
     secrets:
-      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   deploy-chat:
@@ -313,9 +304,10 @@ jobs:
     with:
       service_name: chat
       image_tag: ${{ inputs.image_tag }}
+      environment: staging
+      aws_deploy_role_arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ecr_registry: ${{ vars.ECR_REGISTRY }}
     secrets:
-      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   # -------------------------------------------------------
@@ -326,6 +318,7 @@ jobs:
   scale:
     if: inputs.action == 'scale'
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -336,7 +329,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -356,18 +349,12 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          PROFILE="${{ inputs.scale_profile }}"
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-            DESC="EC2 instances scaled to ${PROFILE} specs."
-          else
-            COLOR=15158332; STATUS="FAILED"
-            DESC="Scale to ${PROFILE} failed. Check Actions logs."
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Scale ${STATUS}: → ${PROFILE}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ format('Staging Scale {0}: → {1}', job.status == 'success' && 'SUCCESS' || 'FAILED', inputs.scale_profile) }}"
+          description: ${{ job.status == 'success' && format('EC2 instances scaled to {0} specs.', inputs.scale_profile) || format('Scale to {0} failed. Check Actions logs.', inputs.scale_profile) }}
 
   # -------------------------------------------------------
   # Destroy — remove RDS from state, then terraform destroy all
@@ -375,6 +362,7 @@ jobs:
   destroy-data:
     if: inputs.action == 'destroy'
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -385,7 +373,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -403,20 +391,17 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-          else
-            COLOR=15158332; STATUS="FAILED"
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: data\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ job.status == 'success' && 'Staging Destroy SUCCESS: data' || 'Staging Destroy FAILED: data' }}"
 
   destroy-app:
     if: inputs.action == 'destroy'
     needs: destroy-data
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -427,7 +412,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -441,20 +426,17 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-          else
-            COLOR=15158332; STATUS="FAILED"
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: app\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ job.status == 'success' && 'Staging Destroy SUCCESS: app' || 'Staging Destroy FAILED: app' }}"
 
   destroy-base:
     if: inputs.action == 'destroy'
     needs: destroy-app
     runs-on: ubuntu-latest
+    environment: terraform-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -465,7 +447,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set traceable hostname for Terraform lock
@@ -479,14 +461,9 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="SUCCESS"
-            DESC="All staging resources destroyed. Cost: \\$0/month."
-          else
-            COLOR=15158332; STATUS="FAILED"
-            DESC="Some resources may remain — check manually."
-          fi
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Staging Destroy ${STATUS}: base\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ job.status == 'success' && 'Staging Destroy SUCCESS: base' || 'Staging Destroy FAILED: base' }}"
+          description: "${{ job.status == 'success' && 'All staging resources destroyed. Cost: $0/month.' || 'Some resources may remain — check manually.' }}"
