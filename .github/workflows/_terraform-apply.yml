@@ -1,0 +1,139 @@
+name: Terraform layer apply
+
+on:
+  workflow_call:
+    inputs:
+      layer:
+        description: Layer label shown in Actions and Discord.
+        required: true
+        type: string
+      directory:
+        description: Terraform working directory relative to the repository root.
+        required: true
+        type: string
+      deployment-environment:
+        description: GitHub Environment that gates this apply.
+        required: true
+        type: string
+      include-module-changes:
+        description: Apply when a changed shared module is referenced by this layer.
+        required: false
+        type: boolean
+        default: false
+      terraform-version:
+        description: Terraform CLI version.
+        required: false
+        type: string
+        default: "1.14.8"
+      aws-region:
+        description: AWS region used for provider authentication.
+        required: false
+        type: string
+        default: ap-northeast-2
+    secrets:
+      DISCORD_WEBHOOK_URL:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  apply:
+    name: Apply ${{ inputs.layer }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.deployment-environment }}
+    concurrency:
+      group: terraform-${{ inputs.layer }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Check if layer changed
+        id: changes
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          LAYER_DIRECTORY: ${{ inputs.directory }}
+          INCLUDE_MODULE_CHANGES: ${{ inputs.include-module-changes }}
+        run: |
+          if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            CHANGED=$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          fi
+
+          SHOULD_APPLY=false
+          if grep -q "^${LAYER_DIRECTORY}/" <<< "$CHANGED"; then
+            SHOULD_APPLY=true
+          fi
+
+          if [ "$SHOULD_APPLY" = "false" ] && [ "$INCLUDE_MODULE_CHANGES" = "true" ]; then
+            CHANGED_MODULES=$(grep '^terraform/modules/' <<< "$CHANGED" | cut -d/ -f3 | sort -u || true)
+            for module in $CHANGED_MODULES; do
+              if grep -rq "modules/${module}" "$LAYER_DIRECTORY"/ 2>/dev/null; then
+                SHOULD_APPLY=true
+                break
+              fi
+            done
+          fi
+
+          echo "should-apply=$SHOULD_APPLY" >> "$GITHUB_OUTPUT"
+          echo "Layer ${{ inputs.layer }} changed: $SHOULD_APPLY"
+
+      - name: Terraform Init
+        if: steps.changes.outputs.should-apply == 'true'
+        working-directory: ${{ inputs.directory }}
+        run: terraform init -backend-config="$GITHUB_WORKSPACE/terraform/backend.hcl"
+
+      - name: Terraform Plan
+        id: plan
+        if: steps.changes.outputs.should-apply == 'true'
+        working-directory: ${{ inputs.directory }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -out=tfplan
+          EXIT_CODE=$?
+          set -e
+
+          echo "exit-code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT_CODE" -eq 1 ]; then
+            exit 1
+          fi
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            terraform show -json tfplan > tfplan.json
+            if jq -e '.resource_changes[]? | select(.change.actions | index("delete"))' tfplan.json >/dev/null; then
+              echo "::error::Plan contains resource deletion or replacement; aborting."
+              exit 1
+            fi
+          fi
+
+      - name: Terraform Apply
+        if: steps.changes.outputs.should-apply == 'true' && steps.plan.outputs.exit-code == '2'
+        working-directory: ${{ inputs.directory }}
+        run: |
+          terraform apply tfplan
+          bash "$GITHUB_WORKSPACE/terraform/scripts/assert-clean-plan.sh"
+
+      - name: Notify Discord
+        if: always() && steps.changes.outputs.should-apply == 'true'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ format('Terraform {0}: {1}', job.status == 'success' && 'SUCCESS' || 'FAILED', inputs.layer) }}"
+          description: by ${{ github.actor }}
