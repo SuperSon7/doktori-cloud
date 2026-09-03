@@ -10,26 +10,36 @@ variable "aws_region" {
   default     = "ap-northeast-2"
 }
 
-variable "github_org" {
-  description = "GitHub organization name"
-  type        = string
-  default     = "100-hours-a-week"
-}
-
-variable "github_repos" {
-  description = "Service repo names for deploy OIDC (ECR push, SSM). Cloud repo는 cloud_repo 변수로 별도 관리"
-  type        = list(string)
+variable "deploy_repos" {
+  description = "GitHub repositories allowed to assume the deploy role through OIDC"
+  type = list(object({
+    owner = string
+    repo  = string
+  }))
   default = [
-    "5-team-service-be",
-    "5-team-service-fe",
-    "5-team-service-ai",
+    {
+      owner = "SuperSon7"
+      repo  = "doktori-backend"
+    },
+    {
+      owner = "SuperSon7"
+      repo  = "doktori-frontend"
+    },
+    {
+      owner = "SuperSon7"
+      repo  = "doktori-ai"
+    },
+    {
+      owner = "SuperSon7"
+      repo  = "doktori-cloud"
+    },
   ]
 }
 
-variable "cloud_repo" {
-  description = "Cloud repo name (for Terraform OIDC role)"
-  type        = string
-  default     = "5-team-service-cloud"
+variable "deploy_role_environments" {
+  description = "GitHub environments allowed to assume the deploy role"
+  type        = set(string)
+  default     = ["dev", "staging", "prod"]
 }
 
 variable "terraform_repos" {
@@ -40,13 +50,20 @@ variable "terraform_repos" {
   }))
   default = [
     {
-      owner = "100-hours-a-week"
-      repo  = "5-team-service-cloud"
-    },
-    {
       owner = "SuperSon7"
       repo  = "doktori-cloud"
     },
+  ]
+}
+
+variable "terraform_role_environments" {
+  description = "GitHub environments allowed to assume the Terraform role"
+  type        = set(string)
+  default = [
+    "terraform-dev",
+    "terraform-prod",
+    "terraform-shared",
+    "terraform-staging",
   ]
 }
 
