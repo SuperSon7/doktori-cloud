@@ -165,6 +165,24 @@ k6 run k6/scenarios/join-meeting.js
 k6 run --out json=result/load.json k6/scenarios/load.js
 ```
 
+### Pod allocation / scheduling 실험
+
+부하 테스트 전에 실제 Ready node 수, requests 기준 allocation, API/Chat Pod의 node 쏠림과 `FailedScheduling` 이벤트를 저장한다.
+
+```bash
+cd 5-team-service-cloud
+./scripts/scheduling-allocation-snapshot.sh prod
+```
+
+재생성 가능한 실습 클러스터에서는 soft `ScheduleAnyway`와 hard `DoNotSchedule + minDomains`의 차이, node 복귀 후 기존 Pod가 자동 재균형되지 않는 특성을 비교한다.
+
+```bash
+kubectl apply -f load-tests/k8s/scheduling-spread-lab.yaml
+kubectl get pod -n scheduling-lab -o wide --sort-by=.spec.nodeName
+```
+
+운영 worker를 cordon하거나 hard constraint를 운영 Deployment에 바로 적용하지 않는다. 실험 전후 상태는 snapshot 스크립트로 각각 저장해 비교한다.
+
 ## 시나리오별 상세
 
 ### 표준 부하 패턴

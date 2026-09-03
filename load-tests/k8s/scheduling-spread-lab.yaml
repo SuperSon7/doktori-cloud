@@ -1,0 +1,96 @@
+# PodTopologySpread soft/hard behavior lab (Kubernetes v1.34)
+#
+# 목적:
+# - ScheduleAnyway는 쏠림을 줄이는 score 힌트일 뿐 보장하지 않음을 확인
+# - DoNotSchedule + minDomains는 가용 노드 부족을 Pending으로 드러냄을 확인
+# - cordon 해제 후 기존 Pod는 자동 재균형되지 않음을 확인
+#
+# 반드시 재생성 가능한 실습 클러스터에서만 사용한다.
+# 실행 절차는 docs/roadmaps/k8s-scheduling-allocation-troubleshooting.md 참고.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scheduling-lab
+  labels:
+    purpose: scheduling-allocation-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spread-soft
+  namespace: scheduling-lab
+  labels:
+    app: spread-soft
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: spread-soft
+  template:
+    metadata:
+      labels:
+        app: spread-soft
+        component: soft
+        purpose: scheduling-spread-lab
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          nodeAffinityPolicy: Honor
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app: spread-soft
+          matchLabelKeys:
+            - pod-template-hash
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spread-hard
+  namespace: scheduling-lab
+  labels:
+    app: spread-hard
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: spread-hard
+  template:
+    metadata:
+      labels:
+        app: spread-hard
+        component: hard
+        purpose: scheduling-spread-lab
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeAffinityPolicy: Honor
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app: spread-hard
+          matchLabelKeys:
+            - pod-template-hash
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
