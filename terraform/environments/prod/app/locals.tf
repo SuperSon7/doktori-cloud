@@ -51,7 +51,6 @@ locals {
 # -----------------------------------------------------------------------------
 locals {
   compute_dns_name_map = {
-    front          = "front"
     ai             = "ai"
     rds_monitoring = "rds-exporter"
   }
