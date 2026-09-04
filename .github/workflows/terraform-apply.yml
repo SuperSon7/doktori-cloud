@@ -1,0 +1,162 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-apply.yml"
+      - ".github/workflows/_terraform-apply.yml"
+      - ".github/actions/discord-notify/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  apply-global:
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: global
+      directory: terraform/global
+      deployment-environment: terraform-shared
+    secrets: inherit
+
+  apply-shared:
+    needs: apply-global
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: ecr
+            directory: terraform/ecr
+          - layer: dns_zone
+            directory: terraform/dns_zone
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: ${{ matrix.layer }}
+      directory: ${{ matrix.directory }}
+      deployment-environment: terraform-shared
+    secrets: inherit
+
+  apply-monitoring-base:
+    needs: apply-shared
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: monitoring/base
+      directory: terraform/monitoring/base
+      deployment-environment: terraform-shared
+    secrets: inherit
+
+  apply-monitoring-data:
+    needs: apply-monitoring-base
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: monitoring/data
+      directory: terraform/monitoring/data
+      deployment-environment: terraform-shared
+    secrets: inherit
+
+  apply-monitoring-app:
+    needs: apply-monitoring-data
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: monitoring/app
+      directory: terraform/monitoring/app
+      deployment-environment: terraform-shared
+    secrets: inherit
+
+  apply-base:
+    needs: apply-monitoring-app
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: dev/base
+            environment: terraform-dev
+          - layer: staging/base
+            environment: terraform-staging
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: ${{ matrix.layer }}
+      directory: terraform/environments/${{ matrix.layer }}
+      deployment-environment: ${{ matrix.environment }}
+      include-module-changes: true
+    secrets: inherit
+
+  apply-prod-base:
+    needs: apply-monitoring-app
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: prod/base
+      directory: terraform/environments/prod/base
+      deployment-environment: terraform-prod
+      include-module-changes: true
+    secrets: inherit
+
+  apply-data:
+    needs: apply-base
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: dev/data
+            environment: terraform-dev
+          - layer: staging/data
+            environment: terraform-staging
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: ${{ matrix.layer }}
+      directory: terraform/environments/${{ matrix.layer }}
+      deployment-environment: ${{ matrix.environment }}
+      include-module-changes: true
+    secrets: inherit
+
+  apply-prod-data:
+    needs: apply-prod-base
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: prod/data
+      directory: terraform/environments/prod/data
+      deployment-environment: terraform-prod
+      include-module-changes: true
+    secrets: inherit
+
+  apply-prod-app:
+    needs: apply-prod-data
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: prod/app
+      directory: terraform/environments/prod/app
+      deployment-environment: terraform-prod
+      include-module-changes: true
+    secrets: inherit
+
+  apply-app:
+    needs: apply-data
+    if: vars.TERRAFORM_APPLY_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: dev/app
+            environment: terraform-dev
+          - layer: staging/app
+            environment: terraform-staging
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      layer: ${{ matrix.layer }}
+      directory: terraform/environments/${{ matrix.layer }}
+      deployment-environment: ${{ matrix.environment }}
+      include-module-changes: true
+    secrets: inherit

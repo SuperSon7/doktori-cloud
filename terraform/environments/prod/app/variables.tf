@@ -20,8 +20,9 @@ variable "key_name" {
 }
 
 variable "domain_name" {
-  type    = string
-  default = "doktori.kr"
+  description = "Root domain name"
+  type        = string
+  default     = "doktori.cloud"
 }
 
 # -----------------------------------------------------------------------------

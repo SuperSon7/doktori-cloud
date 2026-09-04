@@ -5,7 +5,8 @@
 # workloads, monitoring, HPA, security, and ExternalSecret custom resources.
 #
 # Usage:
-#   read -rsp "GitHub PAT: " GIT_PAT; echo
+#   printf "GitHub PAT: "
+#   read -rs GIT_PAT; echo
 #   ansible-playbook -i inventory/k8s-hosts.yml bootstrap-argocd.yml \
 #     -e git_repo_url=https://github.com/SuperSon7/doktori-cloud.git \
 #     -e git_username=SuperSon7 \

@@ -21,13 +21,6 @@ module "compute" {
   ]
 
   services = {
-    front = {
-      instance_type = "t4g.small"
-      architecture  = "arm64"
-      subnet_key    = "private_app"
-      tags          = { Owner = "fe" }
-      sg_ingress    = []
-    }
     ai = {
       instance_type = "t4g.medium"
       architecture  = "arm64"

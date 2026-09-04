@@ -1,0 +1,81 @@
+name: Discord notification
+description: Send a consistent Discord webhook notification without affecting the caller by default.
+
+inputs:
+  webhook-url:
+    description: Discord webhook URL.
+    required: true
+  status:
+    description: Notification status (success, failure, warning, or neutral).
+    required: false
+    default: neutral
+  content:
+    description: Message content shown above the embed.
+    required: false
+    default: ""
+  title:
+    description: Embed title.
+    required: false
+    default: ""
+  description:
+    description: Embed description.
+    required: false
+    default: ""
+  url:
+    description: Embed URL. Defaults to the current Actions run.
+    required: false
+    default: ""
+  color:
+    description: Decimal embed color. Defaults to a color derived from status.
+    required: false
+    default: ""
+  show-context:
+    description: Include repository, branch, commit, author, and Actions fields.
+    required: false
+    default: "false"
+  branch:
+    description: Branch label. Defaults to the current GitHub ref name.
+    required: false
+    default: ""
+  commit-message:
+    description: Commit message or pull request title.
+    required: false
+    default: ""
+  commit-author:
+    description: Commit or pull request author.
+    required: false
+    default: ""
+  image-tag:
+    description: Deployed container image tag.
+    required: false
+    default: ""
+  message-label:
+    description: Label for the commit message field.
+    required: false
+    default: "💬 커밋 메시지"
+  fail-on-error:
+    description: Fail the caller when Discord delivery fails.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Send Discord webhook
+      shell: bash
+      env:
+        INPUT_WEBHOOK_URL: ${{ inputs.webhook-url }}
+        INPUT_STATUS: ${{ inputs.status }}
+        INPUT_CONTENT: ${{ inputs.content }}
+        INPUT_TITLE: ${{ inputs.title }}
+        INPUT_DESCRIPTION: ${{ inputs.description }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_COLOR: ${{ inputs.color }}
+        INPUT_SHOW_CONTEXT: ${{ inputs.show-context }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_COMMIT_AUTHOR: ${{ inputs.commit-author }}
+        INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
+        INPUT_MESSAGE_LABEL: ${{ inputs.message-label }}
+        INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+      run: bash "$GITHUB_ACTION_PATH/send.sh"

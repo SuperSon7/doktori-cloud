@@ -17,6 +17,14 @@ aws ssm delete-parameters --names \
   --region ap-northeast-2
 ```
 
+확인하기
+```bash
+sudo tail -n 200 /var/log/k8s-master-init.log
+sudo tail -n 200 /var/log/cloud-init-output.log
+sudo cat /tmp/kubeadm-init.log 2>/dev/null
+sudo systemctl status kubelet --no-pager
+```
+
 ## Phase 0 — Node Preparation (ALL nodes, user_data 또는 Ansible)
 
 클러스터 초기화 전, 모든 노드에서 실행.

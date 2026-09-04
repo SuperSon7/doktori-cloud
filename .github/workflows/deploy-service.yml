@@ -8,7 +8,7 @@ name: "Deploy Service"
 #   uses: ./.github/workflows/deploy-service.yml
 #
 # Usage from service repos (cross-repo):
-#   uses: 100-hours-a-week/5-team-service-cloud/.github/workflows/deploy-service.yml@main
+#   uses: SuperSon7/doktori-cloud/.github/workflows/deploy-service.yml@main
 
 on:
   workflow_call:
@@ -26,11 +26,15 @@ on:
         required: false
         type: string
         default: staging
+      aws_deploy_role_arn:
+        description: "IAM role ARN assumed through GitHub OIDC"
+        required: true
+        type: string
+      ecr_registry:
+        description: "ECR registry hostname"
+        required: true
+        type: string
     secrets:
-      AWS_DEPLOY_ROLE_ARN:
-        required: true
-      ECR_REGISTRY:
-        required: true
       DISCORD_WEBHOOK_URL:
         required: false
 
@@ -41,6 +45,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
@@ -83,7 +88,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ inputs.aws_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Ensure EC2 is running
@@ -147,7 +152,7 @@ jobs:
 
       - name: Deploy via SSM
         run: |
-          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          REGISTRY="${{ inputs.ecr_registry }}"
           TAG="${{ inputs.image_tag }}"
           IMAGE="${{ steps.config.outputs.image }}"
           PORT="${{ steps.config.outputs.port }}"
@@ -255,19 +260,9 @@ jobs:
 
       - name: Notify Discord
         if: always()
-        env:
-          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          [ -z "$WEBHOOK" ] && exit 0
-
-          if [ "${{ job.status }}" = "success" ]; then
-            COLOR=3066993; STATUS="DEPLOYED"
-            DESC="${{ inputs.service_name }} deployed with tag \`${{ inputs.image_tag }}\` to ${{ inputs.environment }}."
-          else
-            COLOR=15158332; STATUS="DEPLOY FAILED"
-            DESC="${{ inputs.service_name }} deploy failed for tag \`${{ inputs.image_tag }}\` on ${{ inputs.environment }}."
-          fi
-
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"${{ inputs.environment }} ${STATUS}: ${{ inputs.service_name }}\",\"description\":\"${DESC}\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"color\":${COLOR}}]}" \
-            "$WEBHOOK"
+        uses: SuperSon7/doktori-cloud/.github/actions/discord-notify@main
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "${{ format('{0} {1}: {2}', inputs.environment, job.status == 'success' && 'DEPLOYED' || 'DEPLOY FAILED', inputs.service_name) }}"
+          description: ${{ job.status == 'success' && format('{0} deployed with tag `{1}` to {2}.', inputs.service_name, inputs.image_tag, inputs.environment) || format('{0} deploy failed for tag `{1}` on {2}.', inputs.service_name, inputs.image_tag, inputs.environment) }}

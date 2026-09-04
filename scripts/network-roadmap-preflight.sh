@@ -134,9 +134,9 @@ required_files=(
   "$ROOT_DIR/k8s/helm/prometheus-adapter-values.yaml"
   "$ROOT_DIR/load-tests/k6/scenarios/chat-websocket.js"
   "$ROOT_DIR/load-tests/k6/helpers.js"
-  "$ROOT_DIR/load-tests/scripts/get-token.js"
-  "$ROOT_DIR/load-tests/scripts/package.json"
   "$ROOT_DIR/load-tests/k8s/debug-iperf3-pods.yaml"
+  "$ROOT_DIR/load-tests/k8s/scheduling-spread-lab.yaml"
+  "$ROOT_DIR/scripts/scheduling-allocation-snapshot.sh"
   "$ROOT_DIR/k8s/manifests/chaos/fi-18-chat-cross-node-network-degradation.yaml"
 )
 
@@ -225,6 +225,7 @@ run_bash_syntax_check "$ROOT_DIR/k8s/cluster-init.sh"
 run_bash_syntax_check "$ROOT_DIR/k8s/deploy-workloads.sh"
 run_bash_syntax_check "$ROOT_DIR/k8s/install-observability.sh"
 run_bash_syntax_check "$ROOT_DIR/scripts/network-roadmap-preflight.sh"
+run_bash_syntax_check "$ROOT_DIR/scripts/scheduling-allocation-snapshot.sh"
 
 section "클러스터/네트워크 설정 정합성"
 
@@ -279,7 +280,7 @@ else
 fi
 
 if file_contains "$ROOT_DIR/k8s/manifests/hpa/chat-hpa.yaml" "name: chat_ws_sessions_active" &&
-   file_contains "$ROOT_DIR/k8s/helm/prometheus-adapter-values.yaml" "seriesQuery: 'chat_ws_sessions_active'"; then
+   file_contains "$ROOT_DIR/k8s/helm/prometheus-adapter-values.yaml" "seriesQuery: 'chat_ws_sessions_active{"; then
   check "chat HPA custom metric" "PASS"
 else
   check "chat HPA custom metric" "FAIL"
@@ -295,17 +296,25 @@ else
   check "k6 websocket scenario" "FAIL"
 fi
 
-if file_contains "$ROOT_DIR/load-tests/k6/helpers.js" 'const tokenUrl = `${baseUrl}/dev/tokens`'; then
+if file_contains "$ROOT_DIR/load-tests/k6/helpers.js" 'const tokenUrl = `${baseUrl}/dev/tokens?limit='; then
   check "multi token path" "PASS" "(/api/dev/tokens 경유)"
 else
   check "multi token path" "WARN" "(helpers.js 확인 필요)"
 fi
 
-if file_contains "$ROOT_DIR/load-tests/scripts/package.json" "\"playwright\"" &&
-   file_contains "$ROOT_DIR/load-tests/scripts/get-token.js" "oauth/kakao"; then
-  check "token helper" "PASS" "(OAuth 보조 스크립트 존재)"
+if file_contains "$ROOT_DIR/load-tests/k6/helpers.js" "TOKEN_FILE" &&
+   file_contains "$ROOT_DIR/load-tests/k6/helpers.js" "fetchMultiTokens"; then
+  check "token source" "PASS" "(dev token 또는 TOKEN_FILE)"
 else
-  check "token helper" "WARN"
+  check "token source" "WARN"
+fi
+
+if file_contains "$ROOT_DIR/load-tests/k8s/scheduling-spread-lab.yaml" "whenUnsatisfiable: ScheduleAnyway" &&
+   file_contains "$ROOT_DIR/load-tests/k8s/scheduling-spread-lab.yaml" "whenUnsatisfiable: DoNotSchedule" &&
+   file_contains "$ROOT_DIR/load-tests/k8s/scheduling-spread-lab.yaml" "minDomains: 2"; then
+  check "scheduling spread lab" "PASS" "(soft/hard 비교)"
+else
+  check "scheduling spread lab" "FAIL"
 fi
 
 section "주의 / 블로커"
@@ -315,12 +324,6 @@ if file_contains "$ROOT_DIR/k8s/bootstrap-sequence.md" "CNI: Cilium" ||
   check "bootstrap-sequence CNI 문서" "FAIL" "(Calico 기준으로 수정 필요)"
 else
   check "bootstrap-sequence CNI 문서" "PASS"
-fi
-
-if file_contains "$ROOT_DIR/load-tests/scripts/get-token.js" "https://your-api.com/api/oauth/kakao"; then
-  check "get-token.js 기본값" "WARN" "(OAUTH_URL, FRONTEND_URL 환경변수 지정 필요)"
-else
-  check "get-token.js 기본값" "PASS"
 fi
 
 section "실험 당일 최소 순서"

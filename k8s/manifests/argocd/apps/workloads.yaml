@@ -17,6 +17,21 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: prod
+  # API와 Chat의 replica 수는 HPA가 관리한다. Git의 최초 생성값과
+  # HPA가 계산한 실행 중 replica 수가 Argo CD self-heal로 충돌하지 않게 한다.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: api
+      namespace: prod
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: chat
+      namespace: prod
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     automated:
       prune: true
@@ -24,6 +39,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 3
       backoff:

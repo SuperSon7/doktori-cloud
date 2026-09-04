@@ -1,0 +1,106 @@
+name: Terraform Drift
+
+on:
+  schedule:
+    # 매일 09:00 KST (00:00 UTC)
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  TF_VERSION: "1.14.8"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layer: global
+            directory: terraform/global
+          - layer: ecr
+            directory: terraform/ecr
+          - layer: dns_zone
+            directory: terraform/dns_zone
+          - layer: monitoring/base
+            directory: terraform/monitoring/base
+          - layer: monitoring/data
+            directory: terraform/monitoring/data
+          - layer: monitoring/app
+            directory: terraform/monitoring/app
+          - layer: dev/base
+            directory: terraform/environments/dev/base
+          - layer: dev/data
+            directory: terraform/environments/dev/data
+          - layer: dev/app
+            directory: terraform/environments/dev/app
+          - layer: staging/base
+            directory: terraform/environments/staging/base
+          - layer: staging/data
+            directory: terraform/environments/staging/data
+          - layer: staging/app
+            directory: terraform/environments/staging/app
+          - layer: staging/loadtest
+            directory: terraform/environments/staging/loadtest
+          - layer: prod/base
+            directory: terraform/environments/prod/base
+          - layer: prod/data
+            directory: terraform/environments/prod/data
+          - layer: prod/app
+            directory: terraform/environments/prod/app
+          - layer: prod/cdn
+            directory: terraform/environments/prod/cdn
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ matrix.directory }}
+        run: terraform init -backend-config="$GITHUB_WORKSPACE/terraform/backend.hcl"
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ matrix.directory }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -no-color 2>&1 | tee plan.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+
+          echo "exit-code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT_CODE" -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Notify drift
+        if: steps.plan.outputs.exit-code == '2'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: warning
+          title: "Drift detected: ${{ matrix.layer }}"
+          description: 콘솔 수동 변경 감지. 확인 필요.
+
+      - name: Notify drift check failure
+        if: failure()
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: failure
+          title: "Drift check failed: ${{ matrix.layer }}"
+          description: Terraform plan 실행에 실패했습니다. Actions 로그를 확인하세요.

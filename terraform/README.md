@@ -95,7 +95,7 @@ terraform/
 │   ├── prod/
 │   │   ├── base/                  # VPC 10.1.0.0/16, 3개 AZ의 공개/app/db 서브넷, NAT 3대
 │   │   ├── data/                  # RDS Proxy, app S3, CodeDeploy revision 버킷, Redis/RabbitMQ/MongoDB EC2
-│   │   ├── app/                   # 프론트 ASG/ALB, K8s ASG/NLB, front/AI/RDS exporter 보조 EC2
+│   │   ├── app/                   # 프론트 ASG/ALB, K8s ASG/NLB, AI/RDS exporter 보조 EC2
 │   │   ├── cdn/                   # CloudFront + 정적 S3 + OAC + DNS
 │   │   └── loadtest/              # prod VPC k6 러너
 │   └── loadtest/                  # 별도 부하 테스트 계정 VPC/러너, 기본 local state

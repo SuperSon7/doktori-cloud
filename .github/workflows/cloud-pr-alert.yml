@@ -8,37 +8,37 @@ jobs:
   notify-pr:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Notification to Reviewer
+      - uses: actions/checkout@v4
+
+      - name: Resolve Discord reviewer mention
+        id: reviewer
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DISCORD_ID_VANI: "866419639282434048"
-          DISCORD_ID_HALAAND: "1462789390022610975"
+          DISCORD_ID_VANI: ${{ vars.DISCORD_ID_VANI }}
+          DISCORD_ID_HALAAND: ${{ vars.DISCORD_ID_HALAAND }}
+          REQUESTED_GITHUB_USER: ${{ github.event.requested_team.name || github.event.requested_reviewer.login }}
         run: |
-          # 1. 리뷰어로 지정된 사람의 GitHub 아이디 가져오기
-          REQUESTED_GITHUB_USER="${{ github.event.requested_team.name || github.event.requested_reviewer.login }}"
-          
-          # 2. GitHub 아이디를 Discord 멘션으로 변환 (매핑 로직)
           case "$REQUESTED_GITHUB_USER" in
             "SuperSon7")
-              MENTION="<@$DISCORD_ID_ELLA>"
+              if [ -n "$DISCORD_ID_VANI" ]; then MENTION="<@$DISCORD_ID_VANI>"; else MENTION="$REQUESTED_GITHUB_USER"; fi
               ;;
             "JI1047")
-              MENTION="<@DISCORD_ID_BRUNI>"
+              if [ -n "$DISCORD_ID_HALAAND" ]; then MENTION="<@$DISCORD_ID_HALAAND>"; else MENTION="$REQUESTED_GITHUB_USER"; fi
               ;;
             *)
               # 매핑 안 된 사람이면 그냥 백엔드 팀 전체 호출 (안전장치)
               MENTION="@CloudTeam (리뷰어 매핑 필요)"
               ;;
           esac
-          
-          # 3. 메시지 전송
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_URL="${{ github.event.pull_request.html_url }}"
-          AUTHOR="${{ github.actor }}"
+          echo "mention=$MENTION" >> "$GITHUB_OUTPUT"
 
-          MESSAGE="👀 **[코드 리뷰 요청]**\n\n$MENTION 님! **$AUTHOR** 님이 리뷰를 요청했습니다.\n\n제목: **$PR_TITLE**\n링크: $PR_URL"
+      - name: Notify Discord
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          content: |
+            👀 **[코드 리뷰 요청]**
 
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{ \"content\": \"$MESSAGE\" }" \
-               $DISCORD_WEBHOOK
+            ${{ steps.reviewer.outputs.mention }} 님! **${{ github.actor }}** 님이 리뷰를 요청했습니다.
+
+            제목: **${{ github.event.pull_request.title }}**
+            링크: ${{ github.event.pull_request.html_url }}

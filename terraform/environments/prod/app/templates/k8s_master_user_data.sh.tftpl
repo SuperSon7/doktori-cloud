@@ -108,7 +108,7 @@ ssm_lock_age_seconds() {
   local modified_epoch now_epoch
   modified_epoch=$(date -d "$${modified}" +%s)
   now_epoch=$(date +%s)
-  echo "$$((now_epoch - modified_epoch))"
+  echo "$((now_epoch - modified_epoch))"
 }
 
 api_endpoint_reachable() {
@@ -301,7 +301,7 @@ else
       echo "  -> master join 명령 대기 중... ($${i}/90)"
     fi
 
-    if [ "$$((i % 6))" -eq 0 ]; then
+    if [ "$((i % 6))" -eq 0 ]; then
       LOCK_AGE=$(ssm_lock_age_seconds 2>/dev/null || echo 0)
       if [ "$${LOCK_AGE}" -gt "$${STALE_BOOTSTRAP_AFTER_SECONDS}" ] && ! api_endpoint_reachable; then
         echo "  WARN: init-lock이 $${LOCK_AGE}초 지났지만 API endpoint가 응답하지 않음. stale bootstrap state 정리 시도."
