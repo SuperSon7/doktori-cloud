@@ -1,6 +1,6 @@
 # DB 마이그레이션 (Local MySQL → RDS) Roadmap
 
-> EC2 로컬 MySQL에서 RDS로 무중단 마이그레이션 — 컷오버 리허설, 실측, 프로덕션 수행, 포트폴리오 기록
+> EC2 로컬 MySQL에서 RDS로 무중단 마이그레이션 — 컷오버 리허설, 실측, 프로덕션 전환, 결과 분석 및 운영 절차 정리
 >
 > 트래킹 시작: 2026-02-26
 
@@ -14,7 +14,7 @@
 | 1 | [베이스라인 측정](#phase-1-베이스라인-측정-단순-전환-방식) | 🔲 Todo | - | 비교용 "단순 전환" 지표 확보 |
 | 2 | [컷오버 리허설](#phase-2-컷오버-리허설-실행-및-측정) | 🔲 Todo | - | k6 부하 하 리허설 2회+ 반복 |
 | 3 | [프로덕션 컷오버](#phase-3-프로덕션-컷오버) | 🔲 Todo | - | 실제 마이그레이션 수행 |
-| 4 | [포트폴리오 문서화](#phase-4-포트폴리오-문서화) | 🔲 Todo | - | 실측값 기반 비교표, 면접 대비 |
+| 4 | [결과 분석 및 운영 문서화](#phase-4-결과-분석-및-운영-문서화) | 🔲 Todo | - | 실측 결과 비교, 설계 근거 및 복구 절차 정리 |
 
 ---
 
@@ -93,7 +93,7 @@
 ### Checklist
 - [ ] 복제 상태 확인 (Seconds_Behind_Master = 0)
 - [ ] `06-cutover-rehearsal.sh` 실행 (이번엔 리허설이 아닌 실전)
-- [ ] 쓰기 불가 구간 기록 (포트폴리오용 실측값)
+- [ ] 쓰기 불가 구간 기록 (리허설 결과와 비교)
 - [ ] k6 또는 실트래픽 기준 에러 확인
 - [ ] AI 서버 재시작 확인 (`doktori-ai-green`)
 - [ ] 서비스 헬스체크 (API 응답, 채팅 정상)
@@ -106,9 +106,9 @@
 
 ---
 
-## Phase 4: 포트폴리오 문서화
+## Phase 4: 결과 분석 및 운영 문서화
 
-**목표:** 실측값 기반의 기술 포트폴리오 작성 + 면접 대비
+**목표:** 실측 결과로 전환 방식을 평가하고, 설계 근거와 운영·복구 절차를 정리
 
 ### Checklist
 - [ ] 아키텍처 결정 기록 — 왜 nginx stream proxy를 뒀는가
@@ -121,17 +121,17 @@
   | 앱 코드 변경 | DB URL + 재배포 | 없음 |
   | 롤백 | dump 시점 복원만 가능 | nginx reload 즉시 원복 |
 
-- [ ] 기술적 깊이 포인트 정리
+- [ ] 커넥션 전환 동작과 문제 해결 과정 정리
   - HikariCP 커넥션 eviction 문제 + 해결 과정
   - nginx reload vs restart TCP 동작 차이
   - connection-test-query를 왜 버렸는가 (JDBC4 isValid 성능 퇴보)
   - KILL CONNECTION이 nginx stream proxy와 맞물리는 원리
-- [ ] 면접 예상 질문 & 답변 정리
-  - "왜 RDS Multi-AZ failover 안 쓰고 직접 했나?"
-  - "KILL CONNECTION 대신 connection-test-query 쓰면 안 되나?"
-  - "롤백은 어떻게 하나?"
-  - "nginx stream proxy 없이 할 수 있나?"
+- [ ] 설계 대안과 운영 제약 정리
+  - RDS Multi-AZ 장애 조치와 로컬 MySQL → RDS 마이그레이션의 적용 범위
+  - KILL CONNECTION과 connection-test-query의 역할 및 적용 판단 근거
+  - 롤백 실행 조건, 복구 순서 및 데이터 정합성 확인 절차
+  - nginx stream proxy 도입에 따른 이점과 운영 비용
 
 ### 산출물 (예상)
-- `docs/portfolio-db-migration.md` — 포트폴리오 본문
+- [DB 마이그레이션 설계 문서](docs/db-migration-design.md) — 아키텍처, 전환 방식 및 설계 근거
 - `trouble Shootings/` 하위 — 기술 결정 근거 (이미 일부 존재)
