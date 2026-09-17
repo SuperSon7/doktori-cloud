@@ -29,17 +29,19 @@ if [[ "${1:-}" == "--auto" ]]; then
 fi
 
 # ── 설정 ──
+# 접속 정보는 실행 환경에서 주입합니다. 비밀번호를 파일에 저장하지 마세요.
+# 필수: MASTER_USER, MASTER_PASS, RDS_HOST, RDS_USER, RDS_PASS, DB_NAME
 MASTER_HOST="${MASTER_HOST:-localhost}"
 MASTER_PORT="${MASTER_PORT:-3306}"
-MASTER_USER="${MASTER_USER:-doktori_prod}"
-MASTER_PASS="${MASTER_PASS:-hJoz3NCsL2ubKvJrYRsb}"
+MASTER_USER="${MASTER_USER:?MASTER_USER 환경변수를 설정하세요}"
+MASTER_PASS="${MASTER_PASS:?MASTER_PASS 환경변수를 설정하세요}"
 
-RDS_HOST="${RDS_HOST:-doktoritest.cvqsyou66939.ap-northeast-2.rds.amazonaws.com}"
+RDS_HOST="${RDS_HOST:?RDS_HOST 환경변수를 설정하세요}"
 RDS_PORT="${RDS_PORT:-3306}"
-RDS_USER="${RDS_USER:-doktori_prod}"
-RDS_PASS="${RDS_PASS:-hJoz3NCsL2ubKvJrYRsb}"
+RDS_USER="${RDS_USER:?RDS_USER 환경변수를 설정하세요}"
+RDS_PASS="${RDS_PASS:?RDS_PASS 환경변수를 설정하세요}"
 
-DB_NAME="${DB_NAME:-doktoridb}"
+DB_NAME="${DB_NAME:?DB_NAME 환경변수를 설정하세요}"
 PROXY_LISTEN_PORT="${PROXY_LISTEN_PORT:-3307}"
 STREAM_CONF="${STREAM_CONF:-/etc/nginx/stream.d/db-proxy.conf}"
 LOG_FILE="/tmp/db-migration/cutover-rehearsal-$(date +%Y%m%d-%H%M%S).log"
