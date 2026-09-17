@@ -41,7 +41,7 @@
 # 예시:
 #   ./run-single.sh smoke
 #   ./run-single.sh chat-api --prom
-#   PROM_URL=http://13.124.202.148:9090 ./run-single.sh chat-api --prom
+#   PROM_URL=http://prometheus.example.com:9090 ./run-single.sh chat-api --prom
 
 set -e
 

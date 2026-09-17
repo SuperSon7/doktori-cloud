@@ -2,7 +2,7 @@
 set -e
 
 SSH_KEY="${WIREMOCK_SSH_KEY:-~/.ssh/doktori-dev.pem}"
-DEV_HOST="${WIREMOCK_DEV_HOST:-13.209.183.40}"
+DEV_HOST="${WIREMOCK_DEV_HOST:?WIREMOCK_DEV_HOST required}"
 
 echo ">> wiremock 컨테이너 제거 중..."
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ubuntu@${DEV_HOST} bash -s << 'REMOTE'

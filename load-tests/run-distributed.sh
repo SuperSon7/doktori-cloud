@@ -47,7 +47,7 @@ TAG_KEY="Purpose"
 TAG_VALUE="distributed-k6-loadtest"
 
 # 러너 1의 Prometheus (Grafana 연동용)
-PROM_URL="${PROM_URL:-http://13.124.202.148:9090}"
+PROM_URL="${PROM_URL:-}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

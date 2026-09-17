@@ -15,15 +15,15 @@
 set -euo pipefail
 
 # ── 설정 (실행 전 수정 필요) ──
-RDS_HOST="${RDS_HOST:-<RDS_ENDPOINT>}"
+RDS_HOST="${RDS_HOST:?RDS_HOST required}"
 RDS_PORT="${RDS_PORT:-3306}"
 RDS_USER="${RDS_USER:-admin}"
-RDS_PASS="${RDS_PASS:-}"
+RDS_PASS="${RDS_PASS:?RDS_PASS required}"
 
-MASTER_HOST="${MASTER_HOST:-<MASTER_PUBLIC_IP>}"  # dev 서버 IP (13.209.183.40)
+MASTER_HOST="${MASTER_HOST:?MASTER_HOST required}"  # 복제 소스 서버 주소
 MASTER_PORT="${MASTER_PORT:-3306}"                # Docker 포트 매핑 확인 (3306 or 3307)
 REPL_USER="${REPL_USER:-repl_user}"
-REPL_PASS="${REPL_PASS:-}"
+REPL_PASS="${REPL_PASS:?REPL_PASS required}"
 
 # binlog position (02에서 생성된 파일에서 읽기)
 POSITION_FILE="${POSITION_FILE:-/tmp/db-migration/binlog-position.txt}"

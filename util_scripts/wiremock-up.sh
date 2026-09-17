@@ -2,7 +2,7 @@
 set -e
 
 SSH_KEY="${WIREMOCK_SSH_KEY:-~/.ssh/doktori-dev.pem}"
-DEV_HOST="${WIREMOCK_DEV_HOST:-13.209.183.40}"
+DEV_HOST="${WIREMOCK_DEV_HOST:?WIREMOCK_DEV_HOST required}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo ">> wiremock 파일 전송 중..."

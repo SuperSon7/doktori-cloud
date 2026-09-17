@@ -27,15 +27,15 @@ set -euo pipefail
 MASTER_HOST="${MASTER_HOST:-localhost}"        # 구 Master (→ 이제 Slave가 될 서버)
 MASTER_PORT="${MASTER_PORT:-3306}"
 MASTER_USER="${MASTER_USER:-root}"
-MASTER_PASS="${MASTER_PASS:-}"
+MASTER_PASS="${MASTER_PASS:?MASTER_PASS required}"
 
-RDS_HOST="${RDS_HOST:-<RDS_ENDPOINT>}"         # 새 Master (RDS)
+RDS_HOST="${RDS_HOST:?RDS_HOST required}"         # 새 Master (RDS)
 RDS_PORT="${RDS_PORT:-3306}"
 RDS_USER="${RDS_USER:-admin}"
-RDS_PASS="${RDS_PASS:-}"
+RDS_PASS="${RDS_PASS:?RDS_PASS required}"
 
 REPL_USER="${REPL_USER:-repl_user}"
-REPL_PASS="${REPL_PASS:-<REPLICATION_PASSWORD>}"
+REPL_PASS="${REPL_PASS:?REPL_PASS required}"
 
 LOG_DIR="/tmp/db-migration"
 mkdir -p "$LOG_DIR"

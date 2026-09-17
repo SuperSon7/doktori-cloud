@@ -10,10 +10,10 @@
 set -euo pipefail
 
 # ── 설정 ──
-RDS_HOST="${RDS_HOST:-<RDS_ENDPOINT>}"
+RDS_HOST="${RDS_HOST:?RDS_HOST required}"
 RDS_PORT="${RDS_PORT:-3306}"
 RDS_USER="${RDS_USER:-admin}"
-RDS_PASS="${RDS_PASS:-}"
+RDS_PASS="${RDS_PASS:?RDS_PASS required}"
 INTERVAL="${INTERVAL:-3}"  # 관찰 간격 (초)
 
 MYSQL_CMD="mysql -h${RDS_HOST} -P${RDS_PORT} -u${RDS_USER}"

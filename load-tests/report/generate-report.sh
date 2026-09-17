@@ -11,7 +11,8 @@ OUTPUT="${1:-${SCRIPT_DIR}/loadtest-report-$(date +%Y%m%d_%H%M%S).html}"
 SSH_KEY="${SSH_KEY:-~/.ssh/doktori-loadtest.pem}"
 SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=5"
 
-RUNNERS=(13.124.202.148 15.165.59.190 43.201.14.184)
+# 공백으로 구분한 러너 호스트 목록
+read -r -a RUNNERS <<< "${RUNNER_HOSTS:?RUNNER_HOSTS required}"
 
 echo "부하테스트 결과 수집 중..."
 
