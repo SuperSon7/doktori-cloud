@@ -15,7 +15,7 @@ set -euo pipefail
 MYSQL_HOST="${MYSQL_HOST:-localhost}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
-MYSQL_PASS="${MYSQL_PASS:-}"
+MYSQL_PASS="${MYSQL_PASS:?MYSQL_PASS required}"
 DB_NAME="${DB_NAME:-doktoridb}"
 DUMP_DIR="${DUMP_DIR:-/tmp/db-migration}"
 DUMP_FILE="${DUMP_DIR}/master-dump-$(date +%Y%m%d-%H%M%S).sql"

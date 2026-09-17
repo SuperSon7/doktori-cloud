@@ -19,12 +19,12 @@ set -euo pipefail
 REGION="ap-northeast-2"
 
 # 리소스 ID
-ORIGINAL_PRIVATE_RT="rtb-09c76d5f75d9e9a8e"   # doktori-prod-private-rt (원래)
-TEMP_APP_RT="rtb-07d1a844bcd302e93"             # doktori-prod-private-app-rt (임시)
-APP_SUBNET="subnet-0a6a3170675ee0f55"           # doktori-prod-private-app
-NAT_ENI="eni-09fff90c3e8f44375"                 # doktori-prod-nat ENI
-IGW="igw-0e93963b76eb8eac6"                     # prod VPC IGW
-S3_ENDPOINT="vpce-0654ebb7f4295ea6d"            # S3 VPC Gateway endpoint
+ORIGINAL_PRIVATE_RT="${ORIGINAL_PRIVATE_RT:?ORIGINAL_PRIVATE_RT required}"   # doktori-prod-private-rt (원래)
+TEMP_APP_RT="${TEMP_APP_RT:?TEMP_APP_RT required}"             # doktori-prod-private-app-rt (임시)
+APP_SUBNET="${APP_SUBNET:?APP_SUBNET required}"           # doktori-prod-private-app
+NAT_ENI="${NAT_ENI:?NAT_ENI required}"                 # doktori-prod-nat ENI
+IGW="${IGW:?IGW required}"                     # prod VPC IGW
+S3_ENDPOINT="${S3_ENDPOINT:?S3_ENDPOINT required}"            # S3 VPC Gateway endpoint
 
 echo "=== 마이그레이션 완료 후 라우트 테이블 원복 ==="
 echo ""

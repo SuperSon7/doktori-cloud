@@ -2,7 +2,7 @@
 set -e
 
 SSH_KEY="${DEV_SSH_KEY:-~/.ssh/doktori-dev.pem}"
-DEV_HOST="${DEV_HOST:-13.209.183.40}"
+DEV_HOST="${DEV_HOST:?DEV_HOST required}"
 ACTION="${1:-status}"
 
 case "$ACTION" in

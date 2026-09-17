@@ -21,6 +21,8 @@
 set -euo pipefail
 
 # ── 설정 ──
+MASTER_USER="${MASTER_USER:?MASTER_USER required}"
+MASTER_PASS="${MASTER_PASS:?MASTER_PASS required}"
 PROXY_LISTEN_PORT="${PROXY_LISTEN_PORT:-3307}"
 LOCAL_MYSQL_HOST="${LOCAL_MYSQL_HOST:-127.0.0.1}"
 LOCAL_MYSQL_PORT="${LOCAL_MYSQL_PORT:-3306}"
@@ -153,7 +155,7 @@ fi
 
 # MySQL 연결 테스트
 log "  MySQL 프록시 연결 테스트..."
-if mysql -h127.0.0.1 -P${PROXY_LISTEN_PORT} -u${MASTER_USER:-doktori_prod]} -p${MASTER_PASS:-} -e "SELECT 1;" 2>/dev/null; then
+if mysql -h127.0.0.1 -P${PROXY_LISTEN_PORT} -u"${MASTER_USER}" -p"${MASTER_PASS}" -e "SELECT 1;" 2>/dev/null; then
     log "  ✅ 프록시 경유 MySQL 접속 성공"
 else
     log "  ⚠️ MySQL 접속 테스트 실패 (MASTER_USER/MASTER_PASS 확인)"

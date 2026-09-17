@@ -25,7 +25,11 @@ echo " Doktori 부하테스트 실행"
 echo -e "==========================================${NC}"
 echo ""
 echo "BASE_URL: ${BASE_URL:-미설정}"
-echo "JWT_TOKEN: ${JWT_TOKEN:+설정됨}${JWT_TOKEN:-미설정}"
+if [ -n "${JWT_TOKEN:-}" ]; then
+    echo "JWT_TOKEN: 설정됨"
+else
+    echo "JWT_TOKEN: 미설정"
+fi
 echo "결과 저장: $RESULTS_DIR"
 echo ""
 

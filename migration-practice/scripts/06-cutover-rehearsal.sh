@@ -33,15 +33,15 @@ fi
 # 필수: MASTER_USER, MASTER_PASS, RDS_HOST, RDS_USER, RDS_PASS, DB_NAME
 MASTER_HOST="${MASTER_HOST:-localhost}"
 MASTER_PORT="${MASTER_PORT:-3306}"
-MASTER_USER="${MASTER_USER:?MASTER_USER 환경변수를 설정하세요}"
-MASTER_PASS="${MASTER_PASS:?MASTER_PASS 환경변수를 설정하세요}"
+MASTER_USER="${MASTER_USER:?MASTER_USER required}"
+MASTER_PASS="${MASTER_PASS:?MASTER_PASS required}"
 
-RDS_HOST="${RDS_HOST:?RDS_HOST 환경변수를 설정하세요}"
+RDS_HOST="${RDS_HOST:?RDS_HOST required}"
 RDS_PORT="${RDS_PORT:-3306}"
-RDS_USER="${RDS_USER:?RDS_USER 환경변수를 설정하세요}"
-RDS_PASS="${RDS_PASS:?RDS_PASS 환경변수를 설정하세요}"
+RDS_USER="${RDS_USER:?RDS_USER required}"
+RDS_PASS="${RDS_PASS:?RDS_PASS required}"
 
-DB_NAME="${DB_NAME:?DB_NAME 환경변수를 설정하세요}"
+DB_NAME="${DB_NAME:?DB_NAME required}"
 PROXY_LISTEN_PORT="${PROXY_LISTEN_PORT:-3307}"
 STREAM_CONF="${STREAM_CONF:-/etc/nginx/stream.d/db-proxy.conf}"
 LOG_FILE="/tmp/db-migration/cutover-rehearsal-$(date +%Y%m%d-%H%M%S).log"

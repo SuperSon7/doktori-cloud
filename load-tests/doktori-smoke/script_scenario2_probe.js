@@ -3,9 +3,7 @@ import { check, group, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 
 const BASE_URL = __ENV.BASE_URL || "https://doktori.kr";
-const ACCESS_TOKEN =
-  __ENV.ACCESS_TOKEN ||
-  "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsInVzZXJJZCI6MTIsIm5pY2tuYW1lIjoi6rmA7KeA7ISdIiwiaWF0IjoxNzcxOTQyNTM4LCJleHAiOjE3NzE5NDQzMzh9.mL0a87909IO7QxshuCXO5sAXTDL7qA1Wmrr58_3b5rg";
+const ACCESS_TOKEN = __ENV.ACCESS_TOKEN;
 const PARTICIPATION_MIN_MEETING_ID = 1;
 const PARTICIPATION_MAX_MEETING_ID = 65;
 const PARTICIPATION_MAX_RETRIES = 20;

@@ -77,7 +77,11 @@ echo "=========================================="
 echo " 시나리오: $SCENARIO"
 echo "=========================================="
 echo "BASE_URL: $BASE_URL"
-echo "JWT_TOKEN: ${JWT_TOKEN:+설정됨}${JWT_TOKEN:-미설정}"
+if [ -n "${JWT_TOKEN:-}" ]; then
+    echo "JWT_TOKEN: 설정됨"
+else
+    echo "JWT_TOKEN: 미설정"
+fi
 echo "결과 파일: $OUTPUT_FILE"
 echo ""
 

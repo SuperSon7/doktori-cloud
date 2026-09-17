@@ -22,10 +22,10 @@
 
 set -euo pipefail
 
-GRAFANA_URL="${GRAFANA_URL:-http://13.125.29.187:3000}"
+GRAFANA_URL="${GRAFANA_URL:?GRAFANA_URL required}"
 GRAFANA_API_KEY="${GRAFANA_API_KEY:-}"
 GRAFANA_USER="${GRAFANA_USER:-admin}"
-GRAFANA_PASS="${GRAFANA_PASS:-admin}"
+GRAFANA_PASS="${GRAFANA_PASS:-}"
 
 EVENT="${1:-Migration Event}"
 DESCRIPTION="${2:-}"
@@ -44,6 +44,7 @@ esac
 if [ -n "$GRAFANA_API_KEY" ]; then
     AUTH_HEADER="Authorization: Bearer ${GRAFANA_API_KEY}"
 else
+    : "${GRAFANA_PASS:?GRAFANA_PASS required}"
     AUTH_HEADER="Authorization: Basic $(echo -n "${GRAFANA_USER}:${GRAFANA_PASS}" | base64)"
 fi
 
