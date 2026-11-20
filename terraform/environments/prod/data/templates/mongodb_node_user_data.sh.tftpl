@@ -2,12 +2,15 @@
 # MongoDB node bootstrap for self-managed data layer monitoring.
 set -euo pipefail
 
-log() { echo "[mongodb] $*"; }
+log() { echo "[mongodb] $*" >&2; }
 
 PROJECT_NAME="${project_name}"
 ENVIRONMENT="${environment}"
 AWS_REGION="${aws_region}"
 NODE_NAME="${node_name}"
+REPLICA_ENABLED="${replica_enabled}"
+REPLICA_SET_NAME="${replica_set_name}"
+REPLICA_MEMBER_ID="${replica_member_id}"
 
 ssm_get() {
   local name="$1"
@@ -64,11 +67,43 @@ MONGO_ADMIN_PASSWORD="$(ssm_get MONGO_ADMIN_PASSWORD)"
 MONGO_USERNAME="$(ssm_get MONGO_USERNAME)"
 MONGO_PASSWORD="$(ssm_get MONGO_PASSWORD)"
 
+if [ "$REPLICA_ENABLED" = "true" ]; then
+  # 공유 keyfile은 이미지에 bake하지 않고 첫 부팅에 SSM에서 읽는다.
+  MONGO_REPLICA_KEY="$(ssm_get MONGO_REPLICA_KEY)"
+  if [ -z "$MONGO_REPLICA_KEY" ] || [ "$MONGO_REPLICA_KEY" = "CHANGE_ME" ]; then
+    log "MongoDB replica key is not configured"
+    exit 1
+  fi
+  printf '%s' "$MONGO_REPLICA_KEY" >/etc/mongodb-keyfile
+  chown mongodb:mongodb /etc/mongodb-keyfile
+  chmod 0400 /etc/mongodb-keyfile
+  enable_authorization
+  python3 - "$REPLICA_SET_NAME" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path('/etc/mongod.conf')
+text = path.read_text()
+def replace_section(name, body):
+    global text
+    pattern = rf'(?ms)^{name}:.*?(?=^[A-Za-z]|\Z)'
+    section = name + ':\n' + body + '\n'
+    text = re.sub(pattern, lambda match: section, text) if re.search(pattern, text) else text + '\n' + section
+
+replace_section('security', '  authorization: enabled\n  keyFile: /etc/mongodb-keyfile')
+replace_section('replication', '  replSetName: ' + sys.argv[1])
+path.write_text(text)
+PY
+fi
+
 systemctl enable mongod
 systemctl restart mongod
 
+MONGO_READY=false
 for _ in $(seq 1 60); do
   if mongosh --quiet --host 127.0.0.1 --port 27017 --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    MONGO_READY=true
     break
   fi
   if mongosh --quiet --host 127.0.0.1 --port 27017 \
@@ -76,10 +111,33 @@ for _ in $(seq 1 60); do
       --password "$MONGO_ADMIN_PASSWORD" \
       --authenticationDatabase admin \
       --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    MONGO_READY=true
     break
   fi
   sleep 2
 done
+[ "$MONGO_READY" = true ] || { log "MongoDB did not become reachable"; exit 1; }
+
+# A complete existing set may have a primary other than member 0. Rejoining
+# must not force elections or repeat object creation on a secondary.
+EXISTING_REPLICA_CONFIG=false
+if [ "$REPLICA_ENABLED" = "true" ]; then
+  CHECK_CONFIG_JS="$(mktemp /run/mongo-check-config.XXXXXX.js)"
+  cat >"$CHECK_CONFIG_JS" <<JS
+const expected = ${replica_members_json};
+const current = rs.conf();
+quit(current._id === "$REPLICA_SET_NAME" && current.members.length === expected.length &&
+  expected.every(member => current.members.some(actual => actual._id === member._id && actual.host === member.host)) ? 0 : 1);
+JS
+  if mongosh --quiet --host 127.0.0.1 --port 27017 \
+      --username "$MONGO_ADMIN_USERNAME" --password "$MONGO_ADMIN_PASSWORD" \
+      --authenticationDatabase admin "$CHECK_CONFIG_JS" >/dev/null 2>&1; then
+    EXISTING_REPLICA_CONFIG=true
+  fi
+  rm -f "$CHECK_CONFIG_JS"
+fi
+# followers inherit users/indexes; complete sets use explicit later migrations.
+if [ "$EXISTING_REPLICA_CONFIG" != "true" ] && { [ "$REPLICA_ENABLED" != "true" ] || [ "$REPLICA_MEMBER_ID" = "0" ]; }; then
 
 INIT_ADMIN_JS="$(mktemp /run/mongo-init-admin.XXXXXX.js)"
 INIT_APP_JS="$(mktemp /run/mongo-init-app.XXXXXX.js)"
@@ -90,6 +148,36 @@ ADMIN_USER_JSON="$(js_quote "$MONGO_ADMIN_USERNAME")"
 ADMIN_PASS_JSON="$(js_quote "$MONGO_ADMIN_PASSWORD")"
 APP_USER_JSON="$(js_quote "$MONGO_USERNAME")"
 APP_PASS_JSON="$(js_quote "$MONGO_PASSWORD")"
+
+if [ "$REPLICA_ENABLED" = "true" ]; then
+  INIT_RS_JS="$(mktemp /run/mongo-init-rs.XXXXXX.js)"
+  chmod 0600 "$INIT_RS_JS"
+  trap 'rm -f "$INIT_ADMIN_JS" "$INIT_APP_JS" "$INIT_RS_JS"' EXIT
+  cat >"$INIT_RS_JS" <<JS
+const adminDb = db.getSiblingDB("admin");
+try { adminDb.auth($ADMIN_USER_JSON, $ADMIN_PASS_JSON); }
+catch (e) { if (e.code !== 18) throw e; }
+try { rs.status(); }
+catch (e) {
+  if (e.code !== 94) throw e;
+  const members = ${replica_members_json};
+  // 최초 사용자를 만들 동안 coordinator 하나로 시작한 뒤 아래에서 나머지를 추가한다.
+  const result = rs.initiate({_id: "$REPLICA_SET_NAME", members: members.filter(m => m._id === 0)});
+  if (!result.ok) throw new Error(JSON.stringify(result));
+}
+JS
+  mongosh --quiet --host 127.0.0.1 --port 27017 "$INIT_RS_JS"
+  PRIMARY_READY=false
+  for _ in $(seq 1 60); do
+    if mongosh --quiet --host 127.0.0.1 --port 27017 \
+        --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
+      PRIMARY_READY=true
+      break
+    fi
+    sleep 2
+  done
+  [ "$PRIMARY_READY" = true ] || { log "Coordinator is not primary; do not force reconfigure an existing set"; exit 1; }
+fi
 
 ADMIN_AUTH_OK=false
 if mongosh --quiet --host 127.0.0.1 --port 27017 \
@@ -106,7 +194,8 @@ const adminPassword = $ADMIN_PASS_JSON;
 const adminRoles = [
   { role: "userAdminAnyDatabase", db: "admin" },
   { role: "dbAdminAnyDatabase", db: "admin" },
-  { role: "clusterMonitor", db: "admin" }
+  { role: "clusterMonitor", db: "admin" },
+  { role: "clusterManager", db: "admin" }
 ];
 
 if (adminDb.getUser(adminUser) === null) {
@@ -167,19 +256,75 @@ log "Enabling MongoDB authorization"
 enable_authorization
 systemctl restart mongod
 
+AUTH_READY=false
 for _ in $(seq 1 30); do
   if mongosh --quiet --host 127.0.0.1 --port 27017 \
       --username "$MONGO_ADMIN_USERNAME" \
       --password "$MONGO_ADMIN_PASSWORD" \
       --authenticationDatabase admin \
       --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+    AUTH_READY=true
     break
   fi
   sleep 2
 done
+[ "$AUTH_READY" = true ] || { log "Authenticated MongoDB readiness failed"; exit 1; }
 
+if [ "$REPLICA_ENABLED" = "true" ]; then
+  cat >"$INIT_RS_JS" <<JS
+const adminDb = db.getSiblingDB("admin");
+if (!adminDb.auth($ADMIN_USER_JSON, $ADMIN_PASS_JSON)) throw new Error("MongoDB admin authentication failed");
+const expected = ${replica_members_json};
+for (const member of expected) {
+  const existing = rs.conf().members.find(m => m._id === member._id);
+  if (existing && existing.host !== member.host) throw new Error("Existing replica member address differs; manual review required");
+  if (!existing) {
+    const result = rs.add(member);
+    if (!result.ok) throw new Error(JSON.stringify(result));
+  }
+}
+let healthy = false;
+for (let i = 0; i < 120; i++) {
+  const status = rs.status();
+  const ready = status.members.filter(m => m.health === 1 && (m.state === 1 || m.state === 2));
+  if (ready.length === expected.length) { healthy = true; break; }
+  sleep(1000);
+}
+if (!healthy) throw new Error("Replica set initial sync did not finish");
+const result = db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 5000}});
+if (!result.ok) throw new Error(JSON.stringify(result));
+JS
+  mongosh --quiet --host 127.0.0.1 --port 27017 "$INIT_RS_JS"
+fi
+fi
+
+%{ if enable_data_ha_observability ~}
+MONGO_MONITOR_PASSWORD="$(ssm_get MONGO_MONITOR_PASSWORD)"
+export MONGO_MONITOR_PASSWORD MONGO_ADMIN_USERNAME MONGO_ADMIN_PASSWORD
+# A seed-list connection finds the elected primary, including on an existing set.
+if [ "$REPLICA_ENABLED" != "true" ] || [ "$REPLICA_MEMBER_ID" = "0" ]; then
+  MONITOR_JS="$(mktemp /run/mongo-monitor.XXXXXX.js)"
+  chmod 0600 "$MONITOR_JS"
+  cat >"$MONITOR_JS" <<'JS'
+const seeds = ${replica_members_json}.map(m => m.host).join(',');
+const uri = ${replica_enabled} ? 'mongodb://' + seeds + '/admin?replicaSet=${replica_set_name}' : 'mongodb://127.0.0.1:27017/admin';
+const admin = new Mongo(uri).getDB('admin');
+if (!admin.auth(process.env.MONGO_ADMIN_USERNAME, process.env.MONGO_ADMIN_PASSWORD)) throw new Error('Monitor provisioning auth failed');
+const roles = [{role:'clusterMonitor',db:'admin'},{role:'read',db:'local'}];
+const existing = admin.getUser('doktori_ha_monitor');
+if (!existing) admin.createUser({user:'doktori_ha_monitor',pwd:process.env.MONGO_MONITOR_PASSWORD,roles});
+else if (JSON.stringify(existing.roles.map(r=>r.db+':'+r.role).sort()) !== JSON.stringify(roles.map(r=>r.db+':'+r.role).sort())) throw new Error('Existing monitor roles differ; review explicitly');
+JS
+  mongosh --quiet --nodb "$MONITOR_JS"
+  rm -f "$MONITOR_JS"
+fi
+EXPORTER_USER=doktori_ha_monitor
+EXPORTER_PASS="$(urlencode "$MONGO_MONITOR_PASSWORD")"
+unset MONGO_MONITOR_PASSWORD
+%{ else ~}
 EXPORTER_USER="$(urlencode "$MONGO_ADMIN_USERNAME")"
 EXPORTER_PASS="$(urlencode "$MONGO_ADMIN_PASSWORD")"
+%{ endif ~}
 
 install -m 0750 -o root -g alloy -d /etc/alloy
 cat >/etc/alloy/config.alloy <<EOF
@@ -190,16 +335,36 @@ prometheus.exporter.unix "host" {
 prometheus.exporter.mongodb "mongodb" {
   mongodb_uri    = "mongodb://$EXPORTER_USER:$EXPORTER_PASS@127.0.0.1:27017/admin?authSource=admin"
   direct_connect = true
+  collect_all = true
+  compatible_mode = true
+  enable_replicaset_status = ${replica_enabled}
+  enable_replicaset_config = ${replica_enabled}
 }
 
+discovery.relabel "host_metrics_targets" {
+  targets = prometheus.exporter.unix.host.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-host"
+  }
+}
 prometheus.scrape "host_metrics" {
-  targets         = prometheus.exporter.unix.host.targets
+  job_name = "data-ha-host"
+  targets         = discovery.relabel.host_metrics_targets.output
   forward_to      = [prometheus.relabel.data_common.receiver]
   scrape_interval = "30s"
 }
 
+discovery.relabel "mongodb_metrics_targets" {
+  targets = prometheus.exporter.mongodb.mongodb.targets
+  rule {
+    target_label = "job"
+    replacement = "mongodb"
+  }
+}
 prometheus.scrape "mongodb_metrics" {
-  targets         = prometheus.exporter.mongodb.mongodb.targets
+  job_name = "mongodb"
+  targets         = discovery.relabel.mongodb_metrics_targets.output
   forward_to      = [prometheus.relabel.data_common.receiver]
   scrape_interval = "15s"
 }
@@ -218,17 +383,54 @@ prometheus.relabel "data_common" {
     replacement  = "$NODE_NAME"
     target_label = "instance"
   }
+  rule {
+    replacement = "$NODE_NAME"
+    target_label = "node"
+  }
+  rule {
+    replacement = "${project_name}-${environment}-data"
+    target_label = "cluster"
+  }
 }
+
+%{ if enable_data_ha_observability ~}
+prometheus.exporter.self "agent" {}
+discovery.relabel "agent_targets" {
+  targets = prometheus.exporter.self.agent.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-alloy"
+  }
+}
+prometheus.scrape "agent" {
+  job_name = "data-ha-alloy"
+  targets = discovery.relabel.agent_targets.output
+  scrape_interval = "15s"
+  forward_to = [prometheus.relabel.data_common.receiver]
+}
+loki.source.journal "service_0" {
+  matches = "_SYSTEMD_UNIT=mongod.service"
+  max_age = "1h"
+  labels = { env = "${environment}", cluster = "${project_name}-${environment}-data", service = "mongodb", node = "$NODE_NAME", job = "data-ha-logs" }
+  forward_to = [loki.write.monitoring.receiver]
+}
+loki.write "monitoring" {
+  endpoint { url = ${jsonencode(loki_push_url)} }
+}
+%{ endif ~}
 
 prometheus.remote_write "monitoring" {
   endpoint {
-    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+    url = ${jsonencode(remote_write_url)}
   }
 }
 EOF
 
 chown root:alloy /etc/alloy/config.alloy
 chmod 0640 /etc/alloy/config.alloy
+%{ if enable_data_ha_observability ~}
+usermod -aG adm,systemd-journal alloy
+%{ endif ~}
 systemctl enable alloy
 systemctl restart alloy
 

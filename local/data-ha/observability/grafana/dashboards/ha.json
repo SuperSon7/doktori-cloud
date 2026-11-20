@@ -1,0 +1,952 @@
+{
+  "uid": "doktori-data-ha",
+  "title": "독토리 데이터 HA 상태",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "수집 상태: 준비된 대상 수",
+      "description": "응답·인증과 60초 이내 수집을 함께 본다. 전체 프로세스 중단은 아래 경보에서 확인한다.",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:ready_nodes{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "job",
+                "service",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "field": "job",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "기대 대상 수",
+      "description": "배포할 단계에 맞춰 별도 inventory를 렌더한다. 지표가 사라져도 기대 수는 남는다.",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:expected_nodes{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "job",
+                "service",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "field": "job",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "경보 발생 이력",
+      "description": "현재 firing만 조회할 때 0건은 빈 결과다. 수집·룰 로드 정상 여부와 함께 확인한다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by(alertname,severity)(ALERTS{env=~\"$env\",cluster=~\"$cluster\",alertstate=\"firing\",team=\"data-ha\"})",
+          "legendFormat": "{{alertname}} {{severity}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "수집 시계열 나이",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - timestamp(up{env=~\"$env\",cluster=~\"$cluster\",job=~\"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy\"})",
+          "legendFormat": "{{job}} / {{node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Redis primary 수",
+      "description": "정상 목표 1. 초기 role 라벨을 사용하지 않고 실제 INFO 역할을 집계한다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:redis_primary_count{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "관측값"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Redis 연결 replica 수",
+      "description": "목표 2. 현재 min-replicas-to-write=1 설정과 함께 해석한다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:redis_replicas{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "관측값"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Sentinel CKQUORUM",
+      "description": "1 성공·0 실패. 성공이 데이터 무유실이나 복원을 보장하지 않는다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:sentinel_quorum{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Redis replica ACK 지연",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_connected_slave_lag_seconds{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "MQ 큐별 온라인 멤버: 보수적 최소",
+      "description": "각 관리 API의 관측을 합산하지 않는다. 현재 목표 3, 과반 2. API 실패는 별도 경보다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:mq_online_members{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "MQ 큐별 실제 요구 과반",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 31,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:mq_required_majority{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "MQ Ready backlog",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "MQ Unacked",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_unacked{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "MQ consumers",
+      "description": "wait/DLQ 소비자 0은 설계상 가능하다. 본 큐 backlog가 있을 때만 무소비자 경보를 낸다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_consumers{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "MQ 관리 API 수집 성공",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 45,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_rabbitmq_probe_success{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "MongoDB primary 수",
+      "description": "각 exporter의 myState만 집계해 전체 set 반복 보고의 중복을 피한다. 목표 1.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:mongo_primary_count{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "관측값"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "MongoDB 정상 data member 수",
+      "description": "현재 3 voting data-bearing P-S-S 전용. 임의 arbiter/hidden 구성으로 일반화하지 않는다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 52,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:mongo_data_members{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "관측값"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "MongoDB self-member replication lag",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 59,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "doktori_ha:mongo_lag_seconds{env=~\"$env\",cluster=~\"$cluster\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "title": "MongoDB 현재 연결 수",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 59,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mongodb_ss_connections{env=~\"$env\",cluster=~\"$cluster\",conn_type=\"current\"}",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "Alloy 로그 전송량",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(node)(rate(loki_write_sent_entries_total{env=~\"$env\",cluster=~\"$cluster\",job=\"data-ha-alloy\"}[5m]))",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Alloy remote_write 대기 sample",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "local-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 66,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(node)(prometheus_remote_storage_samples_pending{env=~\"$env\",cluster=~\"$cluster\",job=\"data-ha-alloy\"})",
+          "legendFormat": "{{node}} {{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "데이터 없음",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "title": "데이터 서비스 로그",
+      "description": "서비스·노드 라벨로 연결한다. 메시지 본문을 추가로 수집하는 계측은 하지 않는다.",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "local-loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 73,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{env=~\"$env\",cluster=~\"$cluster\",service=~\"redis|rabbitmq|mongodb\"}"
+        }
+      ],
+      "options": {
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "type": "query",
+        "datasource": {
+          "uid": "local-prom",
+          "type": "prometheus"
+        },
+        "query": "label_values(doktori_ha_expected_target,env)",
+        "refresh": 1,
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": {
+          "uid": "local-prom",
+          "type": "prometheus"
+        },
+        "query": "label_values(doktori_ha_expected_target{env=~\"$env\"},cluster)",
+        "refresh": 1,
+        "sort": 1
+      }
+    ]
+  }
+}

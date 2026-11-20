@@ -1,0 +1,9 @@
+# opt-in strategic merge patch; 활성화 전 서버/SSM/클라이언트 검증 필요
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod,redis-sentinel,rabbitmq-ha

@@ -1,0 +1,86 @@
+{
+  "env": "local",
+  "cluster": "doktori-local-data",
+  "targets": [
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-a"
+    },
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-b"
+    },
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-c"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-a"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-b"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-c"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-a"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-b"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-c"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-a"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-b"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-c"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongo-a"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongo-b"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongo-c"
+    },
+    {
+      "job": "data-ha-alloy",
+      "node": "local-alloy",
+      "service": "observability"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-17",
+  "terraform_root_validate": "pass",
+  "topology_plan_cases": 7,
+  "isolated_input_plan_cases": 4,
+  "rendered_bootstrap_cases": 8,
+  "plan_checker_unit_tests": 5,
+  "backend_tests": [
+    {
+      "suite": "TEST-com.example.doktoribackend.config.RedisSentinelProfileTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "TEST-com.example.doktoribackend.notification.service.ConfirmedNotificationPublisherTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "TEST-com.example.doktoribackend.notification.service.NotificationDeliveryConsumerTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "cloud_execution": false,
+  "failover_restore_e2e": false
+}

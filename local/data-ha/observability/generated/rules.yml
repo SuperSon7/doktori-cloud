@@ -1,0 +1,481 @@
+groups:
+- name: data-ha-inventory
+  interval: 15s
+  rules:
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis
+      service: redis
+      node: redis-a
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis
+      service: redis
+      node: redis-b
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis
+      service: redis
+      node: redis-c
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis-sentinel
+      service: redis
+      node: redis-a
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis-sentinel
+      service: redis
+      node: redis-b
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: redis-sentinel
+      service: redis
+      node: redis-c
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq
+      service: rabbitmq
+      node: rabbitmq-a
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq
+      service: rabbitmq
+      node: rabbitmq-b
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq
+      service: rabbitmq
+      node: rabbitmq-c
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq-quorum
+      service: rabbitmq
+      node: rabbitmq-a
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq-quorum
+      service: rabbitmq
+      node: rabbitmq-b
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: rabbitmq-quorum
+      service: rabbitmq
+      node: rabbitmq-c
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: mongodb
+      service: mongodb
+      node: mongo-a
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: mongodb
+      service: mongodb
+      node: mongo-b
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: mongodb
+      service: mongodb
+      node: mongo-c
+  - record: doktori_ha_expected_target
+    expr: vector(1)
+    labels:
+      env: local
+      cluster: doktori-local-data
+      job: data-ha-alloy
+      node: local-alloy
+      service: observability
+- name: data-ha-recording
+  interval: 15s
+  rules:
+  - record: doktori_ha:target_ready
+    expr: "max by (env,cluster,service,job,node) ((\n      (up{cluster!=\"\",node!=\"\
+      \",job=~\"redis|redis-sentinel\"} * on(env,cluster,job,node) group_left() redis_up{cluster!=\"\
+      \",node!=\"\"})\n      or (up{cluster!=\"\",node!=\"\",job=~\"rabbitmq|data-ha-alloy\"\
+      })\n      or (up{cluster!=\"\",node!=\"\",job=\"rabbitmq-quorum\"} * on(env,cluster,job,node)\
+      \ group_left() doktori_rabbitmq_probe_success{cluster!=\"\",node!=\"\"})\n \
+      \     or (up{cluster!=\"\",node!=\"\",job=\"mongodb\"} * on(env,cluster,job,node)\
+      \ group_left() mongodb_up{cluster!=\"\",node!=\"\"})\n    ) and on(env,cluster,job,node)\
+      \ ((timestamp(up{cluster!=\"\",node!=\"\",job=~\"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy\"\
+      }) > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))"
+  - record: doktori_ha:expected_nodes
+    expr: sum by(env,cluster,service,job)(doktori_ha_expected_target)
+  - record: doktori_ha:ready_nodes
+    expr: sum by(env,cluster,service,job)(doktori_ha:target_ready) or on(env,cluster,job)
+      (doktori_ha:expected_nodes * 0)
+  - record: doktori_ha:redis_primary_count
+    expr: sum by(env,cluster)(redis_instance_info{cluster!="",node!="",job="redis",role="master"}
+      and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target)) or
+      on(env,cluster) (sum by(env,cluster)(doktori_ha_expected_target{job="redis"})
+      * 0)
+  - record: doktori_ha:redis_replicas
+    expr: max by(env,cluster)(redis_connected_slaves{cluster!="",node!="",job="redis"}
+      and on(env,cluster,job,node) redis_instance_info{role="master"} and on(env,cluster,job,node)
+      ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))
+  - record: doktori_ha:sentinel_quorum
+    expr: min by(env,cluster,node)(redis_sentinel_master_ckquorum_status{cluster!="",node!="",job="redis-sentinel"}
+      and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))
+  - record: doktori_ha:mq_online_members
+    expr: min by(env,cluster,queue,vhost)(doktori_rabbitmq_queue_online_members{cluster!="",node!=""}
+      and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))
+  - record: doktori_ha:mq_required_majority
+    expr: max by(env,cluster,queue,vhost)(doktori_rabbitmq_queue_required_majority{cluster!="",node!=""}
+      and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))
+  - record: doktori_ha:mongo_primary_count
+    expr: sum by(env,cluster)((mongodb_rs_myState{cluster!="",node!="",job="mongodb"}
+      == bool 1) and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target)) or
+      on(env,cluster) (sum by(env,cluster)(doktori_ha_expected_target{job="mongodb"})
+      * 0)
+  - record: doktori_ha:mongo_data_members
+    expr: count by(env,cluster)((mongodb_rs_myState{cluster!="",node!="",job="mongodb"}
+      == 1 or mongodb_rs_myState{cluster!="",node!="",job="mongodb"} == 2) and on(env,cluster,job,node)
+      ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target)) or
+      on(env,cluster) (sum by(env,cluster)(doktori_ha_expected_target{job="mongodb"})
+      * 0)
+  - record: doktori_ha:mongo_lag_seconds
+    expr: max by(env,cluster,node)(mongodb_mongod_replset_member_replication_lag{cluster!="",node!="",self="1"}
+      and on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target))
+- name: data-ha-alerts
+  interval: 15s
+  rules:
+  - alert: DataHARuleEvaluationFailure
+    expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+      env: local
+      cluster: doktori-local-data
+    annotations:
+      summary: Prometheus rule evaluation is failing; dashboard recordings may be
+        stale
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHALogDeliveryErrors
+    expr: rate(loki_write_dropped_entries_total{cluster!="",node!="",job="data-ha-alloy"}[5m])
+      > 0 or rate(loki_write_batch_retries_total{cluster!="",node!="",job="data-ha-alloy"}[5m])
+      > 0
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Alloy log delivery is retrying or dropping entries
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHAMetricDeliveryErrors
+    expr: rate(prometheus_remote_storage_samples_failed_total{cluster!="",node!="",job="data-ha-alloy"}[5m])
+      > 0
+    for: 2m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Alloy remote_write reports failed samples
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHATelemetryMissing
+    expr: doktori_ha_expected_target unless on(env,cluster,job,node) ((timestamp(up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"})
+      > time() - 60) and on(env,cluster,job,node) doktori_ha_expected_target)
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Expected target has no fresh scrape sample
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHAScrapeFailed
+    expr: (up{cluster!="",node!="",job=~"redis|redis-sentinel|rabbitmq|rabbitmq-quorum|mongodb|data-ha-alloy"}
+      == 0) and on(env,cluster,job,node) doktori_ha_expected_target
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Exporter endpoint cannot be scraped
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHASourceFailed
+    expr: doktori_ha:target_ready == 0
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Exporter is reachable but its data source is not healthy
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHAEssentialMetricsMissing
+    expr: (doktori_ha_expected_target unless on(env,cluster,job,node) doktori_ha:target_ready)
+      and on(env,cluster,job,node) (up == 1)
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Scrape succeeds but required source metrics are missing
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: DataHAStateMetricsMissing
+    expr: "((doktori_ha_expected_target{job=\"redis\"} unless on(env,cluster,job,node)\
+      \ redis_instance_info{cluster!=\"\",node!=\"\"})\n          or (doktori_ha_expected_target{job=\"\
+      redis-sentinel\"} unless on(env,cluster,job,node) redis_sentinel_master_ckquorum_status{cluster!=\"\
+      \",node!=\"\"})\n          or (doktori_ha_expected_target{job=\"mongodb\"} unless\
+      \ on(env,cluster,job,node) mongodb_rs_myState{cluster!=\"\",node!=\"\"})) and\
+      \ on(env,cluster,job,node) (up == 1)"
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Required replication state is absent although exporter responds
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisPrimaryCount
+    expr: (doktori_ha:redis_primary_count != 1) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Redis observed primary count differs from one
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisReplicaDegraded
+    expr: (doktori_ha:redis_replicas < 2) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Redis has fewer than two connected replicas
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisReplicaWriteGate
+    expr: (doktori_ha:redis_replicas < 1) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Redis min-replicas-to-write gate may reject writes
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisReplicaLinkDown
+    expr: (redis_master_link_up{cluster!="",node!="",job="redis"} == 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Redis replica lost its primary link
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisReplicaLag
+    expr: (redis_connected_slave_lag_seconds{cluster!="",node!="",job="redis"} > 5)
+      and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Redis replica ACK lag exceeds draft threshold
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisSentinelQuorum
+    expr: (doktori_ha:sentinel_quorum == 0) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Sentinel CKQUORUM reports failure
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisSentinelDisagreement
+    expr: (count by(env,cluster)(count by(env,cluster,master_address)(redis_sentinel_master_status{cluster!="",node!="",master_status="ok"}))
+      > 1) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Sentinels report different primary addresses
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RedisAOFWriteError
+    expr: (redis_aof_last_write_status{cluster!="",node!=""} == 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="redis"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Redis AOF reports an unsuccessful write
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQQuorumLost
+    expr: (doktori_ha:mq_online_members < on(env,cluster,queue,vhost) doktori_ha:mq_required_majority)
+      and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Observed queue online members are below configured majority
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQReplicaDegraded
+    expr: (doktori_ha:mq_online_members < 3) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Queue has fewer than three online members
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQQueueMissing
+    expr: (doktori_rabbitmq_queue_present{cluster!="",node!=""} == 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: An explicitly monitored application queue is missing
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQQueueNotQuorum
+    expr: (doktori_rabbitmq_queue_is_quorum{cluster!="",node!=""} == 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Application queue is not quorum type
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQLeaderMissing
+    expr: (doktori_rabbitmq_queue_leader_present{cluster!="",node!=""} == 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Queue has no observed online leader
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQPartition
+    expr: (doktori_rabbitmq_partition_reports{cluster!="",node!=""} > 0) and on(env,cluster)
+      count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Management API reports a partition
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQResourceAlarm
+    expr: (rabbitmq_alarms_memory_used_watermark{cluster!="",node!=""} > 0 or rabbitmq_alarms_free_disk_space_watermark{cluster!="",node!=""}
+      > 0) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: RabbitMQ resource alarm can block publishers
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQNoConsumers
+    expr: ((rabbitmq_queue_consumers{cluster!="",node!="",queue="notification.delivery.queue"}
+      == 0) and on(env,cluster,queue,vhost) (rabbitmq_queue_messages_ready > 0)) and
+      on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Delivery backlog exists without consumers
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: RabbitMQDeadLetters
+    expr: (rabbitmq_queue_messages_ready{cluster!="",node!="",queue="notification.delivery.dlq"}
+      > 0) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="rabbitmq"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Dead-letter queue contains messages; inspect without consuming
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: MongoDBPrimaryCount
+    expr: (doktori_ha:mongo_primary_count != 1) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="mongodb"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: MongoDB observed primary count differs from one
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: MongoDBDataMemberDegraded
+    expr: (doktori_ha:mongo_data_members < 3) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="mongodb"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: Fewer than three members report primary/secondary state
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: MongoDBDataMajorityLost
+    expr: (doktori_ha:mongo_data_members < 2) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="mongodb"})
+    for: 1m
+    labels:
+      severity: critical
+      team: data-ha
+    annotations:
+      summary: Fewer than two members report usable data-bearing state
+      runbook_path: runbooks/alerting/data-ha.md
+  - alert: MongoDBReplicationLag
+    expr: (doktori_ha:mongo_lag_seconds > 5) and on(env,cluster) count by(env,cluster)(doktori_ha_expected_target{service="mongodb"})
+    for: 2m
+    labels:
+      severity: warning
+      team: data-ha
+    annotations:
+      summary: MongoDB self-member replication lag exceeds draft threshold
+      runbook_path: runbooks/alerting/data-ha.md

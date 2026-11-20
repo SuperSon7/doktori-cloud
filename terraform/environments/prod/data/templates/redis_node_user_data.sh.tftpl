@@ -5,7 +5,7 @@
 # - every node runs Sentinel with quorum 2
 set -euo pipefail
 
-log() { echo "[redis-ha] $*"; }
+log() { echo "[redis-ha] $*" >&2; }
 
 SSM_PREFIX="/${project_name}/${environment}"
 AWS_REGION="${aws_region}"
@@ -15,6 +15,8 @@ REDIS_SENTINEL_ENABLED="${redis_sentinel_enabled}"
 REDIS_MASTER_NAME="${redis_master_name}"
 REDIS_PRIMARY_DNS="${redis_primary_dns}"
 REDIS_SENTINEL_QUORUM="${redis_sentinel_quorum}"
+REDIS_SENTINEL_NODES="${redis_sentinel_nodes}"
+ALLOW_INITIAL_PRIMARY="${allow_initial_primary}"
 
 get_param() {
   local path="$SSM_PREFIX/$1"
@@ -59,7 +61,47 @@ if ! grep -q " $NODE_NAME" /etc/hosts; then
   echo "$LOCAL_IPV4 $NODE_NAME" >>/etc/hosts
 fi
 
-install -m 0755 -d /etc/redis
+install -m 0750 -o redis -g redis -d /etc/redis
+
+CURRENT_PRIMARY_HOST="$REDIS_PRIMARY_DNS"
+CURRENT_PRIMARY_PORT=6379
+if [ "$REDIS_SENTINEL_ENABLED" = "true" ]; then
+  export REDISCLI_AUTH="$REDIS_PASSWORD"
+  DISCOVERED_PRIMARY=false
+  IFS=',' read -r -a SENTINEL_NODES <<<"$REDIS_SENTINEL_NODES"
+  for _ in $(seq 1 30); do
+    declare -A votes=()
+    for endpoint in "$${SENTINEL_NODES[@]}"; do
+      host="$${endpoint%:*}"
+      port="$${endpoint##*:}"
+      mapfile -t answer < <(timeout 2 redis-cli --raw -h "$host" -p "$port" \
+        SENTINEL get-master-addr-by-name "$REDIS_MASTER_NAME" 2>/dev/null || true)
+      if [ "$${#answer[@]}" -eq 2 ] && [[ "$${answer[1]}" =~ ^[0-9]+$ ]]; then
+        candidate="$${answer[0]}:$${answer[1]}"
+        votes["$candidate"]=$(( $${votes["$candidate"]:-0} + 1 ))
+        if [ "$${votes["$candidate"]}" -ge 2 ] && \
+            [ "$(timeout 2 redis-cli --raw -h "$${answer[0]}" -p "$${answer[1]}" PING 2>/dev/null || true)" = "PONG" ]; then
+          CURRENT_PRIMARY_HOST="$${answer[0]}"
+          CURRENT_PRIMARY_PORT="$${answer[1]}"
+          DISCOVERED_PRIMARY=true
+          break
+        fi
+      fi
+    done
+    [ "$DISCOVERED_PRIMARY" = true ] && break
+    [ "$ALLOW_INITIAL_PRIMARY" = true ] && break
+    sleep 2
+  done
+  if [ "$DISCOVERED_PRIMARY" != true ] && [ "$ALLOW_INITIAL_PRIMARY" != true ]; then
+    log "No agreed reachable primary; refusing to bootstrap an independent Redis writer"
+    exit 1
+  fi
+  # 교체 노드는 a라는 정적 역할 대신 Sentinel이 알려 준 현재 primary를 따른다.
+  if [ "$DISCOVERED_PRIMARY" = true ]; then
+    NODE_ROLE=replica
+    [ "$CURRENT_PRIMARY_HOST" = "$LOCAL_IPV4" ] && NODE_ROLE=primary
+  fi
+fi
 
 cat >/etc/redis/redis.conf <<EOF
 bind 0.0.0.0
@@ -73,18 +115,26 @@ masterauth $REDIS_PASSWORD
 EOF
 
 if [ "$NODE_ROLE" = "replica" ]; then
-  wait_for_dns "$REDIS_PRIMARY_DNS"
-  echo "replicaof $REDIS_PRIMARY_DNS 6379" >>/etc/redis/redis.conf
+  wait_for_dns "$CURRENT_PRIMARY_HOST"
+  echo "replicaof $CURRENT_PRIMARY_HOST $CURRENT_PRIMARY_PORT" >>/etc/redis/redis.conf
 fi
 
 if [ "$REDIS_SENTINEL_ENABLED" = "true" ]; then
+wait_for_dns "$CURRENT_PRIMARY_HOST"
+cat >>/etc/redis/redis.conf <<EOF
+min-replicas-to-write 1
+min-replicas-max-lag 5
+EOF
 cat >/etc/redis/sentinel.conf <<EOF
 bind 0.0.0.0
 protected-mode no
 port 26379
+requirepass $REDIS_PASSWORD
 dir /var/lib/redis
-sentinel monitor $REDIS_MASTER_NAME $REDIS_PRIMARY_DNS 6379 $REDIS_SENTINEL_QUORUM
+sentinel resolve-hostnames yes
+sentinel monitor $REDIS_MASTER_NAME $CURRENT_PRIMARY_HOST $CURRENT_PRIMARY_PORT $REDIS_SENTINEL_QUORUM
 sentinel auth-pass $REDIS_MASTER_NAME $REDIS_PASSWORD
+sentinel sentinel-pass $REDIS_PASSWORD
 sentinel down-after-milliseconds $REDIS_MASTER_NAME 5000
 sentinel failover-timeout $REDIS_MASTER_NAME 60000
 sentinel parallel-syncs $REDIS_MASTER_NAME 1
@@ -138,17 +188,53 @@ prometheus.exporter.redis "redis" {
   redis_password_file = "/etc/alloy/redis-password"
 }
 
+discovery.relabel "host_metrics_targets" {
+  targets = prometheus.exporter.unix.host.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-host"
+  }
+}
 prometheus.scrape "host_metrics" {
-  targets         = prometheus.exporter.unix.host.targets
+  job_name = "data-ha-host"
+  targets         = discovery.relabel.host_metrics_targets.output
   forward_to      = [prometheus.relabel.data_common.receiver]
   scrape_interval = "30s"
 }
 
+discovery.relabel "redis_metrics_targets" {
+  targets = prometheus.exporter.redis.redis.targets
+  rule {
+    target_label = "job"
+    replacement = "redis"
+  }
+}
 prometheus.scrape "redis_metrics" {
-  targets         = prometheus.exporter.redis.redis.targets
+  job_name = "redis"
+  targets         = discovery.relabel.redis_metrics_targets.output
   forward_to      = [prometheus.relabel.data_common.receiver]
   scrape_interval = "15s"
 }
+
+%{ if enable_data_ha_observability && redis_sentinel_enabled ~}
+prometheus.exporter.redis "sentinel" {
+  redis_addr = "127.0.0.1:26379"
+  redis_password_file = "/etc/alloy/redis-password"
+}
+discovery.relabel "sentinel_metrics_targets" {
+  targets = prometheus.exporter.redis.sentinel.targets
+  rule {
+    target_label = "job"
+    replacement = "redis-sentinel"
+  }
+}
+prometheus.scrape "sentinel_metrics" {
+  job_name = "redis-sentinel"
+  targets = discovery.relabel.sentinel_metrics_targets.output
+  scrape_interval = "15s"
+  forward_to = [prometheus.relabel.data_common.receiver]
+}
+%{ endif ~}
 
 prometheus.relabel "data_common" {
   forward_to = [prometheus.remote_write.monitoring.receiver]
@@ -165,20 +251,63 @@ prometheus.relabel "data_common" {
     target_label = "instance"
   }
   rule {
+    replacement = "$NODE_NAME"
+    target_label = "node"
+  }
+  rule {
+    replacement = "${project_name}-${environment}-data"
+    target_label = "cluster"
+  }
+  rule {
     replacement  = "$NODE_ROLE"
-    target_label = "role"
+    target_label = "bootstrap_role"
   }
 }
 
+%{ if enable_data_ha_observability ~}
+prometheus.exporter.self "agent" {}
+discovery.relabel "agent_targets" {
+  targets = prometheus.exporter.self.agent.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-alloy"
+  }
+}
+prometheus.scrape "agent" {
+  job_name = "data-ha-alloy"
+  targets = discovery.relabel.agent_targets.output
+  scrape_interval = "15s"
+  forward_to = [prometheus.relabel.data_common.receiver]
+}
+loki.source.journal "service_0" {
+  matches = "_SYSTEMD_UNIT=redis-server.service"
+  max_age = "1h"
+  labels = { env = "${environment}", cluster = "${project_name}-${environment}-data", service = "redis", node = "$NODE_NAME", job = "data-ha-logs" }
+  forward_to = [loki.write.monitoring.receiver]
+}
+loki.source.journal "service_1" {
+  matches = "_SYSTEMD_UNIT=redis-sentinel.service"
+  max_age = "1h"
+  labels = { env = "${environment}", cluster = "${project_name}-${environment}-data", service = "redis", node = "$NODE_NAME", job = "data-ha-logs" }
+  forward_to = [loki.write.monitoring.receiver]
+}
+loki.write "monitoring" {
+  endpoint { url = ${jsonencode(loki_push_url)} }
+}
+%{ endif ~}
+
 prometheus.remote_write "monitoring" {
   endpoint {
-    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+    url = ${jsonencode(remote_write_url)}
   }
 }
 EOF
 
 chown root:alloy /etc/alloy/config.alloy
 chmod 0640 /etc/alloy/config.alloy
+%{ if enable_data_ha_observability ~}
+usermod -aG adm,systemd-journal alloy
+%{ endif ~}
 systemctl enable alloy
 systemctl restart alloy
 

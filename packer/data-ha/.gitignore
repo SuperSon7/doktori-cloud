@@ -1,0 +1,7 @@
+.runtime/
+build.pkrvars.hcl
+__pycache__/
+!verification.json
+!artifacts-*.json
+!ha-ami-ids-*.tfvars.json
+!manifests/*.json

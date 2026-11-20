@@ -36,7 +36,7 @@ resource "aws_route53_record" "redis" {
 }
 
 resource "aws_route53_record" "redis_sentinel" {
-  count = var.enable_data_ha ? 1 : 0
+  count = local.redis_ha_enabled ? 1 : 0
 
   zone_id = local.net.internal_zone_id
   name    = "redis-sentinel.${local.net.internal_zone_name}"

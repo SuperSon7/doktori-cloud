@@ -1,0 +1,11 @@
+route:
+  receiver: local-evidence
+  group_by: [alertname, env, cluster]
+  group_wait: 1s
+  group_interval: 5s
+  repeat_interval: 4h
+receivers:
+  - name: local-evidence
+    webhook_configs:
+      - url: http://alert-receiver:8081/alerts
+        send_resolved: true

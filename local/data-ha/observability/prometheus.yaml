@@ -1,0 +1,131 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+rule_files:
+- /etc/prometheus/data-ha/rules.yml
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+scrape_configs:
+- job_name: redis
+  static_configs:
+  - targets:
+    - redis-exporter-a:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-a
+  - targets:
+    - redis-exporter-b:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-b
+  - targets:
+    - redis-exporter-c:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-c
+- job_name: redis-sentinel
+  static_configs:
+  - targets:
+    - sentinel-exporter-a:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-a
+  - targets:
+    - sentinel-exporter-b:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-b
+  - targets:
+    - sentinel-exporter-c:9121
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: redis
+      node: redis-c
+- job_name: rabbitmq
+  static_configs:
+  - targets:
+    - rabbitmq-a:15692
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-a
+  - targets:
+    - rabbitmq-b:15692
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-b
+  - targets:
+    - rabbitmq-c:15692
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-c
+- job_name: rabbitmq-quorum
+  static_configs:
+  - targets:
+    - quorum-exporter-a:9419
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-a
+  - targets:
+    - quorum-exporter-b:9419
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-b
+  - targets:
+    - quorum-exporter-c:9419
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: rabbitmq
+      node: rabbitmq-c
+- job_name: mongodb
+  static_configs:
+  - targets:
+    - mongo-exporter-a:9216
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: mongodb
+      node: mongo-a
+  - targets:
+    - mongo-exporter-b:9216
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: mongodb
+      node: mongo-b
+  - targets:
+    - mongo-exporter-c:9216
+    labels:
+      env: local
+      cluster: doktori-local-data
+      service: mongodb
+      node: mongo-c
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - prometheus:9090

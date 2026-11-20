@@ -1,0 +1,647 @@
+name: doktori-ha-local
+services:
+  redis-a:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: redis-a
+    mem_limit: 192m
+    entrypoint:
+    - /bin/sh
+    - /lab/start.sh
+    environment:
+      NODE_NAME: redis-a
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run lab.py init}
+    volumes:
+    - redis-a:/data
+    - ./redis/start.sh:/lab/start.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  sentinel-a:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: sentinel-a
+    mem_limit: 64m
+    entrypoint:
+    - /bin/sh
+    - /lab/sentinel.sh
+    environment:
+      NODE_NAME: sentinel-a
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+    - sentinel-a:/data
+    - ./redis/sentinel.sh:/lab/sentinel.sh:ro
+    depends_on:
+      redis-a:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli -p 26379 ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis-exporter-a:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 64m
+    environment:
+      REDIS_ADDR: redis://redis-a:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  redis-b:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: redis-b
+    mem_limit: 192m
+    entrypoint:
+    - /bin/sh
+    - /lab/start.sh
+    environment:
+      NODE_NAME: redis-b
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run lab.py init}
+    volumes:
+    - redis-b:/data
+    - ./redis/start.sh:/lab/start.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  sentinel-b:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: sentinel-b
+    mem_limit: 64m
+    entrypoint:
+    - /bin/sh
+    - /lab/sentinel.sh
+    environment:
+      NODE_NAME: sentinel-b
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+    - sentinel-b:/data
+    - ./redis/sentinel.sh:/lab/sentinel.sh:ro
+    depends_on:
+      redis-a:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli -p 26379 ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis-exporter-b:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 64m
+    environment:
+      REDIS_ADDR: redis://redis-b:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  redis-c:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: redis-c
+    mem_limit: 192m
+    entrypoint:
+    - /bin/sh
+    - /lab/start.sh
+    environment:
+      NODE_NAME: redis-c
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run lab.py init}
+    volumes:
+    - redis-c:/data
+    - ./redis/start.sh:/lab/start.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  sentinel-c:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: sentinel-c
+    mem_limit: 64m
+    entrypoint:
+    - /bin/sh
+    - /lab/sentinel.sh
+    environment:
+      NODE_NAME: sentinel-c
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+    - sentinel-c:/data
+    - ./redis/sentinel.sh:/lab/sentinel.sh:ro
+    depends_on:
+      redis-a:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli -p 26379 ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis-exporter-c:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 64m
+    environment:
+      REDIS_ADDR: redis://redis-c:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  rabbitmq-a:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.3-management}
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: rabbitmq-a
+    mem_limit: 1g
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbitmq-a
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 2:2
+    volumes:
+    - rabbitmq-a:/var/lib/rabbitmq
+    - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - check_running
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
+    ports:
+    - 127.0.0.1:15672:15672
+  rabbitmq-b:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.3-management}
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: rabbitmq-b
+    mem_limit: 1g
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbitmq-b
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 2:2
+    volumes:
+    - rabbitmq-b:/var/lib/rabbitmq
+    - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - check_running
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
+  rabbitmq-c:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.3-management}
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: rabbitmq-c
+    mem_limit: 1g
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbitmq-c
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 2:2
+    volumes:
+    - rabbitmq-c:/var/lib/rabbitmq
+    - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - check_running
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
+  mongo-a:
+    image: ${MONGO_IMAGE:-mongo:7.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: mongo-a
+    mem_limit: 768m
+    entrypoint:
+    - /bin/bash
+    - /lab/start.sh
+    environment:
+      MONGO_REPLICA_KEY: ${MONGO_REPLICA_KEY}
+      MONGO_ADMIN_USERNAME: ${MONGO_ADMIN_USERNAME}
+      MONGO_ADMIN_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+    volumes:
+    - mongo-a:/data/db
+    - mongo-a-config:/data/configdb
+    - ./mongo/start.sh:/lab/start.sh:ro
+    - ./mongo/init.js:/lab/init.js:ro
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - 'quit(db.adminCommand({ping:1}).ok ? 0 : 1)'
+      interval: 10s
+      timeout: 5s
+      retries: 24
+  mongo-exporter-a:
+    image: ${MONGO_EXPORTER_IMAGE:-percona/mongodb_exporter:0.44.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      MONGODB_URI: mongodb://monitor:${MONGO_MONITOR_PASSWORD}@mongo-a:27017/admin?authSource=admin&directConnection=true
+    command:
+    - --collect-all
+    - --compatible-mode
+  mongo-b:
+    image: ${MONGO_IMAGE:-mongo:7.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: mongo-b
+    mem_limit: 768m
+    entrypoint:
+    - /bin/bash
+    - /lab/start.sh
+    environment:
+      MONGO_REPLICA_KEY: ${MONGO_REPLICA_KEY}
+      MONGO_ADMIN_USERNAME: ${MONGO_ADMIN_USERNAME}
+      MONGO_ADMIN_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+    volumes:
+    - mongo-b:/data/db
+    - mongo-b-config:/data/configdb
+    - ./mongo/start.sh:/lab/start.sh:ro
+    - ./mongo/init.js:/lab/init.js:ro
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - 'quit(db.adminCommand({ping:1}).ok ? 0 : 1)'
+      interval: 10s
+      timeout: 5s
+      retries: 24
+  mongo-exporter-b:
+    image: ${MONGO_EXPORTER_IMAGE:-percona/mongodb_exporter:0.44.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      MONGODB_URI: mongodb://monitor:${MONGO_MONITOR_PASSWORD}@mongo-b:27017/admin?authSource=admin&directConnection=true
+    command:
+    - --collect-all
+    - --compatible-mode
+  mongo-c:
+    image: ${MONGO_IMAGE:-mongo:7.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    hostname: mongo-c
+    mem_limit: 768m
+    entrypoint:
+    - /bin/bash
+    - /lab/start.sh
+    environment:
+      MONGO_REPLICA_KEY: ${MONGO_REPLICA_KEY}
+      MONGO_ADMIN_USERNAME: ${MONGO_ADMIN_USERNAME}
+      MONGO_ADMIN_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+    volumes:
+    - mongo-c:/data/db
+    - mongo-c-config:/data/configdb
+    - ./mongo/start.sh:/lab/start.sh:ro
+    - ./mongo/init.js:/lab/init.js:ro
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - 'quit(db.adminCommand({ping:1}).ok ? 0 : 1)'
+      interval: 10s
+      timeout: 5s
+      retries: 24
+  mongo-exporter-c:
+    image: ${MONGO_EXPORTER_IMAGE:-percona/mongodb_exporter:0.44.0}
+    profiles:
+    - mongodb
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      MONGODB_URI: mongodb://monitor:${MONGO_MONITOR_PASSWORD}@mongo-c:27017/admin?authSource=admin&directConnection=true
+    command:
+    - --collect-all
+    - --compatible-mode
+  lab-tools:
+    profiles:
+    - tools
+    image: doktori-ha-tools:local
+    build:
+      context: ./tools
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
+    networks:
+    - lab
+    mem_limit: 256m
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      MONGO_ADMIN_USERNAME: ${MONGO_ADMIN_USERNAME}
+      MONGO_ADMIN_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_MONITOR_PASSWORD: ${MONGO_MONITOR_PASSWORD}
+      RABBITMQ_MONITOR_USER: ${RABBITMQ_MONITOR_USER}
+      RABBITMQ_MONITOR_PASSWORD: ${RABBITMQ_MONITOR_PASSWORD}
+    volumes:
+    - ./tools/setup_observability.py:/setup-observability.py:ro
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.5.0}
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 384m
+    ports:
+    - 127.0.0.1:19090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.retention.time=6h
+    - --web.enable-remote-write-receiver
+    volumes:
+    - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    - prometheus:/prometheus
+    - ./observability/generated/rules.yml:/etc/prometheus/data-ha/rules.yml:ro
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:12.2.0}
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 384m
+    ports:
+    - 127.0.0.1:13000:3000
+    environment:
+      GF_SECURITY_ADMIN_USER: lab
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+    volumes:
+    - ./observability/grafana:/etc/grafana/provisioning:ro
+    - grafana:/var/lib/grafana
+  sentinel-exporter-a:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      REDIS_ADDR: redis://sentinel-a:26379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  quorum-exporter-a:
+    image: doktori-ha-tools:local
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    entrypoint:
+    - python
+    - /observer.py
+    volumes:
+    - ../../scripts/data-ha/quorum_exporter.py:/observer.py:ro
+    environment:
+      RABBITMQ_API_URL: http://rabbitmq-a:15672
+      RABBITMQ_MONITOR_USER: ${RABBITMQ_MONITOR_USER}
+      RABBITMQ_MONITOR_PASSWORD: ${RABBITMQ_MONITOR_PASSWORD}
+  sentinel-exporter-b:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      REDIS_ADDR: redis://sentinel-b:26379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  quorum-exporter-b:
+    image: doktori-ha-tools:local
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    entrypoint:
+    - python
+    - /observer.py
+    volumes:
+    - ../../scripts/data-ha/quorum_exporter.py:/observer.py:ro
+    environment:
+      RABBITMQ_API_URL: http://rabbitmq-b:15672
+      RABBITMQ_MONITOR_USER: ${RABBITMQ_MONITOR_USER}
+      RABBITMQ_MONITOR_PASSWORD: ${RABBITMQ_MONITOR_PASSWORD}
+  sentinel-exporter-c:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.67.0}
+    profiles:
+    - redis
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    environment:
+      REDIS_ADDR: redis://sentinel-c:26379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  quorum-exporter-c:
+    image: doktori-ha-tools:local
+    profiles:
+    - rabbitmq
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    entrypoint:
+    - python
+    - /observer.py
+    volumes:
+    - ../../scripts/data-ha/quorum_exporter.py:/observer.py:ro
+    environment:
+      RABBITMQ_API_URL: http://rabbitmq-c:15672
+      RABBITMQ_MONITOR_USER: ${RABBITMQ_MONITOR_USER}
+      RABBITMQ_MONITOR_PASSWORD: ${RABBITMQ_MONITOR_PASSWORD}
+  alert-receiver:
+    image: doktori-ha-tools:local
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 64m
+    entrypoint:
+    - python
+    - /receiver.py
+    volumes:
+    - ./tools/alert_receiver.py:/receiver.py:ro
+    ports:
+    - 127.0.0.1:18081:8081
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.28.1}
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 96m
+    ports:
+    - 127.0.0.1:19093:9093
+    command:
+    - --config.file=/etc/alertmanager/alertmanager.yml
+    - --storage.path=/alertmanager
+    volumes:
+    - ./observability/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+    - alertmanager:/alertmanager
+  loki:
+    image: ${LOKI_IMAGE:-grafana/loki:3.6.5}
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 384m
+    ports:
+    - 127.0.0.1:13100:3100
+    command:
+    - -config.file=/etc/loki/config.yaml
+    volumes:
+    - ./observability/loki.yaml:/etc/loki/config.yaml:ro
+    - loki:/loki
+  alloy:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.15.0}
+    profiles:
+    - observability
+    restart: unless-stopped
+    networks:
+    - lab
+    mem_limit: 192m
+    ports:
+    - 127.0.0.1:12345:12345
+    command:
+    - run
+    - --storage.path=/var/lib/alloy/data
+    - --server.http.listen-addr=0.0.0.0:12345
+    - /etc/alloy/config.alloy
+    volumes:
+    - ./observability/logs.alloy:/etc/alloy/config.alloy:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - alloy:/var/lib/alloy/data
+networks:
+  lab: {}
+volumes:
+  redis-a: {}
+  sentinel-a: {}
+  redis-b: {}
+  sentinel-b: {}
+  redis-c: {}
+  sentinel-c: {}
+  rabbitmq-a: {}
+  rabbitmq-b: {}
+  rabbitmq-c: {}
+  mongo-a: {}
+  mongo-a-config: {}
+  mongo-b: {}
+  mongo-b-config: {}
+  mongo-c: {}
+  mongo-c-config: {}
+  prometheus: {}
+  grafana: {}
+  alertmanager: {}
+  loki: {}
+  alloy: {}

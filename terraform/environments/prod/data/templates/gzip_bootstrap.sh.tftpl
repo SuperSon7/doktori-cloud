@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Expanded script is streamed, not logged. Runtime credentials still come from SSM.
+printf '%s' '${payload}' | base64 --decode | gzip --decompress | bash

@@ -1,0 +1,126 @@
+{
+  "env": "prod",
+  "cluster": "doktori-prod-data",
+  "targets": [
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-a"
+    },
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-b"
+    },
+    {
+      "job": "redis",
+      "service": "redis",
+      "node": "redis-c"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-a"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-b"
+    },
+    {
+      "job": "redis-sentinel",
+      "service": "redis",
+      "node": "redis-c"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-a"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-b"
+    },
+    {
+      "job": "rabbitmq",
+      "service": "rabbitmq",
+      "node": "rabbitmq-c"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-a"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-b"
+    },
+    {
+      "job": "rabbitmq-quorum",
+      "service": "rabbitmq",
+      "node": "rabbitmq-c"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongodb"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongodb-b"
+    },
+    {
+      "job": "mongodb",
+      "service": "mongodb",
+      "node": "mongodb-c"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "mongodb",
+      "node": "mongodb"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "mongodb",
+      "node": "mongodb-b"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "mongodb",
+      "node": "mongodb-c"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "rabbitmq",
+      "node": "rabbitmq-a"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "rabbitmq",
+      "node": "rabbitmq-b"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "rabbitmq",
+      "node": "rabbitmq-c"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "redis",
+      "node": "redis-a"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "redis",
+      "node": "redis-b"
+    },
+    {
+      "job": "data-ha-alloy",
+      "service": "redis",
+      "node": "redis-c"
+    }
+  ]
+}

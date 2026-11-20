@@ -93,13 +93,13 @@ variable "redis_version" {
 variable "rabbitmq_version" {
   description = "RabbitMQ server 메이저.마이너 버전"
   type        = string
-  default     = "3.13"
+  default     = "4.3"
 }
 
 variable "erlang_version" {
   description = "Erlang/OTP 메이저 버전 (RabbitMQ 의존성)"
   type        = string
-  default     = "26"
+  default     = "27"
 }
 
 variable "mongodb_version" {
@@ -125,4 +125,34 @@ variable "alloy_version" {
 # -----------------------------------------------------------------------------
 locals {
   timestamp = formatdate("YYYYMMDD-hhmm", timestamp())
+}
+
+# Data HA image runner uses a reviewed base AMI and a per-run artifact folder.
+variable "data_ha_source_ami" {
+  type    = string
+  default = ""
+  validation {
+    condition     = var.data_ha_source_ami == "" || can(regex("^ami-([0-9a-f]{8}|[0-9a-f]{17})$", var.data_ha_source_ami))
+    error_message = "Use a concrete reviewed Ubuntu 22.04 ARM64 AMI ID."
+  }
+}
+
+variable "data_ha_manifest_dir" {
+  type    = string
+  default = "packer"
+}
+
+variable "data_ha_build_id" {
+  type    = string
+  default = "manual"
+}
+
+variable "data_ha_vpc_id" {
+  type    = string
+  default = ""
+}
+
+variable "data_ha_subnet_id" {
+  type    = string
+  default = ""
 }

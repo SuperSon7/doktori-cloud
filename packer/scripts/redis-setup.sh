@@ -71,11 +71,7 @@ install_redis() {
     exit 1
   fi
 
-  # bind: 127.0.0.1 → 0.0.0.0 (접근 제어는 SG에서)
-  # sed는 멱등 — 이미 0.0.0.0이면 패턴 불일치로 무변환
-  sed -i 's/^bind 127\.0\.0\.1 -::1$/bind 0.0.0.0/' /etc/redis/redis.conf
-  sed -i 's/^protected-mode yes$/protected-mode no/' /etc/redis/redis.conf
-
+  # Keep package loopback/protected-mode defaults; EC2 bootstrap owns auth/bind.
   systemctl enable redis-server
   systemctl start redis-server
 }

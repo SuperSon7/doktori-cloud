@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "name": "mongodb",
+      "builder_type": "amazon-ebs",
+      "build_time": 1794890359,
+      "files": null,
+      "artifact_id": "ap-northeast-2:ami-0955e2290aaef0c4a",
+      "packer_run_uuid": "c5dcbf3e-3111-aef6-2b25-c23325be9ca8",
+      "custom_data": {
+        "architecture": "arm64",
+        "base_ami": "ami-027a983d4f876605c",
+        "build_run": "20261117T042307Z-46ae9273",
+        "data_ha_service": "mongodb"
+      }
+    }
+  ],
+  "last_run_uuid": "c5dcbf3e-3111-aef6-2b25-c23325be9ca8"
+}

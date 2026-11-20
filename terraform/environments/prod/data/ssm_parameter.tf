@@ -36,7 +36,7 @@ resource "aws_ssm_parameter" "spring_redis_password" {
 }
 
 resource "aws_ssm_parameter" "spring_redis_sentinel_master" {
-  count = var.enable_data_ha ? 1 : 0
+  count = local.redis_ha_enabled ? 1 : 0
 
   name  = "/${var.project_name}/${var.environment}/SPRING_REDIS_SENTINEL_MASTER"
   type  = "String"
@@ -45,7 +45,7 @@ resource "aws_ssm_parameter" "spring_redis_sentinel_master" {
 }
 
 resource "aws_ssm_parameter" "spring_redis_sentinel_nodes" {
-  count = var.enable_data_ha ? 1 : 0
+  count = local.redis_ha_enabled ? 1 : 0
 
   name  = "/${var.project_name}/${var.environment}/SPRING_REDIS_SENTINEL_NODES"
   type  = "String"
@@ -110,9 +110,18 @@ resource "aws_ssm_parameter" "ai_db_url" {
 resource "aws_ssm_parameter" "mongo_uri" {
   name             = "/${var.project_name}/${var.environment}/MONGO_URI"
   type             = "SecureString"
-  value_wo         = "mongodb://${local.mongo_username}:${ephemeral.aws_ssm_parameter.mongo_password.value}@mongodb.${local.net.internal_zone_name}:27017/${local.mongo_db_name}?authSource=admin"
-  value_wo_version = 1
+  value_wo         = "mongodb://${local.mongo_username}:${ephemeral.aws_ssm_parameter.mongo_password.value}@${join(",", local.mongodb_hosts)}/${local.mongo_db_name}?${local.mongodb_uri_options}"
+  value_wo_version = local.mongodb_ha_enabled ? 2 : 1
   tags             = { Name = "${var.project_name}-${var.environment}-MONGO_URI" }
+}
+
+resource "aws_ssm_parameter" "mongo_replica_key" {
+  count            = local.mongodb_ha_enabled ? 1 : 0
+  name             = "/${var.project_name}/${var.environment}/MONGO_REPLICA_KEY"
+  type             = "SecureString"
+  value_wo         = ephemeral.random_password.mongo_replica_key.result
+  value_wo_version = 1
+  tags             = { Name = "${var.project_name}-${var.environment}-MONGO_REPLICA_KEY" }
 }
 
 # Spring JDBC URL (패스워드 없음 — Spring은 DB_PASSWORD를 별도로 읽음)

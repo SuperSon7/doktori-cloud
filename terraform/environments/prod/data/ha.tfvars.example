@@ -1,0 +1,9 @@
+# 참고용 예시다. 기본값은 단일 노드를 유지하며 서비스 하나씩 전환한다.
+enable_redis_ha    = true
+enable_rabbitmq_ha = false
+enable_mongodb_ha  = false
+ha_ami_ids = {
+  redis = "REPLACE_WITH_REVIEWED_AMI_ID"
+}
+# 최초 구성에만 사용한다. HA 성립 후 false로 바꾸면 교체 노드는 Sentinel에서 현재 primary를 찾는다.
+allow_redis_initial_primary = true

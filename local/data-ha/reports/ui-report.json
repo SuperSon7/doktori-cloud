@@ -1,0 +1,11 @@
+{
+  "browser": "157.0.8103.79",
+  "datasource_errors": [],
+  "logs_panel_visible": true,
+  "screenshots": [
+    "overview.png",
+    "replication.png",
+    "logs.png"
+  ],
+  "scope": "local Grafana; external requests blocked; native EC2 not tested"
+}

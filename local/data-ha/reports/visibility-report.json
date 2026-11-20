@@ -1,0 +1,184 @@
+{
+  "checked_at": "2026-11-17T07:43:20.505059+00:00",
+  "expected_and_ready": {
+    "rabbitmq": 3,
+    "redis": 3,
+    "redis-sentinel": 3,
+    "mongodb": 3,
+    "rabbitmq-quorum": 3,
+    "data-ha-alloy": 1
+  },
+  "queries": {
+    "doktori_ha:redis_primary_count": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:redis_primary_count",
+          "cluster": "doktori-local-data",
+          "env": "local"
+        },
+        "value": 1.0
+      }
+    ],
+    "doktori_ha:sentinel_quorum": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:sentinel_quorum",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "node": "redis-c"
+        },
+        "value": 1.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_ha:sentinel_quorum",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "node": "redis-b"
+        },
+        "value": 1.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_ha:sentinel_quorum",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "node": "redis-a"
+        },
+        "value": 1.0
+      }
+    ],
+    "doktori_ha:mq_online_members": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:mq_online_members",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "queue": "notification.delivery.queue",
+          "vhost": "/"
+        },
+        "value": 3.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_ha:mq_online_members",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "queue": "notification.delivery.wait.v2",
+          "vhost": "/"
+        },
+        "value": 3.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_ha:mq_online_members",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "queue": "notification.delivery.dlq",
+          "vhost": "/"
+        },
+        "value": 3.0
+      }
+    ],
+    "doktori_rabbitmq_probe_success": [
+      {
+        "labels": {
+          "__name__": "doktori_rabbitmq_probe_success",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "instance": "quorum-exporter-b:9419",
+          "job": "rabbitmq-quorum",
+          "node": "rabbitmq-b",
+          "service": "rabbitmq"
+        },
+        "value": 1.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_rabbitmq_probe_success",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "instance": "quorum-exporter-c:9419",
+          "job": "rabbitmq-quorum",
+          "node": "rabbitmq-c",
+          "service": "rabbitmq"
+        },
+        "value": 1.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_rabbitmq_probe_success",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "instance": "quorum-exporter-a:9419",
+          "job": "rabbitmq-quorum",
+          "node": "rabbitmq-a",
+          "service": "rabbitmq"
+        },
+        "value": 1.0
+      }
+    ],
+    "doktori_ha:mongo_primary_count": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:mongo_primary_count",
+          "cluster": "doktori-local-data",
+          "env": "local"
+        },
+        "value": 1.0
+      }
+    ],
+    "doktori_ha:mongo_data_members": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:mongo_data_members",
+          "cluster": "doktori-local-data",
+          "env": "local"
+        },
+        "value": 3.0
+      }
+    ],
+    "doktori_ha:mongo_lag_seconds": [
+      {
+        "labels": {
+          "__name__": "doktori_ha:mongo_lag_seconds",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "node": "mongo-a"
+        },
+        "value": 10.0
+      },
+      {
+        "labels": {
+          "__name__": "doktori_ha:mongo_lag_seconds",
+          "cluster": "doktori-local-data",
+          "env": "local",
+          "node": "mongo-c"
+        },
+        "value": 0.0
+      }
+    ]
+  },
+  "rules": 56,
+  "rule_errors": 0,
+  "firing_alerts": 0,
+  "log_services": [
+    "redis",
+    "rabbitmq",
+    "mongodb"
+  ],
+  "grafana": {
+    "uid": "doktori-data-ha",
+    "panels": 21,
+    "datasources": [
+      "local-prom",
+      "local-loki"
+    ]
+  },
+  "scope": "local metrics/logs/alerts only; no failover, message delivery or EC2 bootstrap test",
+  "synthetic_alert_delivery": {
+    "firing": true,
+    "resolved": true,
+    "receiver": "local in-memory evidence sink; no external notification"
+  }
+}

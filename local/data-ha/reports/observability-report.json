@@ -1,0 +1,30 @@
+{
+  "redis_up": {
+    "series": 3,
+    "status": "present"
+  },
+  "redis_connected_slaves": {
+    "series": 3,
+    "status": "present"
+  },
+  "up{job=\"rabbitmq\"}": {
+    "series": 3,
+    "status": "present"
+  },
+  "rabbitmq_queue_messages_ready": {
+    "series": 3,
+    "status": "present"
+  },
+  "mongodb_up": {
+    "series": 3,
+    "status": "present"
+  },
+  "mongodb_ss_connections{conn_type=\"current\"}": {
+    "series": 3,
+    "status": "present"
+  },
+  "grafana": {
+    "uid": "doktori-local-ha",
+    "panels": 6
+  }
+}

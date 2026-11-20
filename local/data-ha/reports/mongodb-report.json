@@ -1,0 +1,48 @@
+{
+  "stage": "mongodb",
+  "time": "2026-11-17T02:42:50.801025+00:00",
+  "checks": {
+    "server_version": "7.0.48",
+    "set": "doktori-rs",
+    "members": [
+      {
+        "name": "mongo-a:27017",
+        "state": "PRIMARY",
+        "health": 1.0
+      },
+      {
+        "name": "mongo-b:27017",
+        "state": "SECONDARY",
+        "health": 1.0
+      },
+      {
+        "name": "mongo-c:27017",
+        "state": "SECONDARY",
+        "health": 1.0
+      }
+    ],
+    "majority_journal_write_read": true,
+    "indexes": [
+      "_id_",
+      "uk_room_sender_client",
+      "idx_room_id",
+      "idx_round_id"
+    ],
+    "note": "No election, unknown-result retry, restore, or application E2E tested"
+  },
+  "monitoring_targets": [
+    {
+      "target": "mongo-exporter-a:9216",
+      "health": "up"
+    },
+    {
+      "target": "mongo-exporter-b:9216",
+      "health": "up"
+    },
+    {
+      "target": "mongo-exporter-c:9216",
+      "health": "up"
+    }
+  ],
+  "scope": "Docker Desktop only; no failover, AZ, cloud, backup restore or application E2E"
+}

@@ -1,0 +1,161 @@
+{
+  "date": "2026-11-17",
+  "account": "864981723913",
+  "profile": "default",
+  "region": "ap-northeast-2",
+  "base_ami": "ami-027a983d4f876605c",
+  "base_owner": "099720109477",
+  "images": [
+    {
+      "service": "mongodb",
+      "version_observed_in_build": "7.0.48",
+      "image_id": "ami-0955e2290aaef0c4a",
+      "state": "available",
+      "private": true,
+      "architecture": "arm64",
+      "build_run": "20261117T042307Z-46ae9273",
+      "snapshot_ids": [
+        "snap-0c8f806153f7d9fe1"
+      ]
+    },
+    {
+      "service": "redis",
+      "version_observed_in_build": "7.2.17",
+      "image_id": "ami-07452ead0a1e20624",
+      "state": "available",
+      "private": true,
+      "architecture": "arm64",
+      "build_run": "20261117T034621Z-797a46e1",
+      "snapshot_ids": [
+        "snap-013eda4869463a011"
+      ]
+    },
+    {
+      "service": "rabbitmq",
+      "version_observed_in_build": "4.3.8",
+      "image_id": "ami-0e3901cd474260415",
+      "state": "available",
+      "private": true,
+      "architecture": "arm64",
+      "build_run": "20261117T040648Z-893d8886",
+      "snapshot_ids": [
+        "snap-09cea5482388d3eca"
+      ]
+    }
+  ],
+  "cleanup_audits": [
+    {
+      "account": "864981723913",
+      "region": "ap-northeast-2",
+      "build_run": "20261117T034621Z-797a46e1",
+      "active_instances": [],
+      "terminated_instances": [
+        "i-082817e4f26adaebe",
+        "i-0b28e64a2becfd90d"
+      ],
+      "temporary_volumes": [],
+      "temporary_security_groups": [],
+      "temporary_key_pairs": [],
+      "temporary_network_interfaces": [],
+      "named_temporary_security_groups": [],
+      "named_temporary_key_pairs": [],
+      "retained_images": [
+        {
+          "ImageId": "ami-07452ead0a1e20624",
+          "State": "available",
+          "Public": false,
+          "Architecture": "arm64",
+          "Name": "doktori-ha-redis-arm64-20261117-0346-20261117T034621Z-797a46e1"
+        }
+      ],
+      "retained_image_snapshots": [
+        "snap-013eda4869463a011"
+      ],
+      "unreferenced_tagged_snapshots": [],
+      "scope": "exact build-run tag; read-only; no delete/terminate/Terraform calls",
+      "temporary_resources_clean": true
+    },
+    {
+      "account": "864981723913",
+      "region": "ap-northeast-2",
+      "build_run": "20261117T040648Z-893d8886",
+      "active_instances": [],
+      "terminated_instances": [
+        "i-090e4b4ec39bf4a80"
+      ],
+      "temporary_volumes": [],
+      "temporary_security_groups": [],
+      "temporary_key_pairs": [],
+      "temporary_network_interfaces": [],
+      "named_temporary_security_groups": [],
+      "named_temporary_key_pairs": [],
+      "retained_images": [
+        {
+          "ImageId": "ami-0e3901cd474260415",
+          "State": "available",
+          "Public": false,
+          "Architecture": "arm64",
+          "Name": "doktori-ha-rabbitmq-arm64-20261117-0406-20261117T040648Z-893d8886"
+        }
+      ],
+      "retained_image_snapshots": [
+        "snap-09cea5482388d3eca"
+      ],
+      "unreferenced_tagged_snapshots": [],
+      "scope": "exact build-run tag; read-only; no delete/terminate/Terraform calls",
+      "temporary_resources_clean": true
+    },
+    {
+      "account": "864981723913",
+      "region": "ap-northeast-2",
+      "build_run": "20261117T042307Z-46ae9273",
+      "active_instances": [],
+      "terminated_instances": [
+        "i-0bdea8a288c3a98ea"
+      ],
+      "temporary_volumes": [],
+      "temporary_security_groups": [],
+      "temporary_key_pairs": [],
+      "temporary_network_interfaces": [],
+      "named_temporary_security_groups": [],
+      "named_temporary_key_pairs": [],
+      "retained_images": [
+        {
+          "ImageId": "ami-0955e2290aaef0c4a",
+          "State": "available",
+          "Public": false,
+          "Architecture": "arm64",
+          "Name": "doktori-ha-mongodb-arm64-20261117-0423-20261117T042307Z-46ae9273"
+        }
+      ],
+      "retained_image_snapshots": [
+        "snap-0c8f806153f7d9fe1"
+      ],
+      "unreferenced_tagged_snapshots": [],
+      "scope": "exact build-run tag; read-only; no delete/terminate/Terraform calls",
+      "temporary_resources_clean": true
+    }
+  ],
+  "ha_services_deployed": false,
+  "new_ami_boot_or_ha_failover_tested": false,
+  "snapshots": [
+    {
+      "SnapshotId": "snap-0c8f806153f7d9fe1",
+      "State": "completed",
+      "Encrypted": true,
+      "VolumeSize": 12
+    },
+    {
+      "SnapshotId": "snap-013eda4869463a011",
+      "State": "completed",
+      "Encrypted": true,
+      "VolumeSize": 12
+    },
+    {
+      "SnapshotId": "snap-09cea5482388d3eca",
+      "State": "completed",
+      "Encrypted": true,
+      "VolumeSize": 12
+    }
+  ]
+}

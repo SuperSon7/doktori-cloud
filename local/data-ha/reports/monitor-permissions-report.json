@@ -1,0 +1,8 @@
+{
+  "scope": "local owned disposable classic queue",
+  "queue_configuration_denied": true,
+  "publish_denied": true,
+  "get_denied": true,
+  "owned_queue_deleted": true,
+  "application_messages_touched": false
+}

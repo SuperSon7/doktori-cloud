@@ -1,0 +1,9 @@
+# No external delivery target is configured. Add one only after a review.
+route:
+  receiver: review-no-external
+  group_by: [alertname, env, cluster]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: review-no-external

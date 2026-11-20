@@ -1,0 +1,6 @@
+.runtime/
+__pycache__/
+!inventory.example.json
+!generated/dashboard.json
+!verification.json
+!evidence/*.png

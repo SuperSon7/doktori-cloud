@@ -1,0 +1,5 @@
+# Native cloud-init scripts must remain executable when authored on Windows.
+terraform/environments/prod/data/templates/*.tftpl text eol=lf
+scripts/data-ha/*.sh text eol=lf
+scripts/data-ha/*.py text eol=lf
+monitoring/data-ha/*.py text eol=lf

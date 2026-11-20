@@ -1,0 +1,91 @@
+discovery.docker "ha" {
+  host = "unix:///var/run/docker.sock"
+  filter {
+    name = "label"
+    values = ["com.docker.compose.project=doktori-ha-local"]
+  }
+}
+discovery.relabel "ha_logs" {
+  targets = discovery.docker.ha.targets
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex = "(redis|sentinel|rabbitmq|mongo)-[abc]"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label = "node"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex = "(redis|sentinel|rabbitmq|mongo)-[abc]"
+    replacement = "$1"
+    target_label = "service"
+  }
+  rule {
+    source_labels = ["service"]
+    regex = "sentinel"
+    replacement = "redis"
+    target_label = "service"
+  }
+  rule {
+    source_labels = ["service"]
+    regex = "mongo"
+    replacement = "mongodb"
+    target_label = "service"
+  }
+  rule {
+  target_label = "env"
+  replacement = "local"
+}
+  rule {
+  target_label = "cluster"
+  replacement = "doktori-local-data"
+}
+  rule {
+  target_label = "job"
+  replacement = "data-ha-logs"
+}
+}
+loki.source.docker "ha" {
+  labels = {}
+  host = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.ha_logs.output
+  forward_to = [loki.write.local.receiver]
+}
+loki.write "local" {
+  endpoint { url = "http://loki:3100/loki/api/v1/push" }
+}
+prometheus.exporter.self "agent" {}
+prometheus.scrape "agent" {
+  job_name = "data-ha-alloy"
+  targets = prometheus.exporter.self.agent.targets
+  scrape_interval = "15s"
+  forward_to = [prometheus.relabel.agent.receiver]
+}
+prometheus.relabel "agent" {
+  rule {
+    target_label = "job"
+    replacement = "data-ha-alloy"
+  }
+  forward_to = [prometheus.remote_write.local.receiver]
+  rule {
+  target_label = "env"
+  replacement = "local"
+}
+  rule {
+  target_label = "cluster"
+  replacement = "doktori-local-data"
+}
+  rule {
+  target_label = "node"
+  replacement = "local-alloy"
+}
+  rule {
+  target_label = "service"
+  replacement = "observability"
+}
+}
+prometheus.remote_write "local" {
+  endpoint { url = "http://prometheus:9090/api/v1/write" }
+}

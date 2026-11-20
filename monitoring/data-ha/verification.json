@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-11-17T08:05:38.664058+00:00",
+  "local_expected_and_ready_targets": 16,
+  "local_database_exporter_targets": 15,
+  "local_alloy_heartbeat": 1,
+  "native_example_targets": 24,
+  "alert_rules": 29,
+  "recording_rules": 11,
+  "grafana_panels": 21,
+  "promtool_synthetic_cases": 18,
+  "python_unit_tests": 22,
+  "quorum_collector_unit_tests_included": 7,
+  "isolated_inventory_plan_cases": 5,
+  "rendered_bootstrap_alloy_and_gzip_cases": 11,
+  "native_exporter_local_contracts": [
+    "redis including sentinel",
+    "mongodb"
+  ],
+  "local_metrics_logs_and_firing_resolved": true,
+  "local_mq_monitor_permission_denials": true,
+  "ui_visual_review": true,
+  "browser": "157.0.8103.79",
+  "ui_datasource_errors": 0,
+  "external_browser_requests": "blocked",
+  "local_stack_left_running": true,
+  "cloud_execution_this_task": false,
+  "new_ami_bake": false,
+  "native_bootstrap_journal_or_roles_executed": false,
+  "failover_az_restore_load_or_business_e2e_tested": false,
+  "external_human_notification_sent": false
+}

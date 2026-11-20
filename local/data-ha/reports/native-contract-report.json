@@ -1,0 +1,32 @@
+{
+  "redis": {
+    "expected_jobs": [
+      "data-ha-alloy",
+      "data-ha-host",
+      "redis",
+      "redis-sentinel"
+    ],
+    "actual_jobs": [
+      "data-ha-alloy",
+      "data-ha-host",
+      "redis",
+      "redis-sentinel"
+    ]
+  },
+  "mongodb": {
+    "expected_jobs": [
+      "data-ha-alloy",
+      "data-ha-host",
+      "mongodb"
+    ],
+    "actual_jobs": [
+      "data-ha-alloy",
+      "data-ha-host",
+      "mongodb"
+    ]
+  },
+  "redis_actual_role": "master",
+  "mongodb_self_state": 2.0,
+  "cloud_bootstrap_executed": false,
+  "journal_collection_tested": false
+}

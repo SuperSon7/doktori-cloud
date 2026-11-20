@@ -1,0 +1,8 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: chat
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod,redis-sentinel

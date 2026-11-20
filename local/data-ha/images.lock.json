@@ -1,0 +1,70 @@
+{
+  "images": {
+    "REDIS_IMAGE": {
+      "tag": "redis:7.2-alpine",
+      "digest": "redis@sha256:2f66de68111e64c3927859f158f8e666066dae2b97d9f82770a6f37a5aa1c335",
+      "image_id": "sha256:2f66de68111e64c3927859f158f8e666066dae2b97d9f82770a6f37a5aa1c335",
+      "architecture": "amd64"
+    },
+    "RABBITMQ_IMAGE": {
+      "tag": "rabbitmq:4.3-management",
+      "digest": "rabbitmq@sha256:8e913a7748f808be4ce117c3df11817935775bcd83934d4de92441a7e93e9899",
+      "image_id": "sha256:8e913a7748f808be4ce117c3df11817935775bcd83934d4de92441a7e93e9899",
+      "architecture": "amd64"
+    },
+    "MONGO_IMAGE": {
+      "tag": "mongo:7.0",
+      "digest": "mongo@sha256:884c055bff8b7144ca44830d01826facd3083b33c4dea44b94a1476c62de3c32",
+      "image_id": "sha256:884c055bff8b7144ca44830d01826facd3083b33c4dea44b94a1476c62de3c32",
+      "architecture": "amd64"
+    },
+    "REDIS_EXPORTER_IMAGE": {
+      "tag": "oliver006/redis_exporter:v1.67.0",
+      "digest": "oliver006/redis_exporter@sha256:120f7ec77293459ccfdad66bb1db75ab72e8bfeab99f58b1cc2564cadcd7a9e7",
+      "image_id": "sha256:120f7ec77293459ccfdad66bb1db75ab72e8bfeab99f58b1cc2564cadcd7a9e7",
+      "architecture": "amd64"
+    },
+    "MONGO_EXPORTER_IMAGE": {
+      "tag": "percona/mongodb_exporter:0.44.0",
+      "digest": "percona/mongodb_exporter@sha256:d9c577166068197bf6908296d9742cc8267e7b7e1054199436d6d922e8921679",
+      "image_id": "sha256:d9c577166068197bf6908296d9742cc8267e7b7e1054199436d6d922e8921679",
+      "architecture": "amd64"
+    },
+    "PROMETHEUS_IMAGE": {
+      "tag": "prom/prometheus:v3.5.0",
+      "digest": "prom/prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "image_id": "sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "architecture": "amd64"
+    },
+    "GRAFANA_IMAGE": {
+      "tag": "grafana/grafana:12.2.0",
+      "digest": "grafana/grafana@sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7",
+      "image_id": "sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7",
+      "architecture": "amd64"
+    },
+    "PYTHON_IMAGE": {
+      "tag": "python:3.12-slim",
+      "digest": "python@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b",
+      "image_id": "sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b",
+      "architecture": "amd64"
+    },
+    "ALERTMANAGER_IMAGE": {
+      "tag": "prom/alertmanager:v0.28.1",
+      "digest": "prom/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "image_id": "sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "architecture": "amd64"
+    },
+    "LOKI_IMAGE": {
+      "tag": "grafana/loki:3.6.5",
+      "digest": "grafana/loki@sha256:847c287ada0e12603910589f42038c5cdaaad04e248bd1dc6c6e0920a235f427",
+      "image_id": "sha256:847c287ada0e12603910589f42038c5cdaaad04e248bd1dc6c6e0920a235f427",
+      "architecture": "amd64"
+    },
+    "ALLOY_IMAGE": {
+      "tag": "grafana/alloy:v1.15.0",
+      "digest": "grafana/alloy@sha256:579582bce40049f2e27bd1e445000689c907a41f0495cb0d0c7f65609316ba7c",
+      "image_id": "sha256:579582bce40049f2e27bd1e445000689c907a41f0495cb0d0c7f65609316ba7c",
+      "architecture": "amd64"
+    }
+  }
+}

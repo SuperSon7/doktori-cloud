@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "name": "redis",
+      "builder_type": "amazon-ebs",
+      "build_time": 1794888064,
+      "files": null,
+      "artifact_id": "ap-northeast-2:ami-07452ead0a1e20624",
+      "packer_run_uuid": "42d2f248-e825-699e-4c93-bc23c5ab6738",
+      "custom_data": {
+        "architecture": "arm64",
+        "base_ami": "ami-027a983d4f876605c",
+        "build_run": "20261117T034621Z-797a46e1",
+        "data_ha_service": "redis"
+      }
+    }
+  ],
+  "last_run_uuid": "42d2f248-e825-699e-4c93-bc23c5ab6738"
+}

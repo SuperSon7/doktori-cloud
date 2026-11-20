@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "name": "rabbitmq",
+      "builder_type": "amazon-ebs",
+      "build_time": 1794889376,
+      "files": null,
+      "artifact_id": "ap-northeast-2:ami-0e3901cd474260415",
+      "packer_run_uuid": "c7e7bf67-b707-41f2-4313-c75bd1ecef90",
+      "custom_data": {
+        "architecture": "arm64",
+        "base_ami": "ami-027a983d4f876605c",
+        "build_run": "20261117T040648Z-893d8886",
+        "data_ha_service": "rabbitmq"
+      }
+    }
+  ],
+  "last_run_uuid": "c7e7bf67-b707-41f2-4313-c75bd1ecef90"
+}

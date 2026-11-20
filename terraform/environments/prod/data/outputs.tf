@@ -38,13 +38,19 @@ output "data_services" {
     private_ips  = module.data_compute.private_ips
     dns = {
       redis             = aws_route53_record.redis.fqdn
-      redis_sentinel    = var.enable_data_ha ? aws_route53_record.redis_sentinel[0].fqdn : null
+      redis_sentinel    = local.redis_ha_enabled ? aws_route53_record.redis_sentinel[0].fqdn : null
       rabbitmq          = aws_route53_record.rabbitmq.fqdn
       mongodb           = aws_route53_record.data_service["mongodb"].fqdn
       redis_nodes       = { for key in local.redis_service_keys : key => aws_route53_record.data_service[key].fqdn }
       rabbitmq_nodes    = { for key in local.rabbitmq_service_keys : key => aws_route53_record.data_service[key].fqdn }
+      mongodb_nodes     = { for key in local.mongodb_service_keys : key => aws_route53_record.data_service[key].fqdn }
       redis_master_name = local.redis_sentinel_master
-      ha_enabled        = var.enable_data_ha
+      ha_enabled        = local.redis_ha_enabled && local.rabbitmq_ha_enabled
+      ha = {
+        redis    = local.redis_ha_enabled
+        rabbitmq = local.rabbitmq_ha_enabled
+        mongodb  = local.mongodb_ha_enabled
+      }
     }
   }
 }

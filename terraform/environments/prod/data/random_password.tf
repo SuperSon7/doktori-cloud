@@ -15,3 +15,8 @@ ephemeral "random_password" "redis" {
   length  = 24
   special = false
 }
+
+ephemeral "random_password" "mongo_replica_key" {
+  length  = 96
+  special = false
+}

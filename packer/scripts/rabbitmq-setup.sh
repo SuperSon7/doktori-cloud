@@ -3,16 +3,16 @@
 # RabbitMQ AMI Setup — Erlang + RabbitMQ + management/prometheus plugins + Alloy + AWS CLI + SSM
 #
 # Packer provisioner로 실행됨
-# 환경변수: RABBITMQ_VERSION (e.g. "3.13"), ERLANG_VERSION (메이저, e.g. "26")
+# 환경변수: RABBITMQ_VERSION (e.g. "4.3"), ERLANG_VERSION (메이저, e.g. "27")
 #
 # 공식 권장 방식:
-# - arm64 Erlang 26: Team RabbitMQ Launchpad PPA
+# - arm64 Erlang 27: Team RabbitMQ Launchpad PPA
 # - RabbitMQ server: Team RabbitMQ apt repository
 # =============================================================================
 set -Eeuo pipefail
 
-RABBITMQ_VERSION="${RABBITMQ_VERSION:-3.13}"
-ERLANG_VERSION="${ERLANG_VERSION:-26}"
+RABBITMQ_VERSION="${RABBITMQ_VERSION:-4.3}"
+ERLANG_VERSION="${ERLANG_VERSION:-27}"
 ALLOY_VERSION="${ALLOY_VERSION:-1.15.0}"
 
 log() { echo "[rabbitmq-setup] $*"; }
@@ -57,7 +57,9 @@ install_erlang() {
 
   case "$ERLANG_VERSION" in
     26) erlang_ppa="rabbitmq-erlang-26" ;;
-    27) erlang_ppa="rabbitmq-erlang-27" ;;
+    # Team RabbitMQ's current install guide uses this PPA for OTP 27.
+    # The versioned -27 Jammy arm64 index has no erlang-base package.
+    27) erlang_ppa="rabbitmq-erlang" ;;
     *)
       log "지원하지 않는 Erlang major version: ${ERLANG_VERSION} (Launchpad PPA 매핑 없음)"
       exit 1

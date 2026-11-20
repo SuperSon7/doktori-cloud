@@ -1,0 +1,54 @@
+storage:
+  tsdb:
+    out_of_order_time_window: 1h
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+rule_files:
+- /etc/prometheus/rules/*.yml
+- /etc/prometheus/data-ha/rules.yml
+scrape_configs:
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - prometheus:9090
+- job_name: cadvisor
+  static_configs:
+  - targets:
+    - cadvisor:8080
+    labels:
+      env: monitoring
+- job_name: rds-mysql
+  static_configs:
+  - targets:
+    - 10.1.26.239:9104
+    labels:
+      env: prod
+      instance: mysql
+      app: mysql
+      target: rds-prod
+- job_name: blackbox-http
+  metrics_path: /probe
+  params:
+    module:
+    - http_2xx
+  static_configs:
+  - targets:
+    - https://doktori.kr/api/actuator/health
+    - https://doktori.kr/
+    labels:
+      env: prod
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - target_label: __address__
+    replacement: blackbox-exporter:9115
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - data-ha-alertmanager:9093

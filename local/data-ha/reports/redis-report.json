@@ -1,0 +1,67 @@
+{
+  "stage": "redis",
+  "time": "2026-11-17T02:29:57.245344+00:00",
+  "checks": {
+    "server_versions": [
+      "7.2.17"
+    ],
+    "nodes": [
+      {
+        "node": "redis-a",
+        "role": "master",
+        "link": null
+      },
+      {
+        "node": "redis-b",
+        "role": "slave",
+        "link": "up"
+      },
+      {
+        "node": "redis-c",
+        "role": "slave",
+        "link": "up"
+      }
+    ],
+    "sentinels": [
+      {
+        "node": "sentinel-a",
+        "master": [
+          "redis-a",
+          6379
+        ]
+      },
+      {
+        "node": "sentinel-b",
+        "master": [
+          "redis-a",
+          6379
+        ]
+      },
+      {
+        "node": "sentinel-c",
+        "master": [
+          "redis-a",
+          6379
+        ]
+      }
+    ],
+    "write_read": true,
+    "wait_replicas": 2,
+    "note": "TTL smoke key; no failover/durability claim"
+  },
+  "monitoring_targets": [
+    {
+      "target": "redis-exporter-a:9121",
+      "health": "up"
+    },
+    {
+      "target": "redis-exporter-b:9121",
+      "health": "up"
+    },
+    {
+      "target": "redis-exporter-c:9121",
+      "health": "up"
+    }
+  ],
+  "scope": "Docker Desktop only; no failover, AZ, cloud, backup restore or application E2E"
+}

@@ -1,0 +1,10 @@
+enable_data_ha_observability = true
+# Cumulative second stage. Preserve the reviewed Redis image.
+enable_redis_ha             = true
+enable_rabbitmq_ha          = true
+enable_mongodb_ha           = false
+allow_redis_initial_primary = false
+ha_ami_ids = {
+  redis    = "REPLACE_WITH_REVIEWED_REDIS_AMI_ID"
+  rabbitmq = "REPLACE_WITH_REVIEWED_RABBITMQ_4_3_AMI_ID"
+}

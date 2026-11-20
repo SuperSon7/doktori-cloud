@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+- access: proxy
+  isDefault: true
+  name: Local Prometheus
+  type: prometheus
+  uid: local-prom
+  url: http://prometheus:9090
+- name: Local Loki
+  type: loki
+  uid: local-loki
+  access: proxy
+  url: http://loki:3100
+  editable: false

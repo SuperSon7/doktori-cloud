@@ -1,0 +1,75 @@
+{
+  "stage": "rabbitmq",
+  "time": "2026-11-17T02:40:53.075288+00:00",
+  "checks": {
+    "server_versions": [
+      "4.3.7"
+    ],
+    "running_nodes": [
+      "rabbit@rabbitmq-a",
+      "rabbit@rabbitmq-b",
+      "rabbit@rabbitmq-c"
+    ],
+    "queues": [
+      {
+        "name": "notification.delivery.queue",
+        "type": "quorum",
+        "members": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ],
+        "online": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ]
+      },
+      {
+        "name": "notification.delivery.wait.v2",
+        "type": "quorum",
+        "members": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ],
+        "online": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ]
+      },
+      {
+        "name": "notification.delivery.dlq",
+        "type": "quorum",
+        "members": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ],
+        "online": [
+          "rabbit@rabbitmq-a",
+          "rabbit@rabbitmq-b",
+          "rabbit@rabbitmq-c"
+        ]
+      }
+    ],
+    "amqp_confirm_manual_ack": true,
+    "note": "Own empty smoke queue removed; no app queues/messages consumed"
+  },
+  "monitoring_targets": [
+    {
+      "target": "rabbitmq-b:15692",
+      "health": "up"
+    },
+    {
+      "target": "rabbitmq-c:15692",
+      "health": "up"
+    },
+    {
+      "target": "rabbitmq-a:15692",
+      "health": "up"
+    }
+  ],
+  "scope": "Docker Desktop only; no failover, AZ, cloud, backup restore or application E2E"
+}

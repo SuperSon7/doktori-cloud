@@ -52,10 +52,7 @@ install_mongodb() {
   apt-mark hold mongodb-org mongodb-org-database mongodb-org-server \
     mongodb-org-mongos mongodb-org-tools
 
-  # bindIp는 VPC 내부 앱 서브넷에서 접근할 수 있게 열고, Mongo 인증은 항상 활성화한다.
-  if grep -q 'bindIp: 127\.0\.0\.1' /etc/mongod.conf 2>/dev/null; then
-    sed -i 's/bindIp: 127\.0\.0\.1/bindIp: 0.0.0.0/' /etc/mongod.conf
-  fi
+  # Keep loopback bind in the image; EC2 bootstrap owns network/auth config.
   if grep -q '^security:' /etc/mongod.conf 2>/dev/null; then
     if grep -q '^[[:space:]]*authorization:' /etc/mongod.conf 2>/dev/null; then
       sed -i 's/^[[:space:]]*authorization:.*/  authorization: enabled/' /etc/mongod.conf

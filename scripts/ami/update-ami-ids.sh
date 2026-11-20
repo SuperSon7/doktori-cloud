@@ -3,6 +3,8 @@
 # AMI ID 업데이트 스크립트
 #
 # Packer 빌드 후 생성된 manifest-*.json을 읽어
+# HA 신규 입력은 이 스크립트 대신 scripts/data-ha/images.py export로
+# 명시적 ha_ami_ids 검토 파일을 만든다. 이 스크립트는 기존 default만 바꾼다.
 # terraform/environments/prod/{app,data,base}와 terraform/monitoring/base의
 # AMI ID 기본값을 업데이트함.
 #

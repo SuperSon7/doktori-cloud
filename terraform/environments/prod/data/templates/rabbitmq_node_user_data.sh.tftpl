@@ -2,7 +2,7 @@
 # RabbitMQ node bootstrap for a 3-node quorum-queue-ready cluster.
 set -euo pipefail
 
-log() { echo "[rabbitmq-ha] $*"; }
+log() { echo "[rabbitmq-ha] $*" >&2; }
 
 SSM_PREFIX="/${project_name}/${environment}"
 AWS_REGION="${aws_region}"
@@ -79,21 +79,23 @@ printf "%s" "$ERLANG_COOKIE" >/var/lib/rabbitmq/.erlang.cookie
 chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
 chmod 0400 /var/lib/rabbitmq/.erlang.cookie
 
+if [ "$CLUSTER_ENABLED" = "true" ]; then
+  # New RabbitMQ 4.3 images use discovery, never reset on every bootstrap.
+  CLUSTER_DOMAIN="$${PRIMARY_NODE_DNS#rabbitmq-a.}"
+  cat >/etc/rabbitmq/rabbitmq.conf <<EOF
+cluster_formation.peer_discovery_backend = classic_config
+cluster_formation.classic_config.nodes.1 = rabbit@rabbitmq-a.$CLUSTER_DOMAIN
+cluster_formation.classic_config.nodes.2 = rabbit@rabbitmq-b.$CLUSTER_DOMAIN
+cluster_formation.classic_config.nodes.3 = rabbit@rabbitmq-c.$CLUSTER_DOMAIN
+cluster_partition_handling = pause_minority
+prometheus.return_per_object_metrics = true
+default_queue_type = quorum
+quorum_queue.initial_cluster_size = 3
+EOF
+fi
 systemctl enable rabbitmq-server
 systemctl restart rabbitmq-server
-
-if [ "$CLUSTER_ENABLED" != "true" ]; then
-  rabbitmqctl await_startup
-elif [ "$NODE_NAME" = "rabbitmq-a" ]; then
-  rabbitmqctl await_startup
-else
-  wait_for_dns "$PRIMARY_NODE_DNS"
-  wait_for_rabbit "$PRIMARY_NODENAME"
-  rabbitmqctl stop_app
-  rabbitmqctl reset
-  rabbitmqctl join_cluster "$PRIMARY_NODENAME"
-  rabbitmqctl start_app
-fi
+rabbitmqctl await_startup
 
 rabbitmqctl add_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" 2>/dev/null || \
   rabbitmqctl change_password "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
@@ -101,25 +103,85 @@ rabbitmqctl set_permissions -p / "$RABBITMQ_USER" ".*" ".*" ".*"
 rabbitmqctl set_user_tags "$RABBITMQ_USER" management
 rabbitmq-plugins enable rabbitmq_prometheus
 
+%{ if enable_data_ha_observability ~}
+MONITOR_PASSWORD="$(get_param RABBITMQ_MONITOR_PASSWORD)"
+rabbitmqctl add_user doktori_ha_monitor "$MONITOR_PASSWORD" 2>/dev/null || rabbitmqctl change_password doktori_ha_monitor "$MONITOR_PASSWORD"
+rabbitmqctl set_user_tags doktori_ha_monitor monitoring
+rabbitmqctl set_permissions -p / doktori_ha_monitor "" "" ""
+install -m 0755 -d /opt/doktori
+install -m 0750 -o root -g alloy -d /etc/doktori
+printf '%s' '${quorum_exporter_b64}' | base64 --decode >/opt/doktori/quorum_exporter.py
+chmod 0644 /opt/doktori/quorum_exporter.py
+export MONITOR_PASSWORD
+python3 - <<'PY'
+import json, os
+from pathlib import Path
+Path('/etc/doktori/quorum-exporter.json').write_text(json.dumps({
+    'url':'http://127.0.0.1:15672','username':'doktori_ha_monitor',
+    'password':os.environ['MONITOR_PASSWORD'],'listen':'127.0.0.1','port':9419}))
+PY
+unset MONITOR_PASSWORD
+chown root:alloy /etc/doktori/quorum-exporter.json
+chmod 0640 /etc/doktori/quorum-exporter.json
+cat >/etc/systemd/system/doktori-quorum-exporter.service <<'UNIT'
+[Unit]
+Description=Read-only Doktori quorum status exporter
+After=network-online.target rabbitmq-server.service
+[Service]
+User=alloy
+Group=alloy
+ExecStart=/usr/bin/python3 /opt/doktori/quorum_exporter.py --config /etc/doktori/quorum-exporter.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now doktori-quorum-exporter
+%{ endif ~}
+
 install -m 0750 -o root -g alloy -d /etc/alloy
 cat >/etc/alloy/config.alloy <<EOF
 prometheus.exporter.unix "host" {
   set_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev"]
 }
 
+discovery.relabel "host_metrics_targets" {
+  targets = prometheus.exporter.unix.host.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-host"
+  }
+}
 prometheus.scrape "host_metrics" {
-  targets         = prometheus.exporter.unix.host.targets
+  job_name = "data-ha-host"
+  targets         = discovery.relabel.host_metrics_targets.output
   forward_to      = [prometheus.relabel.host_common.receiver]
   scrape_interval = "30s"
 }
 
 prometheus.scrape "rabbitmq_metrics" {
+  job_name = "rabbitmq"
   targets = [{
     __address__ = "127.0.0.1:15692",
   }]
   forward_to      = [prometheus.relabel.rabbitmq_common.receiver]
   scrape_interval = "15s"
 }
+
+%{ if enable_data_ha_observability ~}
+prometheus.scrape "quorum_metrics" {
+  job_name = "rabbitmq-quorum"
+  targets = [{ __address__ = "127.0.0.1:9419" }]
+  scrape_interval = "15s"
+  scrape_timeout = "10s"
+  forward_to = [prometheus.relabel.rabbitmq_common.receiver]
+}
+%{ endif ~}
 
 prometheus.relabel "host_common" {
   forward_to = [prometheus.remote_write.monitoring.receiver]
@@ -134,6 +196,14 @@ prometheus.relabel "host_common" {
   rule {
     replacement  = "$NODE_NAME"
     target_label = "instance"
+  }
+  rule {
+    replacement = "$NODE_NAME"
+    target_label = "node"
+  }
+  rule {
+    replacement = "${project_name}-${environment}-data"
+    target_label = "cluster"
   }
 }
 
@@ -155,17 +225,60 @@ prometheus.relabel "rabbitmq_common" {
     replacement  = "$NODE_NAME"
     target_label = "instance"
   }
+  rule {
+    replacement = "$NODE_NAME"
+    target_label = "node"
+  }
+  rule {
+    replacement = "${project_name}-${environment}-data"
+    target_label = "cluster"
+  }
 }
+
+%{ if enable_data_ha_observability ~}
+prometheus.exporter.self "agent" {}
+discovery.relabel "agent_targets" {
+  targets = prometheus.exporter.self.agent.targets
+  rule {
+    target_label = "job"
+    replacement = "data-ha-alloy"
+  }
+}
+prometheus.scrape "agent" {
+  job_name = "data-ha-alloy"
+  targets = discovery.relabel.agent_targets.output
+  scrape_interval = "15s"
+  forward_to = [prometheus.relabel.rabbitmq_common.receiver]
+}
+loki.source.journal "service_0" {
+  matches = "_SYSTEMD_UNIT=rabbitmq-server.service"
+  max_age = "1h"
+  labels = { env = "${environment}", cluster = "${project_name}-${environment}-data", service = "rabbitmq", node = "$NODE_NAME", job = "data-ha-logs" }
+  forward_to = [loki.write.monitoring.receiver]
+}
+loki.source.journal "service_1" {
+  matches = "_SYSTEMD_UNIT=doktori-quorum-exporter.service"
+  max_age = "1h"
+  labels = { env = "${environment}", cluster = "${project_name}-${environment}-data", service = "rabbitmq", node = "$NODE_NAME", job = "data-ha-logs" }
+  forward_to = [loki.write.monitoring.receiver]
+}
+loki.write "monitoring" {
+  endpoint { url = ${jsonencode(loki_push_url)} }
+}
+%{ endif ~}
 
 prometheus.remote_write "monitoring" {
   endpoint {
-    url = "http://monitoring.mgmt.doktori.internal:9090/api/v1/write"
+    url = ${jsonencode(remote_write_url)}
   }
 }
 EOF
 
 chown root:alloy /etc/alloy/config.alloy
 chmod 0640 /etc/alloy/config.alloy
+%{ if enable_data_ha_observability ~}
+usermod -aG adm,systemd-journal alloy
+%{ endif ~}
 systemctl enable alloy
 systemctl restart alloy
 

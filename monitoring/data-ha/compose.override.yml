@@ -1,0 +1,21 @@
+# Run with the existing monitoring/docker-compose.yml only after rendering inventory.
+services:
+  prometheus:
+    volumes:
+      - ./data-ha/generated/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data-ha/generated:/etc/prometheus/data-ha:ro
+  grafana:
+    volumes:
+      - ./data-ha/generated/dashboard.json:/var/lib/grafana/dashboards/Application/data-ha.json:ro
+  data-ha-alertmanager:
+    image: prom/alertmanager:v0.28.1
+    profiles: [data-ha]
+    restart: unless-stopped
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager]
+    ports: ["127.0.0.1:9093:9093"]
+    volumes:
+      - ./data-ha/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - data_ha_alertmanager:/alertmanager
+    networks: [monitoring]
+volumes:
+  data_ha_alertmanager: {}
