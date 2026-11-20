@@ -1,0 +1,21 @@
+{
+  "scope": "offline only; no AWS or cluster access",
+  "chart_version": "1.15.2",
+  "controller_digest": "sha256:4a7dc37f85ad8987ece1cf5df55e607aa17a879a6faa76f5258c5bf182fbdfff",
+  "helm_documents": 18,
+  "checks": [
+    "upstream file hashes",
+    "OCI chart version",
+    "image digest",
+    "unique environment names",
+    "separate STS projection",
+    "fixed system node selector",
+    "NodePool/NodeClass structural schemas",
+    "rendered userData bash syntax"
+  ],
+  "limitations": [
+    "no Kubernetes CEL/admission validation",
+    "no AWS IAM simulator",
+    "no live join or issuer verification"
+  ]
+}

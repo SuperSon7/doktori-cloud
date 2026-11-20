@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh the worker join bundle with overlapping 60-minute tokens
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=30
+Unit=doktori-karpenter-publish.service
+
+[Install]
+WantedBy=timers.target

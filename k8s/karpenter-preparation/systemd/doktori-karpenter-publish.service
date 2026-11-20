@@ -1,0 +1,19 @@
+[Unit]
+Description=Publish short-lived kubeadm worker credentials to one SSM parameter
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/kubernetes/admin.conf
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/lib/doktori-karpenter/join_runtime.py publish --config /etc/doktori-karpenter/publisher.json --execute
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run
+
+# Install on ONE designated fixed control-plane host; no kubeconfig on workers.

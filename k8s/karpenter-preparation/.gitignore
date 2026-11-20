@@ -1,0 +1,6 @@
+.generated/
+__pycache__/
+.verification/
+!inputs.example.json
+!upstream/release-lock.json
+!verification.json

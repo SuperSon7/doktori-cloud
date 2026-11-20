@@ -1,0 +1,10 @@
+// Merge into ONE designated collector, not the existing per-node Alloy DaemonSet.
+// The destination receiver and network access must be supplied by that collector.
+prometheus.scrape "karpenter" {
+  targets = [{"__address__" = "karpenter.karpenter.svc.cluster.local:8080"}]
+  scrape_interval = "30s"
+  job_name = "karpenter"
+  forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+// This initial singleton target covers the Service-selected controller only.
+// For both replicas, use Pod discovery with a single owner/sharding and retain pod labels.

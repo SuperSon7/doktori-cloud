@@ -1,0 +1,20 @@
+{
+  "version": "1.15.2",
+  "origin": "public.ecr.aws/karpenter",
+  "files": {
+    "cloudformation-v1.15.2.yaml": "8ee49d6de4f2397797aea5c961706c90491a291b6a961268000cb2daadbd958f",
+    "karpenter-1.15.2.tgz": "ba0b5e555e79abb2254e89ecea9aad318b7f2061644413003f2af045ae29dbd0"
+  },
+  "karpenter_digest": "sha256:fe0155bd92b9c491afce246e7ec600d56e03fe8c04a2bd92becaf4c960b72c90",
+  "controller_digest": "sha256:4a7dc37f85ad8987ece1cf5df55e607aa17a879a6faa76f5258c5bf182fbdfff",
+  "controller_platforms": [
+    {
+      "architecture": "amd64",
+      "os": "linux"
+    },
+    {
+      "architecture": "arm64",
+      "os": "linux"
+    }
+  ]
+}

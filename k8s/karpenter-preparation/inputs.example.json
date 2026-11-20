@@ -1,0 +1,19 @@
+{
+  "account_id": "000000000000",
+  "region": "ap-northeast-2",
+  "cluster_name": "doktori-karpenter-lab",
+  "issuer": "https://oidc.example.invalid/doktori-lab",
+  "cluster_endpoint": "https://api.example.invalid:6443",
+  "cluster_ca_base64": "REPLACE_WITH_PUBLIC_CLUSTER_CA_BASE64",
+  "ca_spki_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "kms_key_arn": "arn:aws:kms:ap-northeast-2:000000000000:key/00000000-0000-0000-0000-000000000000",
+  "controller_role_name": "doktori-karpenter-lab-karpenter-controller",
+  "node_instance_profile": "doktori-karpenter-lab-karpenter-node",
+  "ami_id": "ami-00000000000000000",
+  "subnet_ids": ["subnet-00000000000000001", "subnet-00000000000000002"],
+  "security_group_ids": ["sg-00000000000000000"],
+  "join_config_parameter": "/doktori/lab/karpenter/join-config",
+  "max_pods": 30,
+  "chart_reference": "1.15.2",
+  "deployment_approved": false
+}

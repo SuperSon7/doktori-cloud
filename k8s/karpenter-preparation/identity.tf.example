@@ -1,0 +1,18 @@
+# Global-layer integration example only. NOT wired into any Terraform root.
+# Publish discovery/JWKS first; reuse an existing provider if this issuer already exists.
+variable "issuer_url" { type = string }
+variable "tls_ca_thumbprints" { type = list(string) }
+locals {
+  issuer_hostpath = trimprefix(var.issuer_url, "https://")
+}
+resource "aws_iam_openid_connect_provider" "cluster" {
+  url             = var.issuer_url
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = var.tls_ca_thumbprints
+}
+output "karpenter_oidc_provider_arn" {
+  value = aws_iam_openid_connect_provider.cluster.arn
+}
+# The app layer consumes this global output through terraform_remote_state.
+# Controller/node/publisher roles live in terraform/modules/karpenter-identity.
+# Do not create another controller role from the older trust-only sketch.
