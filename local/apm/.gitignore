@@ -1,0 +1,7 @@
+.runtime/
+!reports/
+!reports/*.json
+__pycache__/
+!agent.lock.json
+!images.lock.json
+!reports/*.png

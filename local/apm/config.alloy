@@ -1,0 +1,24 @@
+otelcol.receiver.otlp "api" {
+  http { endpoint = "0.0.0.0:4318" }
+  output { traces = [otelcol.processor.batch.api.input] }
+}
+otelcol.processor.batch "api" {
+  timeout = "1s"
+  output { traces = [otelcol.exporter.otlp.tempo.input] }
+}
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls { insecure = true }
+  }
+}
+local.file_match "api" {
+  path_targets = [{__path__ = "/logs/api.log", service_name = "doktori-api-pilot", env = "local"}]
+}
+loki.source.file "api" {
+  targets = local.file_match.api.targets
+  forward_to = [loki.write.local.receiver]
+}
+loki.write "local" {
+  endpoint { url = "http://loki:3100/loki/api/v1/push" }
+}

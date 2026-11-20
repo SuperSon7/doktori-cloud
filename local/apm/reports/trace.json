@@ -1,0 +1,865 @@
+{
+  "batches": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "4c3bb6b344701ec9665fa46320f7dbeaf593b6c69d965a03ab2dcc33494c9108"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "local"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "4c3bb6b34470"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 5.15.146.1-microsoft-standard-WSL2"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:/agent/otel.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app/apm-pilot.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "00d01448-99b5-47ca-bacd-af365d257b89"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "doktori-api-pilot"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "doktori"
+            }
+          },
+          {
+            "key": "telemetry.distro.name",
+            "value": {
+              "stringValue": "opentelemetry-java-instrumentation"
+            }
+          },
+          {
+            "key": "telemetry.distro.version",
+            "value": {
+              "stringValue": "2.23.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.57.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.spring-data-1.8",
+            "version": "2.23.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "V/nGYG+TZLN+9/q35hA3Ag==",
+              "spanId": "0MOFL40T0FA=",
+              "parentSpanId": "wpbaHLDWAU0=",
+              "flags": 257,
+              "name": "ReadingGenreRepository.findAllByDeletedAtIsNullOrderByPriorityAsc",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1794933177410365295",
+              "endTimeUnixNano": "1794933177413519870",
+              "attributes": [
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "33"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                },
+                {
+                  "key": "code.namespace",
+                  "value": {
+                    "stringValue": "com.example.doktoribackend.reading.repository.ReadingGenreRepository"
+                  }
+                },
+                {
+                  "key": "code.function",
+                  "value": {
+                    "stringValue": "findAllByDeletedAtIsNullOrderByPriorityAsc"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "4c3bb6b344701ec9665fa46320f7dbeaf593b6c69d965a03ab2dcc33494c9108"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "local"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "4c3bb6b34470"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 5.15.146.1-microsoft-standard-WSL2"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:/agent/otel.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app/apm-pilot.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "00d01448-99b5-47ca-bacd-af365d257b89"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "doktori-api-pilot"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "doktori"
+            }
+          },
+          {
+            "key": "telemetry.distro.name",
+            "value": {
+              "stringValue": "opentelemetry-java-instrumentation"
+            }
+          },
+          {
+            "key": "telemetry.distro.version",
+            "value": {
+              "stringValue": "2.23.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.57.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.hibernate-6.0",
+            "version": "2.23.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "V/nGYG+TZLN+9/q35hA3Ag==",
+              "spanId": "y2QkEEDq9xo=",
+              "parentSpanId": "0MOFL40T0FA=",
+              "flags": 257,
+              "name": "SELECT com.example.doktoribackend.reading.domain.ReadingGenre",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1794933177410987917",
+              "endTimeUnixNano": "1794933177413349490",
+              "attributes": [
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "33"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "V/nGYG+TZLN+9/q35hA3Ag==",
+              "spanId": "XxMCjaTR18E=",
+              "parentSpanId": "wpbaHLDWAU0=",
+              "flags": 257,
+              "name": "Transaction.commit",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1794933177413564611",
+              "endTimeUnixNano": "1794933177413930832",
+              "attributes": [
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "33"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "4c3bb6b344701ec9665fa46320f7dbeaf593b6c69d965a03ab2dcc33494c9108"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "local"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "4c3bb6b34470"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 5.15.146.1-microsoft-standard-WSL2"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:/agent/otel.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app/apm-pilot.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "00d01448-99b5-47ca-bacd-af365d257b89"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "doktori-api-pilot"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "doktori"
+            }
+          },
+          {
+            "key": "telemetry.distro.name",
+            "value": {
+              "stringValue": "opentelemetry-java-instrumentation"
+            }
+          },
+          {
+            "key": "telemetry.distro.version",
+            "value": {
+              "stringValue": "2.23.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.57.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.tomcat-10.0",
+            "version": "2.23.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "V/nGYG+TZLN+9/q35hA3Ag==",
+              "spanId": "wpbaHLDWAU0=",
+              "parentSpanId": "KhMD71YUTOs=",
+              "flags": 769,
+              "name": "GET /api/policies/reading-genres",
+              "kind": "SPAN_KIND_SERVER",
+              "startTimeUnixNano": "1794933177408569090",
+              "endTimeUnixNano": "1794933177415194105",
+              "attributes": [
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "33"
+                  }
+                },
+                {
+                  "key": "http.response.status_code",
+                  "value": {
+                    "intValue": "200"
+                  }
+                },
+                {
+                  "key": "url.path",
+                  "value": {
+                    "stringValue": "/api/policies/reading-genres"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "127.0.0.1"
+                  }
+                },
+                {
+                  "key": "client.address",
+                  "value": {
+                    "stringValue": "172.28.0.8"
+                  }
+                },
+                {
+                  "key": "network.peer.address",
+                  "value": {
+                    "stringValue": "172.28.0.8"
+                  }
+                },
+                {
+                  "key": "http.route",
+                  "value": {
+                    "stringValue": "/api/policies/reading-genres"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "GET"
+                  }
+                },
+                {
+                  "key": "network.peer.port",
+                  "value": {
+                    "intValue": "54644"
+                  }
+                },
+                {
+                  "key": "url.scheme",
+                  "value": {
+                    "stringValue": "http"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                },
+                {
+                  "key": "user_agent.original",
+                  "value": {
+                    "stringValue": "Python-urllib/3.11"
+                  }
+                },
+                {
+                  "key": "network.protocol.version",
+                  "value": {
+                    "stringValue": "1.0"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "4c3bb6b344701ec9665fa46320f7dbeaf593b6c69d965a03ab2dcc33494c9108"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "local"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "4c3bb6b34470"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 5.15.146.1-microsoft-standard-WSL2"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:/agent/otel.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app/apm-pilot.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "21.0.5+11-LTS"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "00d01448-99b5-47ca-bacd-af365d257b89"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "doktori-api-pilot"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "doktori"
+            }
+          },
+          {
+            "key": "telemetry.distro.name",
+            "value": {
+              "stringValue": "opentelemetry-java-instrumentation"
+            }
+          },
+          {
+            "key": "telemetry.distro.version",
+            "value": {
+              "stringValue": "2.23.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.57.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.jdbc",
+            "version": "2.23.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "V/nGYG+TZLN+9/q35hA3Ag==",
+              "spanId": "HfaaggTUciE=",
+              "parentSpanId": "y2QkEEDq9xo=",
+              "flags": 257,
+              "name": "SELECT apmpilot.reading_genres",
+              "kind": "SPAN_KIND_CLIENT",
+              "startTimeUnixNano": "1794933177412110248",
+              "endTimeUnixNano": "1794933177412690995",
+              "attributes": [
+                {
+                  "key": "db.sql.table",
+                  "value": {
+                    "stringValue": "reading_genres"
+                  }
+                },
+                {
+                  "key": "server.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "SELECT"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "apmpilot"
+                  }
+                },
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "33"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "pilot"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mysql://mysql:3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "select rg1_0.id,rg1_0.code,rg1_0.created_at,rg1_0.deleted_at,rg1_0.name,rg1_0.priority,rg1_0.updated_at from reading_genres rg1_0 where rg1_0.deleted_at is null order by rg1_0.priority"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

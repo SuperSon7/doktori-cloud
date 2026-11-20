@@ -1,0 +1,35 @@
+{
+  "verified_at": "2026-11-17T16:32:59.535868+00:00",
+  "trace_id": "57f9c6606f9364b37ef7fab7e6103702",
+  "request": "GET /api/policies/reading-genres",
+  "response": {
+    "message": "OK",
+    "data": [
+      {
+        "id": 1,
+        "code": "APM_FIRST",
+        "name": "APM fixture first"
+      },
+      {
+        "id": 2,
+        "code": "APM_SECOND",
+        "name": "APM fixture second"
+      }
+    ]
+  },
+  "http_server_spans": 1,
+  "mysql_spans": 1,
+  "span_names": [
+    "ReadingGenreRepository.findAllByDeletedAtIsNullOrderByPriorityAsc",
+    "SELECT com.example.doktoribackend.reading.domain.ReadingGenre",
+    "Transaction.commit",
+    "GET /api/policies/reading-genres",
+    "SELECT apmpilot.reading_genres"
+  ],
+  "db_descendant_of_http": true,
+  "w3c_parent_preserved": true,
+  "log_correlation": true,
+  "grafana_trace_and_log_queries_passed": true,
+  "scope": "real source slice; isolated MySQL fixture; not full API runtime",
+  "cloud_deployed": false
+}

@@ -1,0 +1,25 @@
+apiVersion: 1
+datasources:
+  - name: APM Tempo
+    uid: apm-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: apm-loki
+        spanStartTimeShift: '-1m'
+        spanEndTimeShift: '1m'
+        filterByTraceID: true
+        tags: [{key: service.name, value: service_name}]
+  - name: APM Loki
+    uid: apm-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: 'trace_id=([0-9a-f]{32})'
+          datasourceUid: apm-tempo
+          url: '$${__value.raw}'
